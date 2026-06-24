@@ -101,6 +101,8 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/rollback", appAPIHandler.Rollback)
 			r.Get("/{id}/deployments", appAPIHandler.ListDeployments)
 			r.Get("/{id}/logs", appAPIHandler.Logs)
+			r.Get("/{id}/webhook-secret", appAPIHandler.GetWebhookSecret)
+			r.Post("/{id}/webhook-secret/roll", appAPIHandler.RollWebhookSecret)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)

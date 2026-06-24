@@ -1,6 +1,9 @@
 package webhook
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log"
@@ -10,6 +13,7 @@ import (
 
 type WebhookService interface {
 	DeployByGit(repo, branch, commitSHA string)
+	GetWebhookSecret(repo, branch string) string
 }
 
 type Handler struct {
@@ -24,7 +28,6 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 	event := r.Header.Get("X-GitHub-Event")
 	if event != "push" {
 		log.Printf("Webhook: ignoring GitHub event %q", event)
-		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ignored"))
 		return
 	}
@@ -36,9 +39,9 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload struct {
-		Ref  string `json:"ref"`
+		Ref   string `json:"ref"`
 		After string `json:"after"`
-		Repo struct {
+		Repo  struct {
 			CloneURL string `json:"clone_url"`
 		} `json:"repository"`
 	}
@@ -51,10 +54,18 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Repo.CloneURL
 	commitSHA := payload.After
 
+	secret := h.service.GetWebhookSecret(repo, branch)
+	if secret != "" {
+		sig := r.Header.Get("X-Hub-Signature-256")
+		if !verifyHMACSHA256(sig, body, secret) {
+			log.Printf("Webhook: invalid signature for %s@%s", repo, branch)
+			http.Error(w, "invalid signature", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	log.Printf("GitHub webhook: repo=%s branch=%s commit=%s", repo, branch, commitSHA)
 	go h.service.DeployByGit(repo, branch, commitSHA)
-
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
 }
 
@@ -62,7 +73,6 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 	event := r.Header.Get("X-Gitlab-Event")
 	if event != "Push Hook" {
 		log.Printf("Webhook: ignoring GitLab event %q", event)
-		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ignored"))
 		return
 	}
@@ -74,7 +84,7 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload struct {
-		Ref  string `json:"ref"`
+		Ref   string `json:"ref"`
 		After string `json:"after"`
 		Project struct {
 			GitHTTPURL string `json:"git_http_url"`
@@ -89,9 +99,31 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Project.GitHTTPURL
 	commitSHA := payload.After
 
+	secret := h.service.GetWebhookSecret(repo, branch)
+	if secret != "" {
+		token := r.Header.Get("X-Gitlab-Token")
+		if token != secret {
+			log.Printf("Webhook: invalid token for %s@%s", repo, branch)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	log.Printf("GitLab webhook: repo=%s branch=%s commit=%s", repo, branch, commitSHA)
 	go h.service.DeployByGit(repo, branch, commitSHA)
-
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func verifyHMACSHA256(sig string, body []byte, secret string) bool {
+	if !strings.HasPrefix(sig, "sha256=") {
+		return false
+	}
+	sigBytes, err := hex.DecodeString(sig[7:])
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expected := mac.Sum(nil)
+	return hmac.Equal(sigBytes, expected)
 }

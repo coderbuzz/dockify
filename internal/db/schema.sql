@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS apps (
     git_branch  TEXT DEFAULT 'main',
     auth_user   TEXT DEFAULT '',
     auth_pass   TEXT DEFAULT '',
+    webhook_secret TEXT DEFAULT '',
     status      TEXT DEFAULT 'created',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -16,7 +16,7 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
 		FROM apps ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -30,7 +30,7 @@ func (r *Repository) List() ([]App, error) {
 		var gitRepo, gitBranch sql.NullString
 		if err := rows.Scan(
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.CreatedAt, &a.UpdatedAt,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -46,11 +46,11 @@ func (r *Repository) Get(id int64) (*App, error) {
 	var gitRepo, gitBranch sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
 		FROM apps WHERE id = ?
 	`, id).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.CreatedAt, &a.UpdatedAt,
+		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -68,11 +68,11 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 	var gitRepo, gitBranch sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
 		FROM apps WHERE git_repo = ? AND git_branch = ?
 	`, repo, branch).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.CreatedAt, &a.UpdatedAt,
+		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -88,7 +88,7 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
 		FROM apps WHERE server_id = ? ORDER BY created_at DESC
 	`, serverID)
 	if err != nil {
@@ -102,7 +102,7 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 		var gitRepo, gitBranch sql.NullString
 		if err := rows.Scan(
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.CreatedAt, &a.UpdatedAt,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -115,9 +115,9 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 
 func (r *Repository) Create(a *App) error {
 	result, err := r.db.Exec(`
-		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created")
+		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, webhook_secret, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.WebhookSecret, "created")
 	if err != nil {
 		return fmt.Errorf("insert app: %w", err)
 	}
@@ -130,10 +130,10 @@ func (r *Repository) Update(a *App) error {
 	_, err := r.db.Exec(`
 		UPDATE apps SET
 			name=?, server_id=?, domain=?, port=?, compose=?,
-			git_repo=?, git_branch=?, auth_user=?, auth_pass=?, status=?, updated_at=CURRENT_TIMESTAMP
+			git_repo=?, git_branch=?, auth_user=?, auth_pass=?, webhook_secret=?, status=?, updated_at=CURRENT_TIMESTAMP
 		WHERE id=?
 	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose,
-		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.Status, a.ID)
+		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.WebhookSecret, a.Status, a.ID)
 	return err
 }
 
@@ -141,6 +141,11 @@ func (r *Repository) UpdateStatus(id int64, status string) error {
 	_, err := r.db.Exec(`
 		UPDATE apps SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
 	`, status, id)
+	return err
+}
+
+func (r *Repository) UpdateWebhookSecret(id int64, secret string) error {
+	_, err := r.db.Exec(`UPDATE apps SET webhook_secret=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, secret, id)
 	return err
 }
 
