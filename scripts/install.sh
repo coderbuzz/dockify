@@ -5,77 +5,57 @@ REPO="https://github.com/coderbuzz/dockify"
 RAW="https://raw.githubusercontent.com/coderbuzz/dockify/main"
 INSTALL_DIR="${INSTALL_DIR:-/opt/dockify}"
 
-# Read from /dev/tty for curl | bash compatibility
-TTY=""
-if [ -e /dev/tty ]; then
-  TTY="/dev/tty"
-fi
-
-read_input() {
-  local prompt="$1"
-  local var="$2"
-  local default="$3"
-  local hidden="$4"
-
-  if [ -n "$prompt" ]; then
-    if [ "$hidden" = "1" ]; then
-      read -s -p "$prompt" val < "${TTY:-/dev/stdin}"
-      echo ""
-    else
-      read -p "$prompt" val < "${TTY:-/dev/stdin}"
-    fi
-  else
-    read val < "${TTY:-/dev/stdin}"
-  fi
-
-  if [ -z "$val" ] && [ -n "$default" ]; then
-    val="$default"
-  fi
-
-  printf -v "$var" "%s" "$val"
-}
-
 echo "=== Dockify Installer ==="
 echo ""
 
 OS=$(uname -s)
 ARCH=$(uname -m)
-if [ "$OS" != "Linux" ]; then
-    echo "Error: Dockify only supports Linux. Detected: $OS"
+if [ "$OS" != "Linux" ]; then echo "Error: Linux only. Detected: $OS"; exit 1; fi
+if [ "$ARCH" != "x86_64" ]; then echo "Error: x86_64 only. Detected: $ARCH"; exit 1; fi
+
+# Try to detect interactive terminal
+TTY=""
+[ -c /dev/tty ] && TTY="/dev/tty"
+
+prompt() {
+  local var="$1" msg="$2" default="$3" required="$4"
+  local val="${!var}"
+  if [ -z "$val" ] && [ -n "$TTY" ]; then
+    read -p "$msg" val < "$TTY" || true
+  fi
+  [ -z "$val" ] && val="$default"
+  if [ -z "$val" ] && [ -n "$required" ]; then
+    echo "Error: $msg is required"
     exit 1
-fi
-if [ "$ARCH" != "x86_64" ]; then
-    echo "Error: Dockify only supports x86_64. Detected: $ARCH"
-    exit 1
-fi
+  fi
+  printf -v "$var" "%s" "$val"
+}
 
-# --- Collect config ---
-read_input "Domain for Dockify (e.g., dockify.amg.id): " DOMAIN
-while [ -z "$DOMAIN" ]; do
-  echo "Error: domain is required"
-  read_input "Domain for Dockify (e.g., dockify.amg.id): " DOMAIN
-done
+prompt_secret() {
+  local var="$1" msg="$2"
+  local val="${!var}"
+  if [ -z "$val" ] && [ -n "$TTY" ]; then
+    read -s -p "$msg" val < "$TTY" || true
+    echo ""
+  fi
+  printf -v "$var" "%s" "$val"
+}
 
-echo ""
-echo "Cloudflare API credentials are optional. They enable automatic DNS A record"
-echo "creation when you deploy apps to worker VMs."
-echo ""
-read_input "Cloudflare API Token (optional, press Enter to skip): " CF_TOKEN
-read_input "Cloudflare Zone ID (optional): " CF_ZONE
+# You can pre-set env vars for non-interactive install:
+#   DOMAIN=dockify.amg.id ADMIN_PASS=secret curl ... | bash
+prompt DOMAIN "Domain for Dockify (e.g., dockify.amg.id): " "" required
 
 echo ""
-echo "Admin credentials for web UI login. If no password is set, the web UI will"
-echo "have no authentication (open to anyone)."
-echo ""
-read_input "Admin username [admin]: " ADMIN_USER admin
-ADMIN_USER="${ADMIN_USER:-admin}"
-read_input "Admin password (optional, press Enter to skip): " ADMIN_PASS "" 1
+echo "Cloudflare credentials (optional — enable auto DNS A records on deploy)"
+prompt CF_TOKEN "Cloudflare API Token (optional, Enter to skip): "
+prompt CF_ZONE  "Cloudflare Zone ID (optional): "
 
 echo ""
-echo "DOCKIFY_BASE_PATH is only needed when accessing Dockify through a URL prefix"
-echo "(e.g., behind code-server proxy: /proxy/9898). Leave empty for normal access."
-echo ""
-read_input "Base path (optional, press Enter to skip): " BASE_PATH
+echo "Admin credentials (optional — empty password = no authentication)"
+prompt ADMIN_USER "Admin username [admin]: " admin
+prompt_secret ADMIN_PASS "Admin password (optional, Enter to skip): "
+
+prompt BASE_PATH "Base path for reverse proxy (optional, Enter to skip): "
 
 echo ""
 echo "Downloading files..."
