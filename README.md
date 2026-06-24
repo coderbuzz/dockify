@@ -39,10 +39,10 @@ Worker VM
 Recommended OS: **Debian 12** (minimal, no GUI). All specs are **total VM size** (OS + Dockify).
 
 | Mode | Min vCPU | Min RAM | Min Disk | RAM used | HTTPS | Docker? |
-|---|---|---|---|---|---|---|
-| **1: Docker Compose** | 1 | 1 GB | 10 GB | ~100 MB | Auto (Caddy container) | ✅ |
-| **2: Binary only** | 1 | 1 GB | 10 GB | ~30 MB | Manual | ❌ |
-| **3: Binary + Caddy** | 1 | 1 GB | 10 GB | ~40 MB | Auto (native Caddy) | ❌ |
+|---|---|---|---|---|---|---|---|
+| **1: Docker Compose** | 1 | **1 GB** | 10 GB | ~100 MB | Auto (Caddy container) | ✅ |
+| **2: Binary only** | 1 | **512 MB** | 10 GB | ~30 MB | Manual | ❌ |
+| **3: Binary + Caddy** | 1 | **512 MB** | 10 GB | ~40 MB | Auto (native Caddy) | ❌ |
 
 **Option A: Binary + native Caddy (lightweight + auto HTTPS) — recommended**
 
