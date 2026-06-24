@@ -39,11 +39,9 @@
   </div>
 
   <div class="btn-group">
-    {{if eq .Server.Status "pending" "offline" "error"}}
     <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
       <button type="submit" class="btn btn-primary">Initialize Worker</button>
     </form>
-    {{end}}
     <form method="POST" action="servers/{{.Server.ID}}/delete" style="display:inline"
           onsubmit="return confirm('Remove {{.Server.Name}}? This cannot be undone.')">
       <button type="submit" class="btn btn-ghost btn-red">Remove Server</button>
