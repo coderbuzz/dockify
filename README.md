@@ -32,14 +32,44 @@ Worker VM
 
 ## Quick Start
 
-```bash
-# Install Dockify on controller VM
-curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+### Option 1: Docker Compose (recommended)
 
-# Or build from source
+```bash
+git clone https://github.com/coderbuzz/dockify.git
+cd dockify
+cp .env.example .env
+# Edit .env → set DOMAIN=your-domain.com
+# Uncomment CLOUDFLARE_API_TOKEN + CLOUDFLARE_ZONE_ID for DNS automation
+docker compose up -d
+# Open https://your-domain.com (auto HTTPS via Caddy)
+```
+
+### Option 2: Docker
+
+```bash
+docker run -d \
+  --name dockify \
+  -p 8080:8080 \
+  -v dockify_data:/var/lib/dockify \
+  -v ~/.ssh:/home/dockify/.ssh:ro \
+  -e CLOUDFLARE_API_TOKEN=xxx \
+  -e CLOUDFLARE_ZONE_ID=xxx \
+  ghcr.io/coderbuzz/dockify:latest
+```
+
+### Option 3: Install script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+```
+
+### Option 4: Build from source
+
+```bash
+git clone https://github.com/coderbuzz/dockify.git
+cd dockify
 go build -o dockify ./cmd/dockify
 ./dockify serve
-# Open http://localhost:8080
 ```
 
 ## Project Structure
