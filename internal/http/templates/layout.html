@@ -1,6 +1,7 @@
 {{define "head"}}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="{{.BasePath}}">
 <title>{{.Title}} - Dockify</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -25,12 +26,12 @@
 <header class="container">
   <nav>
     <ul>
-      <li><strong><a href="/" style="text-decoration:none">Dockify</a></strong></li>
+      <li><strong><a href="." style="text-decoration:none">Dockify</a></strong></li>
     </ul>
     <ul>
-      <li><a href="/" role="button" class="outline contrast" style="font-size:0.85em">Dashboard</a></li>
-      <li><a href="/servers" role="button" class="outline contrast" style="font-size:0.85em">Servers</a></li>
-      <li><a href="/apps" role="button" class="outline contrast" style="font-size:0.85em">Apps</a></li>
+      <li><a href="." role="button" class="outline contrast" style="font-size:0.85em">Dashboard</a></li>
+      <li><a href="servers" role="button" class="outline contrast" style="font-size:0.85em">Servers</a></li>
+      <li><a href="apps" role="button" class="outline contrast" style="font-size:0.85em">Apps</a></li>
     </ul>
   </nav>
 </header>

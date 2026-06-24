@@ -6,7 +6,7 @@
 <main class="container">
   <nav aria-label="breadcrumb">
     <ul>
-      <li><a href="/servers">Servers</a></li>
+      <li><a href="servers">Servers</a></li>
       <li>{{.Server.Name}}</li>
     </ul>
   </nav>
@@ -41,11 +41,11 @@
 
   <div role="group">
     {{if eq .Server.Status "pending" "offline" "error"}}
-    <form method="POST" action="/servers/{{.Server.ID}}/init" style="display:inline">
+    <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
       <button type="submit">Initialize Worker</button>
     </form>
     {{end}}
-    <form method="POST" action="/servers/{{.Server.ID}}/delete" style="display:inline"
+    <form method="POST" action="servers/{{.Server.ID}}/delete" style="display:inline"
           onsubmit="return confirm('Remove {{.Server.Name}}? This cannot be undone.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove Server</button>
     </form>

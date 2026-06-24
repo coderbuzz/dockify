@@ -46,12 +46,12 @@
     <tbody>
       {{range .Servers}}
       <tr>
-        <td><a href="/servers/{{.ID}}">{{.Name}}</a></td>
+        <td><a href="servers/{{.ID}}">{{.Name}}</a></td>
         <td>{{.Host}}:{{.Port}}</td>
         <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
         <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
         <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
-        <td><a href="/servers/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a></td>
+        <td><a href="servers/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a></td>
       </tr>
       {{end}}
     </tbody>
@@ -59,7 +59,7 @@
   {{else}}
   <article>
     <p>No servers registered yet.</p>
-    <a href="/servers/add" role="button">Add Your First Server</a>
+    <a href="servers/add" role="button">Add Your First Server</a>
   </article>
   {{end}}
 
@@ -78,11 +78,11 @@
     <tbody>
       {{range .Apps}}
       <tr>
-        <td><a href="/apps/{{.ID}}">{{.Name}}</a></td>
+        <td><a href="apps/{{.ID}}">{{.Name}}</a></td>
         <td>{{.Domain}}</td>
         <td>{{.Port}}</td>
         <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
-        <td><a href="/apps/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a></td>
+        <td><a href="apps/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a></td>
       </tr>
       {{end}}
     </tbody>
@@ -90,7 +90,7 @@
   {{else}}
   <article>
     <p>No apps deployed yet.</p>
-    <a href="/apps/add" role="button">Deploy Your First App</a>
+    <a href="apps/add" role="button">Deploy Your First App</a>
   </article>
   {{end}}
 </main>

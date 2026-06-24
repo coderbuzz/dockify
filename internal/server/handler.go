@@ -124,7 +124,7 @@ func NewWebHandler(service *Service) *WebHandler {
 func (h *WebHandler) ServerListPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
 	servers, err := h.service.List()
 	if err != nil {
-		render(w, r, http.StatusInternalServerError, "error.html", map[string]string{"Message": err.Error()})
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": err.Error()})
 		return
 	}
 
@@ -195,11 +195,11 @@ func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, re
 
 	server, err := h.service.Get(id)
 	if err != nil {
-		render(w, r, http.StatusInternalServerError, "error.html", map[string]string{"Message": err.Error()})
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": err.Error()})
 		return
 	}
 	if server == nil {
-		render(w, r, http.StatusNotFound, "error.html", map[string]string{"Message": "server not found"})
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "server not found"})
 		return
 	}
 

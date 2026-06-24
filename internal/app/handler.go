@@ -298,11 +298,11 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 
 	app, err := h.service.Get(id)
 	if err != nil {
-		render(w, r, http.StatusInternalServerError, "error.html", map[string]string{"Message": err.Error()})
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": err.Error()})
 		return
 	}
 	if app == nil {
-		render(w, r, http.StatusNotFound, "error.html", map[string]string{"Message": "app not found"})
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
 		return
 	}
 

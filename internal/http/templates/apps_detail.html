@@ -6,7 +6,7 @@
 <main class="container">
   <nav aria-label="breadcrumb">
     <ul>
-      <li><a href="/apps">Apps</a></li>
+      <li><a href="apps">Apps</a></li>
       <li>{{.App.Name}}</li>
     </ul>
   </nav>
@@ -37,20 +37,20 @@
   </div>
 
   <div role="group">
-    <form method="POST" action="/apps/{{.App.ID}}/redeploy" style="display:inline">
+    <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
       <button type="submit">Redeploy</button>
     </form>
-    <form method="POST" action="/apps/{{.App.ID}}/rollback" style="display:inline"
+    <form method="POST" action="apps/{{.App.ID}}/rollback" style="display:inline"
           onsubmit="return confirm('Rollback to the last successful deployment? Current compose will be replaced.')">
       <button type="submit" class="outline contrast secondary-outline">Rollback</button>
     </form>
     {{if eq .App.Status "running"}}
-    <form method="POST" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+    <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
           onsubmit="return confirm('Undeploy {{.App.Name}}? This will stop and remove the app.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Undeploy</button>
     </form>
     {{else}}
-    <form method="POST" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+    <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
           onsubmit="return confirm('Remove {{.App.Name}}? This cannot be undone.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove</button>
     </form>
@@ -85,9 +85,9 @@
   <h2>Logs</h2>
   <div id="logs-area">
     <div role="group" style="margin-bottom:0.5em">
-      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=50" hx-target="#logs-content" hx-swap="innerHTML">Tail 50</button>
-      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=200" hx-target="#logs-content" hx-swap="innerHTML">Tail 200</button>
-      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=500" hx-target="#logs-content" hx-swap="innerHTML">Tail 500</button>
+      <button hx-get="api/apps/{{.App.ID}}/logs?tail=50" hx-target="#logs-content" hx-swap="innerHTML">Tail 50</button>
+      <button hx-get="api/apps/{{.App.ID}}/logs?tail=200" hx-target="#logs-content" hx-swap="innerHTML">Tail 200</button>
+      <button hx-get="api/apps/{{.App.ID}}/logs?tail=500" hx-target="#logs-content" hx-swap="innerHTML">Tail 500</button>
     </div>
     <pre id="logs-content" style="max-height:400px;overflow:auto;background:var(--pico-color-grey-900);padding:0.5em;font-size:0.8em;border-radius:4px">
       {{if .Logs}}{{.Logs}}{{else}}Click to load logs...{{end}}

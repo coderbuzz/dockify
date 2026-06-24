@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/server"
@@ -16,6 +17,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RealIP)
+	r.Use(PrefixMiddleware)
 	r.Use(CORSMiddleware)
 
 	apiHandler := server.NewHandler(svc)
@@ -120,6 +122,21 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(staticDir)))
 
 	return r
+}
+
+func PrefixMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := r.Header.Get("X-Forwarded-Prefix")
+		if prefix != "" {
+			prefix = strings.TrimSuffix(prefix, "/")
+			r = SetBasePath(r, prefix+"/")
+			r.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
+			if r.URL.Path == "" {
+				r.URL.Path = "/"
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {
