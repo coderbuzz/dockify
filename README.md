@@ -36,20 +36,61 @@ Worker VM
 
 ### Step 1: Install Dockify on Controller VM
 
+Choose one option:
+
+**Option A: Docker Compose (recommended)** — Includes Caddy reverse proxy with auto HTTPS. Best for production.
+
 ```bash
-# Option A: Docker Compose (recommended)
 git clone https://github.com/coderbuzz/dockify.git && cd dockify
-cp .env.example .env   # edit DOMAIN + Cloudflare keys
-docker compose up -d    # auto HTTPS via Caddy
-
-# Option B: One-liner install script
-curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
-
-# Option C: Build from source
-go build -o dockify ./cmd/dockify && ./dockify serve
+cp .env.example .env
+docker compose up -d
 ```
 
+Dockify + Caddy run in the same Docker network (`dockify`). Caddy listens on port 80/443, auto-proxies to Dockify on `dockify:8080`, and auto-obtains Let's Encrypt certificates. The `Caddyfile` uses `{$DOMAIN}` from your `.env`.
+
+**Option B: One-liner install script** — Installs as a systemd service. No bundled Caddy for the dashboard itself.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+sudo systemctl start dockify
+```
+
+Runs Dockify as a standalone binary behind systemd. The dashboard is accessible at `http://<ip>:8080` (plain HTTP). If you want HTTPS for the dashboard, add a reverse proxy (Caddy, nginx) manually, or use Docker Compose (Option A) instead.
+
+**Option C: Build from source** — Same as install script but manual. Good for development.
+
+```bash
+go build -o dockify ./cmd/dockify
+./dockify serve
+```
+
+**All three options share the same architecture for worker VMs:**
+- Dockify connects to workers via SSH
+- Installs Docker + creates the `dockify` Docker network
+- Deploys Caddy on each worker (port 80/443 + Admin API on localhost:2019)
+- Apps communicate with Caddy through the `dockify` network
+
+The choice only affects how you host the Dockify controller itself.
+
 Open `https://<your-domain>` or `http://<controller-ip>:8080`.
+
+### Environment Variables
+
+Create a `.env` file in the project root or set these environment variables:
+
+```env
+# Domain for Caddy reverse proxy (auto HTTPS). Only needed for Option A (Docker Compose).
+DOMAIN=dockify.example.com
+
+# Cloudflare API credentials (optional, enables automatic DNS A record creation on deploy)
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ZONE_ID=
+
+# Optional: base path when behind a reverse proxy (e.g., code-server: /proxy/9898)
+DOCKIFY_BASE_PATH=
+```
+
+Dockify runs with sensible defaults. Only `DOMAIN` is required for Option A. `CLOUDFLARE_*` is optional and only needed if you want automated DNS records. `DOCKIFY_BASE_PATH` is only needed when accessing Dockify through a URL prefix (e.g., code-server proxy).
 
 ### Step 2: Prepare a Worker VM
 
