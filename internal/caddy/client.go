@@ -81,6 +81,9 @@ func (c *Client) postRoute(route Route) error {
 		route.ID,
 	))
 
+	// Ensure server listens on both HTTP and HTTPS for auto-TLS (ignore error if already set)
+	c.ssh.Exec(`docker exec caddy curl -s -o /dev/null -X PUT http://localhost:2019/config/apps/http/servers/srv0/listen -H 'Content-Type: application/json' -d '[":80",":443"]'`)
+
 	body, err := json.Marshal(route)
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
@@ -92,15 +95,13 @@ func (c *Client) postRoute(route Route) error {
 	)
 	out, err := c.ssh.Exec(cmd)
 	if err != nil {
-		// Caddy may restart admin endpoint after config change, breaking the TCP connection.
-		// The route is likely added. Verify via GET before treating as error.
 		verifyCmd := fmt.Sprintf(
 			`docker exec caddy curl -s -o /dev/null -w '%%{http_code}' http://localhost:2019/id/%s`,
 			route.ID,
 		)
 		vOut, vErr := c.ssh.Exec(verifyCmd)
 		if vErr == nil && strings.TrimSpace(vOut) == "200" {
-			return nil // route was actually added
+			return nil
 		}
 		return fmt.Errorf("caddy add route: %w (output: %s)", err, strings.TrimSpace(out))
 	}
@@ -110,7 +111,6 @@ func (c *Client) postRoute(route Route) error {
 		if len(lines) > 1 && strings.TrimSpace(lines[1]) != "" {
 			return fmt.Errorf("caddy returned HTTP %s (body: %s)", code, strings.TrimSpace(lines[1]))
 		}
-		// Same verification fallback
 		verifyCmd := fmt.Sprintf(
 			`docker exec caddy curl -s -o /dev/null -w '%%{http_code}' http://localhost:2019/id/%s`,
 			route.ID,

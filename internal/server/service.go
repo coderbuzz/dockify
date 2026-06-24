@@ -124,11 +124,6 @@ func (s *Service) InitWorker(id int64) error {
 		return fmt.Errorf("deploy caddy: %w", err)
 	}
 
-	// Configure Caddy server to listen on both HTTP and HTTPS for auto-TLS
-	client.Exec(`docker exec caddy curl -s -X PATCH http://localhost:2019/config/apps/http/servers/srv0 \
-  -H 'Content-Type: application/json' \
-  -d '{"listen":[":80", ":443"]}'`)
-
 	s.repo.UpdateStatus(id, StatusOnline)
 	log.Printf("Worker %q initialized successfully", server.Name)
 
