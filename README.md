@@ -139,19 +139,34 @@ Dockify runs with sensible defaults. Only `DOMAIN` is required for Option A. `CL
 
 Fresh Ubuntu/Debian VM. Zero dependencies needed — Dockify installs everything.
 
-**Generate an SSH key pair (anywhere — your laptop, the controller VM, etc.):**
+**Option A: One-liner script (run on the worker VM)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash
+```
+
+The script will:
+1. Generate an SSH key pair at `/root/.ssh/dockify`
+2. Add the public key to `/root/.ssh/authorized_keys`
+3. Output the **private key content** — copy this
+
+Then paste the private key into the Dockify Add Server form. No `ssh-copy-id` needed.
+
+**Option B: Manual (generate elsewhere)**
+
+Generate an SSH key pair anywhere (laptop, controller VM, etc.):
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/dockify -N ""
 ```
 
-**Copy the public key to the worker VM:**
+Copy the public key to the worker VM:
 
 ```bash
 ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 ```
 
-> The public key is appended to `/root/.ssh/authorized_keys` on the worker. You will then paste the **private key content** (`cat ~/.ssh/dockify`) into the Dockify web UI form — not a file path, but the key material itself.
+> The private key content (`cat ~/.ssh/dockify`) is then pasted into the Dockify web UI form — not a file path, but the key material itself.
 
 ### Step 3: Register + Initialize in Web UI
 

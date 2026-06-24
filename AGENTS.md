@@ -39,6 +39,7 @@ internal/
     templates/                # HTML templates (custom CSS + HTMX)
 scripts/
   install.sh                  # One-liner install script
+  setup-worker.sh             # Generate SSH key on worker, output for Dockify UI
   release.sh                  # Version bump + tag helper
 Dockerfile                    # Multi-stage Docker build
 docker-compose.yml            # Dockify + Caddy reverse proxy
