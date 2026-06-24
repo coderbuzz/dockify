@@ -34,6 +34,15 @@ read -p "Cloudflare API Token (optional, press Enter to skip): " CF_TOKEN
 read -p "Cloudflare Zone ID (optional): " CF_ZONE
 
 echo ""
+echo "Admin credentials for web UI login. If no password is set, the web UI will"
+echo "have no authentication (open to anyone)."
+echo ""
+read -p "Admin username [admin]: " ADMIN_USER
+ADMIN_USER="${ADMIN_USER:-admin}"
+read -s -p "Admin password (optional, press Enter to skip): " ADMIN_PASS
+echo ""
+
+echo ""
 echo "DOCKIFY_BASE_PATH is only needed when accessing Dockify through a URL prefix"
 echo "(e.g., behind code-server proxy: /proxy/9898). Leave empty for normal access."
 echo ""
@@ -51,6 +60,10 @@ echo "Creating .env..."
 cat > "$INSTALL_DIR/.env" << ENVEOF
 # Domain for Caddy reverse proxy (auto HTTPS)
 DOMAIN=$DOMAIN
+
+# Admin credentials (optional, enables web UI login)
+DOCKIFY_ADMIN_USER=$ADMIN_USER
+DOCKIFY_ADMIN_PASSWORD=$ADMIN_PASS
 
 # Cloudflare API credentials (optional, auto DNS A record on deploy)
 CLOUDFLARE_API_TOKEN=$CF_TOKEN
