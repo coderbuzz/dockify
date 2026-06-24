@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
-<main class="container">
+<div class="container">
   <hgroup>
     <h1>Apps</h1>
-    <a href="apps/add" role="button">Deploy App</a>
+    <p><a href="apps/add" class="btn btn-primary">Deploy App</a></p>
   </hgroup>
 
   {{template "apps_list" .}}
-</main>
+</div>
 {{template "scripts" .}}
 </body>
 </html>

@@ -1,44 +1,31 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
-<main class="container">
+<div class="container">
   <hgroup>
     <h1>Deploy App</h1>
     <p>Deploy a Docker container to a worker VM</p>
   </hgroup>
 
   {{if .Error}}
-  <article style="color:var(--pico-color-red-500)">{{.Error}}</article>
+  <div class="card" style="color:var(--red)">{{.Error}}</div>
   {{end}}
 
   <form method="POST" action="apps/add">
     <fieldset>
       <div class="grid">
-        <label>
-          App Name
-          <input type="text" name="name" placeholder="my-web-app" required autofocus>
-        </label>
-        <label>
-          Domain
-          <input type="text" name="domain" placeholder="app.example.com" required>
-        </label>
+        <label>App Name<input type="text" name="name" placeholder="my-web-app" required autofocus></label>
+        <label>Domain<input type="text" name="domain" placeholder="app.example.com" required></label>
       </div>
       <div class="grid">
-        <label>
-          Port
-          <input type="number" name="port" placeholder="80" required>
-          <small>Internal container port</small>
-        </label>
-        <label>
-          Server
-            <select name="server_id" required>
+        <label>Port<input type="number" name="port" placeholder="80" required><small>Internal container port</small></label>
+        <label>Server
+          <select name="server_id" required>
             <option value="">Select a server...</option>
             <option value="0">Auto-select (least loaded)</option>
-            {{range .Servers}}
-            <option value="{{.ID}}">{{.Name}} ({{.Status}})</option>
-            {{end}}
+            {{range .Servers}}<option value="{{.ID}}">{{.Name}} ({{.Status}})</option>{{end}}
           </select>
         </label>
       </div>
@@ -46,54 +33,31 @@
 
     <fieldset>
       <legend>
-        <label style="display:inline;margin-right:1em">
-          <input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'">
-          Simple Mode
-        </label>
-        <label style="display:inline">
-          <input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''">
-          Advanced Mode
-        </label>
+        <label style="display:inline;margin-right:1em"><input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'"> Simple Mode</label>
+        <label style="display:inline"><input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''"> Advanced Mode</label>
       </legend>
 
       <div id="simple-section">
-        <label>
-          Docker Image
-          <input type="text" name="image" placeholder="nginx:alpine">
-        </label>
-        <label>
-          Environment Variables
-          <input type="text" name="env_vars" placeholder="KEY=val, FOO=bar">
-          <small>Comma-separated key=value pairs</small>
-        </label>
+        <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine"></label>
+        <label>Environment Variables<input type="text" name="env_vars" placeholder="KEY=val, FOO=bar"><small>Comma-separated key=value pairs</small></label>
       </div>
 
       <div id="advanced-section" style="display:none">
-        <label>
-          Docker Compose
-          <textarea name="compose" rows="14" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify"></textarea>
-          <small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small>
-        </label>
+        <label>Docker Compose<textarea name="compose" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify"></textarea><small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small></label>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>Git (optional - for auto-deploy on push)</legend>
+      <legend>Git (optional — for auto-deploy on push)</legend>
       <div class="grid">
-        <label>
-          Git Repo URL
-          <input type="text" name="git_repo" placeholder="https://github.com/user/repo.git">
-        </label>
-        <label>
-          Branch
-          <input type="text" name="git_branch" value="main" placeholder="main">
-        </label>
+        <label>Git Repo URL<input type="text" name="git_repo" placeholder="https://github.com/user/repo.git"></label>
+        <label>Branch<input type="text" name="git_branch" value="main" placeholder="main"></label>
       </div>
     </fieldset>
 
-    <button type="submit">Deploy App</button>
+    <button type="submit" class="btn btn-primary">Deploy App</button>
   </form>
-</main>
+</div>
 {{template "scripts" .}}
 </body>
 </html>

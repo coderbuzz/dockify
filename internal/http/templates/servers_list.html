@@ -1,16 +1,8 @@
 {{define "servers_list"}}
 {{if .Servers}}
-<table role="grid">
+<table>
   <thead>
-    <tr>
-      <th>Name</th>
-      <th>Host</th>
-      <th>User</th>
-      <th>Status</th>
-      <th>CPU</th>
-      <th>RAM</th>
-      <th></th>
-    </tr>
+    <tr><th>Name</th><th>Host</th><th>User</th><th>Status</th><th>CPU</th><th>RAM</th><th></th></tr>
   </thead>
   <tbody>
     {{range .Servers}}
@@ -18,14 +10,14 @@
       <td><a href="servers/{{.ID}}">{{.Name}}</a></td>
       <td>{{.Host}}:{{.Port}}</td>
       <td>{{.User}}</td>
-      <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+      <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
       <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>
-        <a href="servers/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a>
+        <a href="servers/{{.ID}}" class="btn btn-ghost">View</a>
         <form method="POST" action="servers/{{.ID}}/delete" style="display:inline"
               onsubmit="return confirm('Delete {{.Name}}? This cannot be undone.')">
-          <button type="submit" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em;color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Delete</button>
+          <button type="submit" class="btn btn-ghost btn-red">Delete</button>
         </form>
       </td>
     </tr>
@@ -33,9 +25,9 @@
   </tbody>
 </table>
 {{else}}
-<article>
+<div class="empty-state">
   <p>No servers registered yet.</p>
-  <a href="servers/add" role="button">Add Your First Server</a>
-</article>
+  <a href="servers/add" class="btn btn-primary">Add Your First Server</a>
+</div>
 {{end}}
 {{end}}
