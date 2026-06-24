@@ -1,31 +1,38 @@
-# Status Fix Caddy Route
+# Fix Caddy Route Matching
 
 ## Masalah
-Route app ditambahkan ke `/routes` (akhir array) setelah file server default Caddy. Akibatnya domain app tidak terlayani (halaman "Caddy works!").
+Caddy di worker VM jalan tanpa Caddyfile (default mode). Route yang diinject via Admin API tidak match meskipun route terdaftar. Akibatnya domain app tidak terlayani (halaman "Caddy works!").
 
-## Fix (sudah dijalankan)
-Route di-inject ke posisi `/routes/0` (sebelum file server default).
+## Fix untuk Worker Existing
 
+Jalankan di **WORKER VM** untuk restart Caddy dengan Caddyfile:
+
+```bash
+mkdir -p /opt/dockify/caddy
+cat > /opt/dockify/caddy/Caddyfile << 'EOF'
+:80, :443 {
+}
+EOF
+docker rm -f caddy
+docker run -d --name caddy --network dockify \
+  -p 80:80 -p 443:443 -p 127.0.0.1:2019:2019 \
+  -v caddy_data:/data \
+  -v /opt/dockify/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  --restart unless-stopped caddy:latest
 ```
-delete /id/dockify-kv-amg-id
-post /routes/0 → route baru
-```
+
+Setelah Caddy restart, **redeploy app dari UI Dockify**.
+
+## Permanent Fix (sudah di kode)
+
+InitWorker sekarang deploy Caddy dengan Caddyfile `:80, :443 {}` langsung. Worker baru akan otomatis pakai config ini.
 
 ## Verifikasi
-```bash
-# Dari luar VM
-curl -v https://kv.amg.id/
-# Dari controller VM
-curl -k https://kv.amg.id/
-```
-
-> Jangan test localhost:2019 — itu Admin API, bukan HTTP server.
-
-## Permanent Fix
-Kode `postRoute()` sudah diubah dari `/routes` menjadi `/routes/0`. Setelah CI selesai, update controller:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
-```
+# Cek apakah route terdaftar
+docker exec caddy curl -s http://localhost:2019/id/dockify-kv-amg-id
 
-Lalu redeploy app dari UI.
+# Test akses dari luar
+curl -s https://kv.amg.id/health
+```
