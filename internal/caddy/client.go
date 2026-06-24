@@ -81,7 +81,7 @@ func (c *Client) postRoute(route Route) error {
 	}
 
 	cmd := fmt.Sprintf(
-		`curl -s -o /dev/null -w '%%{http_code}' -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'`,
+		`curl -s -o /dev/null -w '%%{http_code}' -X POST http://127.0.0.1:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'`,
 		escapeShell(string(body)),
 	)
 	out, err := c.ssh.Exec(cmd)
@@ -98,7 +98,7 @@ func (c *Client) postRoute(route Route) error {
 func (c *Client) RemoveRoute(domain string) error {
 	id := sanitizeID(domain)
 	cmd := fmt.Sprintf(
-		`curl -s -o /dev/null -w '%%{http_code}' -X DELETE http://localhost:2019/id/%s`,
+		`curl -s -o /dev/null -w '%%{http_code}' -X DELETE http://127.0.0.1:2019/id/%s`,
 		id,
 	)
 	out, err := c.ssh.Exec(cmd)
