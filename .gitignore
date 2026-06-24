@@ -1,0 +1,34 @@
+# Dockify project dependencies
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+dockify
+dist/
+
+# Test
+*.test
+*.out
+
+# Data
+*.db
+*.sqlite
+/var/
+
+# Secrets
+.env
+*.pem
+keys/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
