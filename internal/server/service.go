@@ -108,7 +108,6 @@ func (s *Service) InitWorker(id int64) error {
 	if err != nil {
 		log.Printf("Warning: failed to create dockify network: %v", err)
 	}
-
 	log.Printf("Deploying Caddy on %s...", server.Name)
 	caddyRun := `docker rm -f caddy 2>/dev/null; docker run -d \
   --name caddy \
@@ -124,6 +123,11 @@ func (s *Service) InitWorker(id int64) error {
 		s.repo.UpdateStatus(id, StatusError)
 		return fmt.Errorf("deploy caddy: %w", err)
 	}
+
+	// Configure Caddy server to listen on both HTTP and HTTPS for auto-TLS
+	client.Exec(`docker exec caddy curl -s -X PATCH http://localhost:2019/config/apps/http/servers/srv0 \
+  -H 'Content-Type: application/json' \
+  -d '{"listen":[":80", ":443"]}'`)
 
 	s.repo.UpdateStatus(id, StatusOnline)
 	log.Printf("Worker %q initialized successfully", server.Name)
