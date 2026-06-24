@@ -81,16 +81,21 @@ func (c *Client) postRoute(route Route) error {
 	}
 
 	cmd := fmt.Sprintf(
-		`curl -s -o /dev/null -w '%%{http_code}' -X POST http://127.0.0.1:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'`,
+		`curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://127.0.0.1:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; cat /tmp/cr.txt`,
 		escapeShell(string(body)),
 	)
 	out, err := c.ssh.Exec(cmd)
 	if err != nil {
-		return fmt.Errorf("caddy add route: %w", err)
+		return fmt.Errorf("caddy add route: %w (output: %s)", err, strings.TrimSpace(out))
 	}
-	code := strings.TrimSpace(out)
+	lines := strings.SplitN(out, "\n", 2)
+	code := strings.TrimSpace(lines[0])
 	if code != "200" {
-		return fmt.Errorf("caddy returned HTTP %s", code)
+		body := ""
+		if len(lines) > 1 {
+			body = strings.TrimSpace(lines[1])
+		}
+		return fmt.Errorf("caddy returned HTTP %s (body: %s)", code, body)
 	}
 	return nil
 }
@@ -98,14 +103,15 @@ func (c *Client) postRoute(route Route) error {
 func (c *Client) RemoveRoute(domain string) error {
 	id := sanitizeID(domain)
 	cmd := fmt.Sprintf(
-		`curl -s -o /dev/null -w '%%{http_code}' -X DELETE http://127.0.0.1:2019/id/%s`,
+		`curl -s -w '%%{http_code}' -o /tmp/cr.txt -X DELETE http://127.0.0.1:2019/id/%s; echo; cat /tmp/cr.txt`,
 		id,
 	)
 	out, err := c.ssh.Exec(cmd)
 	if err != nil {
-		return fmt.Errorf("caddy remove route: %w", err)
+		return fmt.Errorf("caddy remove route: %w (output: %s)", err, strings.TrimSpace(out))
 	}
-	code := strings.TrimSpace(out)
+	lines := strings.SplitN(out, "\n", 2)
+	code := strings.TrimSpace(lines[0])
 	if code != "200" {
 		return fmt.Errorf("caddy returned HTTP %s", code)
 	}
