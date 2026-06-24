@@ -81,21 +81,39 @@ func (c *Client) postRoute(route Route) error {
 	}
 
 	cmd := fmt.Sprintf(
-		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; docker exec caddy cat /tmp/cr.txt`,
+		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; docker exec caddy cat /tmp/cr.txt 2>/dev/null`,
 		escapeShell(string(body)),
 	)
 	out, err := c.ssh.Exec(cmd)
 	if err != nil {
+		// Caddy may restart admin endpoint after config change, breaking the TCP connection.
+		// The route is likely added. Verify via GET before treating as error.
+		verifyCmd := fmt.Sprintf(
+			`docker exec caddy curl -s -o /dev/null -w '%%{http_code}' http://localhost:2019/id/%s`,
+			route.ID,
+		)
+		vOut, vErr := c.ssh.Exec(verifyCmd)
+		if vErr == nil && strings.TrimSpace(vOut) == "200" {
+			return nil // route was actually added
+		}
 		return fmt.Errorf("caddy add route: %w (output: %s)", err, strings.TrimSpace(out))
 	}
 	lines := strings.SplitN(out, "\n", 2)
 	code := strings.TrimSpace(lines[0])
 	if code != "200" {
-		body := ""
-		if len(lines) > 1 {
-			body = strings.TrimSpace(lines[1])
+		if len(lines) > 1 && strings.TrimSpace(lines[1]) != "" {
+			return fmt.Errorf("caddy returned HTTP %s (body: %s)", code, strings.TrimSpace(lines[1]))
 		}
-		return fmt.Errorf("caddy returned HTTP %s (body: %s)", code, body)
+		// Same verification fallback
+		verifyCmd := fmt.Sprintf(
+			`docker exec caddy curl -s -o /dev/null -w '%%{http_code}' http://localhost:2019/id/%s`,
+			route.ID,
+		)
+		vOut, vErr := c.ssh.Exec(verifyCmd)
+		if vErr == nil && strings.TrimSpace(vOut) == "200" {
+			return nil
+		}
+		return fmt.Errorf("caddy returned HTTP %s", code)
 	}
 	return nil
 }
@@ -103,7 +121,7 @@ func (c *Client) postRoute(route Route) error {
 func (c *Client) RemoveRoute(domain string) error {
 	id := sanitizeID(domain)
 	cmd := fmt.Sprintf(
-		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X DELETE http://localhost:2019/id/%s; echo; docker exec caddy cat /tmp/cr.txt`,
+		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X DELETE http://localhost:2019/id/%s; echo; docker exec caddy cat /tmp/cr.txt 2>/dev/null`,
 		id,
 	)
 	out, err := c.ssh.Exec(cmd)
