@@ -122,11 +122,17 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	target := fmt.Sprintf("%s:%d", getServiceName(app.Compose), app.Port)
 	caddyClient := caddy.NewClient(client)
-	if err := caddyClient.AddRoute(app.Domain, target); err != nil {
-		log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, err)
-		logs = append(logs, fmt.Sprintf("caddy: %v", err))
+	var caddyErr error
+	if app.AuthUser != "" && app.AuthPass != "" {
+		caddyErr = caddyClient.AddRouteWithAuth(app.Domain, target, app.AuthUser, app.AuthPass)
+		log.Printf("Caddy route (with auth) added: %s -> %s", app.Domain, target)
 	} else {
+		caddyErr = caddyClient.AddRoute(app.Domain, target)
 		log.Printf("Caddy route added: %s -> %s", app.Domain, target)
+	}
+	if caddyErr != nil {
+		log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, caddyErr)
+		logs = append(logs, fmt.Sprintf("caddy: %v", caddyErr))
 	}
 
 	s.repo.SaveRoute(&Route{

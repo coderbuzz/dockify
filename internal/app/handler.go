@@ -37,6 +37,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		EnvVars   string `json:"env_vars"`
 		GitRepo   string `json:"git_repo"`
 		GitBranch string `json:"git_branch"`
+		AuthUser  string `json:"auth_user"`
+		AuthPass  string `json:"auth_pass"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -75,6 +77,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Compose:   compose,
 		GitRepo:   input.GitRepo,
 		GitBranch: input.GitBranch,
+		AuthUser:  input.AuthUser,
+		AuthPass:  input.AuthPass,
 	}
 
 	if err := h.service.Create(app); err != nil {
@@ -252,6 +256,8 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		Compose:   compose,
 		GitRepo:   strings.TrimSpace(r.FormValue("git_repo")),
 		GitBranch: gitBranch,
+		AuthUser:  strings.TrimSpace(r.FormValue("auth_user")),
+		AuthPass:  strings.TrimSpace(r.FormValue("auth_pass")),
 	}
 
 	if app.Name == "" || app.Domain == "" || app.Port == 0 || app.Compose == "" {

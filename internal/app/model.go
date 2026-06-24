@@ -11,6 +11,8 @@ type App struct {
 	Compose   string    `json:"compose"`
 	GitRepo   string    `json:"git_repo"`
 	GitBranch string    `json:"git_branch"`
+	AuthUser  string    `json:"auth_user"`
+	AuthPass  string    `json:"auth_pass"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

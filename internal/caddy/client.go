@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/coderbuzz/dockify/internal/ssh"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Route struct {
-	ID      string   `json:"@id"`
-	Match   []match  `json:"match"`
-	Handle  []handle `json:"handle"`
+	ID     string   `json:"@id"`
+	Match  []match  `json:"match"`
+	Handle []handle `json:"handle"`
 }
 
 type match struct {
@@ -20,7 +21,9 @@ type match struct {
 
 type handle struct {
 	Handler   string     `json:"handler"`
-	Upstreams []upstream `json:"upstreams"`
+	Upstreams []upstream `json:"upstreams,omitempty"`
+	Username  string     `json:"username,omitempty"`
+	Hash      string     `json:"hash,omitempty"`
 }
 
 type upstream struct {
@@ -44,7 +47,34 @@ func (c *Client) AddRoute(domain, target string) error {
 			Upstreams: []upstream{{Dial: target}},
 		}},
 	}
+	return c.postRoute(route)
+}
 
+func (c *Client) AddRouteWithAuth(domain, target, user, pass string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), 14)
+	if err != nil {
+		return fmt.Errorf("bcrypt hash: %w", err)
+	}
+
+	route := Route{
+		ID: sanitizeID(domain),
+		Match: []match{{Host: []string{domain}}},
+		Handle: []handle{
+			{
+				Handler:  "basic_auth",
+				Username: user,
+				Hash:     string(hash),
+			},
+			{
+				Handler:   "reverse_proxy",
+				Upstreams: []upstream{{Dial: target}},
+			},
+		},
+	}
+	return c.postRoute(route)
+}
+
+func (c *Client) postRoute(route Route) error {
 	body, err := json.Marshal(route)
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
@@ -83,10 +113,7 @@ func (c *Client) RemoveRoute(domain string) error {
 }
 
 func sanitizeID(s string) string {
-	r := strings.NewReplacer(
-		".", "-",
-		"*", "-",
-	)
+	r := strings.NewReplacer(".", "-", "*", "-")
 	return "dockify-" + r.Replace(s)
 }
 

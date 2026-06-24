@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS apps (
     compose     TEXT NOT NULL,
     git_repo    TEXT,
     git_branch  TEXT DEFAULT 'main',
+    auth_user   TEXT DEFAULT '',
+    auth_pass   TEXT DEFAULT '',
     status      TEXT DEFAULT 'created',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
