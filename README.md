@@ -82,6 +82,11 @@ Create a `.env` file in the project root or set these environment variables:
 # Domain for Caddy reverse proxy (auto HTTPS). Only needed for Option A (Docker Compose).
 DOMAIN=dockify.example.com
 
+# Admin credentials (required for web UI login).
+# If DOCKIFY_ADMIN_PASSWORD is not set, the web UI has no authentication.
+DOCKIFY_ADMIN_USER=admin
+DOCKIFY_ADMIN_PASSWORD=your-secure-password
+
 # Cloudflare API credentials (optional, enables automatic DNS A record creation on deploy)
 CLOUDFLARE_API_TOKEN=
 CLOUDFLARE_ZONE_ID=
@@ -89,6 +94,27 @@ CLOUDFLARE_ZONE_ID=
 # Optional: base path when behind a reverse proxy (e.g., code-server: /proxy/9898)
 DOCKIFY_BASE_PATH=
 ```
+
+### Authentication
+
+The web UI is protected by a login page. To enable authentication, set `DOCKIFY_ADMIN_PASSWORD` in your `.env` or environment:
+
+```bash
+# In .env
+DOCKIFY_ADMIN_USER=admin
+DOCKIFY_ADMIN_PASSWORD=secret123
+
+# Or as env vars
+DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
+```
+
+- **Default username:** `admin` (configurable via `DOCKIFY_ADMIN_USER`)
+- **No password set:** Web UI has **no authentication** (open to anyone)
+- **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
+- **Session:** Cookie-based, expires after 24 hours
+- **Logout:** Visit `/logout`
+
+The login page is at `/login`. After successful login, you are redirected to the dashboard. Webhook endpoints (`/api/webhook/github`, `/api/webhook/gitlab`) and health check (`/health`) do not require authentication.
 
 Dockify runs with sensible defaults. Only `DOMAIN` is required for Option A. `CLOUDFLARE_*` is optional and only needed if you want automated DNS records. `DOCKIFY_BASE_PATH` is only needed when accessing Dockify through a URL prefix (e.g., code-server proxy).
 

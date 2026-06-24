@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="{{.BasePath}}">
+<title>{{.Title}} - Dockify</title>
+<style>
+:root {
+  --bg: #f5f5f5;
+  --bg-card: #fff;
+  --border: #d4d4d4;
+  --text: #1a1a1a;
+  --text-muted: #666;
+  --red: #9a2a2a;
+}
+html.dark {
+  --bg: #0d0d0d;
+  --bg-card: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #cfcecd;
+  --text-muted: #888;
+  --red: #b33a3a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+.login-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2em;
+  width: 340px;
+}
+.login-card h1 { font-size: 1.1em; font-weight: 600; margin: 0 0 0.3em; }
+.login-card p { color: var(--text-muted); margin: 0 0 1.2em; font-size: 0.85em; }
+.error { color: var(--red); font-size: 0.85em; margin-bottom: 1em; }
+label { font-size: 0.82em; color: var(--text-muted); display: block; margin-bottom: 0.3em; }
+input {
+  font-family: inherit;
+  font-size: 0.95em;
+  padding: 0.5em 0.7em;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  margin-bottom: 1em;
+}
+input:focus { border-color: #888; }
+.btn {
+  display: inline-block;
+  padding: 0.5em 1em;
+  font-size: 0.9em;
+  font-family: inherit;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #555;
+  color: #fff;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+}
+.btn:hover { background: #333; border-color: #333; }
+.theme-btn {
+  position: fixed;
+  top: 0.8em;
+  right: 0.8em;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3em 0.6em;
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+.theme-btn:hover { border-color: #888; color: var(--text); }
+</style>
+</head>
+<body>
+<button class="theme-btn" onclick="toggleTheme()" id="theme-toggle">☾</button>
+<div class="login-card">
+  <h1>Dockify</h1>
+  <p>Sign in to continue</p>
+  {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+  <form method="POST" action="login">
+    <label for="user">Username</label>
+    <input type="text" id="user" name="user" required autofocus>
+    <label for="pass">Password</label>
+    <input type="password" id="pass" name="pass" required>
+    <button type="submit" class="btn">Sign in</button>
+  </form>
+</div>
+<script>
+(function() {
+  var t = localStorage.getItem('dockify-theme');
+  if (t === 'dark') {
+    document.documentElement.classList.add('dark');
+    document.getElementById('theme-toggle').textContent = '☀';
+  }
+})();
+function toggleTheme() {
+  var h = document.documentElement;
+  var b = document.getElementById('theme-toggle');
+  h.classList.toggle('dark');
+  var isDark = h.classList.contains('dark');
+  b.textContent = isDark ? '☀' : '☾';
+  localStorage.setItem('dockify-theme', isDark ? 'dark' : 'light');
+}
+</script>
+</body>
+</html>

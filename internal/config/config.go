@@ -44,6 +44,10 @@ func (c *Config) Addr() string {
 	return c.Host + ":" + c.Port
 }
 
+func (c *Config) AuthEnabled() bool {
+	return c.AdminPass != ""
+}
+
 func getEnv(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

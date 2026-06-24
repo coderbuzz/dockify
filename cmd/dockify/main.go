@@ -61,7 +61,13 @@ func main() {
 
 	serverListAdapter := &serverLister{svc: svc}
 
-	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter)
+	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass)
+
+	if cfg.AdminPass == "" {
+		log.Println("WARNING: No admin password set (DOCKIFY_ADMIN_PASSWORD). Web UI has no authentication.")
+	} else {
+		log.Println("Web UI authentication enabled")
+	}
 
 	srv := &http.Server{
 		Addr:    cfg.Addr(),
