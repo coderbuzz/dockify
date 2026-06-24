@@ -56,6 +56,16 @@ Worker VM
 
 The Go binary is ~20 MB with near-zero CPU at idle. All modes run on Linux (any distro).
 
+**Recommended VM specs (Debian 12):**
+
+| Plan | Provider example | vCPU | RAM | Disk | Price/mo | Mode |
+|---|---|---|---|---|---|---|
+| **Nano** | Oracle free tier, Hetzner CX22 | 1 | 512 MB | 10 GB | ~€3 | 2 or 3 |
+| **Micro** | DigitalOcean $6, Linode $8 | 1 | 1 GB | 25 GB | ~$6–8 | 3 |
+| **Small** | Hetzner CX32, Netcup | 2 | 2 GB | 40 GB | ~€8 | 1 or 3 |
+
+> **Tip:** Mode 2 or 3 (binary) can run on the cheapest VPS without Docker overhead. Mode 1 (Docker Compose) needs a bit more RAM for the Docker daemon.
+
 ### Worker VMs (where apps run)
 
 | Resource | Notes |
