@@ -199,7 +199,7 @@ Dockify can auto-deploy on every push via GitHub or GitLab webhooks. When an app
 2. Add a webhook pointing to your Dockify instance:
 
 ```
-Payload URL: https://dockify.amg.id/api/webhook/github
+Payload URL: https://dockify.example.com/api/webhook/github
 Content type: application/json
 Events: Just the push event
 ```
@@ -237,7 +237,7 @@ jobs:
 
       - name: Trigger Dockify deploy
         run: |
-          curl -s -X POST https://dockify.amg.id/api/webhook/github \
+          curl -s -X POST https://dockify.example.com/api/webhook/github \
             -H "Content-Type: application/json" \
             -d '{
               "ref": "refs/heads/main",

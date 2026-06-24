@@ -50,7 +50,7 @@ if [ "$MODE" = "2" ] || [ "$MODE" = "3" ]; then
   prompt BASE_PATH "Base path (optional): "
 
   if [ "$MODE" = "3" ]; then
-    prompt DOMAIN "Domain for Dockify (e.g., dockify.amg.id): " "" required
+prompt DOMAIN "Domain for Dockify (e.g., dockify.example.com): " "" required
   fi
 
   echo ""
@@ -155,7 +155,7 @@ CADDYEOF
   fi
 
 else
-  prompt DOMAIN "Domain for Dockify (e.g., dockify.amg.id): " "" required
+  prompt DOMAIN "Domain for Dockify (e.g., dockify.example.com): " "" required
   echo ""
   echo "Cloudflare credentials (optional)"
   prompt CF_TOKEN "Cloudflare API Token: "
