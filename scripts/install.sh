@@ -1,20 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-DATA_DIR="${DATA_DIR:-/var/lib/dockify}"
-SERVICE_USER="${SERVICE_USER:-dockify}"
+REPO="https://github.com/coderbuzz/dockify"
+RAW="https://raw.githubusercontent.com/coderbuzz/dockify/main"
+INSTALL_DIR="${INSTALL_DIR:-/opt/dockify}"
 
-if [ -z "$DOCKIFY_VERSION" ]; then
-    echo "Fetching latest release version..."
-    DOCKIFY_VERSION=$(curl -fsSL https://api.github.com/repos/coderbuzz/dockify/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
-    if [ -z "$DOCKIFY_VERSION" ]; then
-        echo "Error: could not determine latest version. Set DOCKIFY_VERSION manually."
-        exit 1
-    fi
-fi
-
-echo "=== Dockify v${DOCKIFY_VERSION} Installer ==="
+echo "=== Dockify Installer ==="
+echo ""
 
 OS=$(uname -s)
 ARCH=$(uname -m)
@@ -27,74 +19,63 @@ if [ "$ARCH" != "x86_64" ]; then
     exit 1
 fi
 
-echo "[1/5] Creating service user: $SERVICE_USER"
-if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-    sudo useradd -r -s /bin/false -d "$DATA_DIR" -m "$SERVICE_USER"
+# --- Collect config ---
+read -p "Domain for Dockify (e.g., dockify.amg.id): " DOMAIN
+if [ -z "$DOMAIN" ]; then
+    echo "Error: domain is required"
+    exit 1
 fi
 
-echo "[2/5] Creating data directories"
-sudo mkdir -p "$DATA_DIR"
-sudo mkdir -p "$DATA_DIR/keys"
-sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
+echo ""
+echo "Cloudflare API credentials are optional. They enable automatic DNS A record"
+echo "creation when you deploy apps to worker VMs."
+echo ""
+read -p "Cloudflare API Token (optional, press Enter to skip): " CF_TOKEN
+read -p "Cloudflare Zone ID (optional): " CF_ZONE
 
-echo "[3/5] Downloading Dockify v${DOCKIFY_VERSION}..."
-TMP_DIR=$(mktemp -d)
-curl -fsSL "https://github.com/coderbuzz/dockify/releases/download/v${DOCKIFY_VERSION}/dockify-linux-amd64" -o "$TMP_DIR/dockify"
-sudo mv "$TMP_DIR/dockify" "$INSTALL_DIR/dockify"
-sudo chmod +x "$INSTALL_DIR/dockify"
-rm -rf "$TMP_DIR"
+echo ""
+echo "DOCKIFY_BASE_PATH is only needed when accessing Dockify through a URL prefix"
+echo "(e.g., behind code-server proxy: /proxy/9898). Leave empty for normal access."
+echo ""
+read -p "Base path (optional, press Enter to skip): " BASE_PATH
 
-echo "[4/5] Testing binary..."
-"$INSTALL_DIR/dockify" version
+echo ""
+echo "Downloading files..."
+sudo mkdir -p "$INSTALL_DIR"
 
-echo "[5/5] Creating systemd service..."
-sudo tee /etc/systemd/system/dockify.service > /dev/null << 'SYSTEMD'
-[Unit]
-Description=Dockify - Self-hosted Docker app deployment platform
-After=network.target
+curl -fsSL "$RAW/docker-compose.yml" -o "$INSTALL_DIR/docker-compose.yml"
+curl -fsSL "$RAW/Caddyfile" -o "$INSTALL_DIR/Caddyfile"
+curl -fsSL "$RAW/.env.example" -o "$INSTALL_DIR/.env.example"
 
-[Service]
-Type=simple
-User=SERVICE_USER_PLACEHOLDER
-ExecStart=/usr/local/bin/dockify serve
-Restart=on-failure
-RestartSec=10
-EnvironmentFile=/etc/dockify/dockify.env
+echo "Creating .env..."
+cat > "$INSTALL_DIR/.env" << ENVEOF
+# Domain for Caddy reverse proxy (auto HTTPS)
+DOMAIN=$DOMAIN
 
-[Install]
-WantedBy=multi-user.target
-SYSTEMD
+# Cloudflare API credentials (optional, auto DNS A record on deploy)
+CLOUDFLARE_API_TOKEN=$CF_TOKEN
+CLOUDFLARE_ZONE_ID=$CF_ZONE
 
-sudo sed -i "s/SERVICE_USER_PLACEHOLDER/$SERVICE_USER/" /etc/systemd/system/dockify.service
-
-if [ ! -f /etc/dockify/dockify.env ]; then
-    echo ""
-    echo "Creating /etc/dockify/dockify.env with defaults..."
-    sudo mkdir -p /etc/dockify
-    sudo tee /etc/dockify/dockify.env > /dev/null << 'ENVFILE'
-DOCKIFY_HOST=0.0.0.0
-DOCKIFY_PORT=8080
-DOCKIFY_DATA_DIR=/var/lib/dockify
-DOCKIFY_SSH_KEY_DIR=/var/lib/dockify/keys
-# CLOUDFLARE_API_TOKEN=
-# CLOUDFLARE_ZONE_ID=
-ENVFILE
-fi
-
-sudo systemctl daemon-reload
-sudo systemctl enable dockify
+# Base path when behind a reverse proxy (optional)
+DOCKIFY_BASE_PATH=$BASE_PATH
+ENVEOF
 
 echo ""
 echo "=== Dockify installed successfully! ==="
 echo ""
-echo "Next steps:"
-echo "  1. Edit /etc/dockify/dockify.env to configure your settings"
-echo "  2. Set Cloudflare API token if you want DNS automation"
-echo "  3. Start: sudo systemctl start dockify"
-echo "  4. Open http://<your-ip>:8080"
+echo "Directory: $INSTALL_DIR"
+echo "Domain:    $DOMAIN"
 echo ""
-echo "Manually build from source:"
-echo "  git clone https://github.com/coderbuzz/dockify.git"
-echo "  cd dockify"
-echo "  go build -o dockify ./cmd/dockify"
-echo "  ./dockify serve"
+echo "Next steps:"
+echo ""
+echo "  1. Point $DOMAIN DNS A record to this server's IP"
+echo "  2. Start Dockify:"
+echo ""
+echo "     cd $INSTALL_DIR"
+echo "     docker compose up -d"
+echo ""
+echo "  3. Open https://$DOMAIN"
+echo ""
+echo "To stop:          docker compose -f $INSTALL_DIR/docker-compose.yml down"
+echo "To view logs:     docker compose -f $INSTALL_DIR/docker-compose.yml logs -f"
+echo "To update:        cd $INSTALL_DIR && docker compose pull && docker compose up -d"

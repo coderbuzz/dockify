@@ -48,11 +48,11 @@ docker compose up -d
 
 Dockify + Caddy run in the same Docker network (`dockify`). Caddy listens on port 80/443, auto-proxies to Dockify on `dockify:8080`, and auto-obtains Let's Encrypt certificates. The `Caddyfile` uses `{$DOMAIN}` from your `.env`.
 
-**Option B: One-liner install script** — Installs as a systemd service. No bundled Caddy for the dashboard itself.
+**Option B: One-liner script** — Interactive installer. Prompts for domain + Cloudflare keys, downloads `docker-compose.yml` + `Caddyfile`, creates `.env`, and sets up everything.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
-sudo systemctl start dockify
+cd /opt/dockify && docker compose up -d
 ```
 
 Runs Dockify as a standalone binary behind systemd. The dashboard is accessible at `http://<ip>:8080` (plain HTTP). If you want HTTPS for the dashboard, add a reverse proxy (Caddy, nginx) manually, or use Docker Compose (Option A) instead.
