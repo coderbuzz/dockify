@@ -122,7 +122,7 @@ Dockify runs with sensible defaults. Only `DOMAIN` is required for Option A. `CL
 
 Fresh Ubuntu/Debian VM. Zero dependencies needed — Dockify installs everything.
 
-**Generate SSH key on the controller:**
+**Generate SSH key on your local machine (or anywhere):**
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/dockify -N ""
@@ -134,7 +134,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/dockify -N ""
 ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 ```
 
-> This appends the key to `/root/.ssh/authorized_keys` on the worker. From this point, the controller can SSH into the worker as root without a password.
+> This appends the key to `/root/.ssh/authorized_keys` on the worker. From this point, the controller can SSH into the worker as root without a password. You will paste the **private key** (`~/.ssh/dockify`, not `.pub`) into the Dockify web UI form.
 
 ### Step 3: Register + Initialize in Web UI
 
@@ -143,7 +143,7 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
    - **Name:** `worker-01`
    - **Host:** `<worker-ip>`
    - **User:** `root`
-   - **SSH Private Key Path:** `/home/user/.ssh/dockify` (path on controller)
+   - **SSH Private Key:** Paste the content of `~/.ssh/dockify` (the private key file, `cat ~/.ssh/dockify`)
 3. Click **Add Server** → redirects to server detail
 4. Click **Initialize Worker**
 
