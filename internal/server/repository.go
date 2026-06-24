@@ -29,13 +29,20 @@ func (r *Repository) List() ([]Server, error) {
 	var servers []Server
 	for rows.Next() {
 		var s Server
+		var cpuCores, ramMB, diskGB sql.NullInt64
+		var cpuUsage, ramUsage sql.NullFloat64
 		if err := rows.Scan(
 			&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
-			&s.Status, &s.CPUCores, &s.RAMMB, &s.DiskGB,
-			&s.CPUUsage, &s.RAMUsage, &s.CreatedAt, &s.UpdatedAt,
+			&s.Status, &cpuCores, &ramMB, &diskGB,
+			&cpuUsage, &ramUsage, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		s.CPUCores = int(cpuCores.Int64)
+		s.RAMMB = int(ramMB.Int64)
+		s.DiskGB = int(diskGB.Int64)
+		s.CPUUsage = cpuUsage.Float64
+		s.RAMUsage = ramUsage.Float64
 		servers = append(servers, s)
 	}
 	return servers, rows.Err()
@@ -43,6 +50,8 @@ func (r *Repository) List() ([]Server, error) {
 
 func (r *Repository) Get(id int64) (*Server, error) {
 	s := &Server{}
+	var cpuCores, ramMB, diskGB sql.NullInt64
+	var cpuUsage, ramUsage sql.NullFloat64
 	err := r.db.QueryRow(`
 		SELECT id, name, host, port, user, ssh_key, status,
 		       cpu_cores, ram_mb, disk_gb, cpu_usage, ram_usage,
@@ -50,8 +59,8 @@ func (r *Repository) Get(id int64) (*Server, error) {
 		FROM servers WHERE id = ?
 	`, id).Scan(
 		&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
-		&s.Status, &s.CPUCores, &s.RAMMB, &s.DiskGB,
-		&s.CPUUsage, &s.RAMUsage, &s.CreatedAt, &s.UpdatedAt,
+		&s.Status, &cpuCores, &ramMB, &diskGB,
+		&cpuUsage, &ramUsage, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -59,6 +68,11 @@ func (r *Repository) Get(id int64) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.CPUCores = int(cpuCores.Int64)
+	s.RAMMB = int(ramMB.Int64)
+	s.DiskGB = int(diskGB.Int64)
+	s.CPUUsage = cpuUsage.Float64
+	s.RAMUsage = ramUsage.Float64
 	return s, nil
 }
 
@@ -66,7 +80,7 @@ func (r *Repository) Create(s *Server) error {
 	result, err := r.db.Exec(`
 		INSERT INTO servers (name, host, port, user, ssh_key, status)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, s.Name, s.Host, s.Port, s.User, s.SSHKey, "pending")
+	`, s.Name, s.Host, s.Port, s.User, s.SSHKey, s.Status)
 	if err != nil {
 		return fmt.Errorf("insert server: %w", err)
 	}
@@ -125,13 +139,20 @@ func (r *Repository) ListOnline() ([]Server, error) {
 	var servers []Server
 	for rows.Next() {
 		var s Server
+		var cpuCores, ramMB, diskGB sql.NullInt64
+		var cpuUsage, ramUsage sql.NullFloat64
 		if err := rows.Scan(
 			&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
-			&s.Status, &s.CPUCores, &s.RAMMB, &s.DiskGB,
-			&s.CPUUsage, &s.RAMUsage, &s.CreatedAt, &s.UpdatedAt,
+			&s.Status, &cpuCores, &ramMB, &diskGB,
+			&cpuUsage, &ramUsage, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		s.CPUCores = int(cpuCores.Int64)
+		s.RAMMB = int(ramMB.Int64)
+		s.DiskGB = int(diskGB.Int64)
+		s.CPUUsage = cpuUsage.Float64
+		s.RAMUsage = ramUsage.Float64
 		servers = append(servers, s)
 	}
 	return servers, rows.Err()
