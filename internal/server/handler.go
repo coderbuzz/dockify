@@ -76,6 +76,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	go func(id int64) {
 		h.service.TestConnection(id)
+		h.service.InitWorker(id)
 		h.service.RefreshResources(id)
 	}(server.ID)
 
@@ -231,6 +232,7 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 
 	go func(id int64) {
 		h.service.TestConnection(id)
+		h.service.InitWorker(id)
 		h.service.RefreshResources(id)
 	}(server.ID)
 
