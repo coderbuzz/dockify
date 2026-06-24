@@ -32,50 +32,17 @@ Worker VM
   └── Caddy routes to containers via Docker network
 ```
 
-## System Requirements
-
-### Controller VM (where Dockify runs)
-
-Recommended OS: **Debian 12** (minimal install, no GUI). All specs below are **total VM size** (OS + Dockify).
-
-| Spec | Minimum | Recommended |
-|---|---|---|
-| **OS** | Debian 12 minimal | Debian 12 minimal |
-| **vCPU** | 1 core | 2 cores |
-| **RAM** | 1 GB | 2 GB |
-| **Disk** | 10 GB | 20 GB |
-
-The Go binary is ~20 MB with near-zero CPU at idle. A 1 GB / 10 GB VM is enough even for Docker Compose mode.
-
-| Install mode | Docker needed? | HTTPS dashboard | RAM used |
-|---|---|---|---|
-| **1: Docker Compose** | ✅ Yes | Auto (Caddy container) | ~100 MB |
-| **2: Binary only** | ❌ No | Manual | ~30 MB |
-| **3: Binary + native Caddy** | ❌ No | Auto (Let's Encrypt) | ~40 MB |
-
-### Worker VMs (where apps run)
-
-| Resource | Notes |
-|---|---|
-| CPU | Depends on your apps |
-| RAM | Depends on your apps |
-| Disk | Depends on your apps |
-| OS | Ubuntu / Debian recommended |
-| Docker | Auto-installed by Dockify on init |
-
-Worker VMs need zero setup — Dockify installs Docker and Caddy automatically via SSH.
-
 ## Quick Start
 
 ### Step 1: Install Dockify on Controller VM
 
-**Choose the right mode for your controller:**
+Recommended OS: **Debian 12** (minimal, no GUI). All specs are **total VM size** (OS + Dockify).
 
-| Mode | RAM | HTTPS dashboard | Docker needed? | Manage via |
-|---|---|---|---|---|
-| **1: Docker Compose** | ~100 MB | Auto (Caddy container, Let's Encrypt) | ✅ | `docker compose` |
-| **2: Binary only** | ~30 MB | Manual (nginx/Caddy) | ❌ | `systemctl` |
-| **3: Binary + Caddy** | ~40 MB | Auto (native Caddy, Let's Encrypt) | ❌ | `systemctl` |
+| Mode | Min vCPU | Min RAM | Min Disk | RAM used | HTTPS | Docker? |
+|---|---|---|---|---|---|---|
+| **1: Docker Compose** | 1 | 1 GB | 10 GB | ~100 MB | Auto (Caddy container) | ✅ |
+| **2: Binary only** | 1 | 1 GB | 10 GB | ~30 MB | Manual | ❌ |
+| **3: Binary + Caddy** | 1 | 1 GB | 10 GB | ~40 MB | Auto (native Caddy) | ❌ |
 
 **Option A: Binary + native Caddy (lightweight + auto HTTPS) — recommended**
 
@@ -105,6 +72,15 @@ curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/inst
 cd /opt/dockify && docker compose up -d
 ```
 
+**Option D: Build from source (development)**
+
+```bash
+git clone https://github.com/coderbuzz/dockify.git
+cd dockify
+go build -o dockify ./cmd/dockify
+./dockify serve
+```
+
 **All installation methods share the same architecture for worker VMs:**
 - Dockify connects to workers via SSH
 - Installs Docker + creates the `dockify` Docker network on each worker
@@ -120,7 +96,7 @@ Open `https://<your-domain>` or `http://<controller-ip>:8080`.
 Create a `.env` file in the project root or set these environment variables:
 
 ```env
-# Domain for Caddy reverse proxy (auto HTTPS). Only needed for Option A (Docker Compose).
+# Domain for Caddy reverse proxy (auto HTTPS). Only needed for Mode 1 (Docker Compose).
 DOMAIN=dockify.example.com
 
 # Admin credentials (required for web UI login).
