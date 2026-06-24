@@ -103,6 +103,7 @@ SYSTEMD
 
   sudo systemctl daemon-reload
   sudo systemctl enable dockify
+  sudo systemctl start dockify
 
   # Mode 3: install native Caddy
   if [ "$MODE" = "3" ]; then
@@ -134,22 +135,18 @@ CADDYEOF
 
     sudo systemctl daemon-reload
     sudo systemctl enable dockify-caddy
+    sudo systemctl start dockify-caddy
   fi
 
   echo ""
   if [ "$MODE" = "3" ]; then
-    echo "=== Dockify v${VERSION} + Caddy installed! ==="
-    echo "Start:  sudo systemctl start dockify-caddy"
-    echo "        (starts dockify automatically)"
+    echo "=== Dockify v${VERSION} + Caddy installed and running! ==="
     echo "Logs:   journalctl -u dockify-caddy -f"
-    echo "Config: $INSTALL_DIR/.env"
     echo ""
     echo "Open https://$DOMAIN"
   else
-    echo "=== Dockify v${VERSION} installed! ==="
-    echo "Start:  sudo systemctl start dockify"
+    echo "=== Dockify v${VERSION} installed and running! ==="
     echo "Logs:   journalctl -u dockify -f"
-    echo "Config: $INSTALL_DIR/.env"
     echo ""
     echo "Open http://<your-ip>:8080"
   fi
