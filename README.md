@@ -63,36 +63,38 @@ Worker VMs need zero setup — Dockify installs Docker and Caddy automatically v
 
 **Choose the right mode for your controller:**
 
-| Mode | RAM | HTTPS dashboard | Manage via | Use case |
+| Mode | RAM | HTTPS dashboard | Docker needed? | Manage via |
 |---|---|---|---|---|
-| **Binary + systemd** | ~30 MB | Manual (Caddy/nginx) | `systemctl` | Production, lightweight |
-| **Docker Compose** | ~100 MB | Auto (Caddy, Let's Encrypt) | `docker compose` | Production, convenience |
+| **1: Docker Compose** | ~100 MB | Auto (Caddy container, Let's Encrypt) | ✅ | `docker compose` |
+| **2: Binary only** | ~30 MB | Manual (nginx/Caddy) | ❌ | `systemctl` |
+| **3: Binary + Caddy** | ~40 MB | Auto (native Caddy, Let's Encrypt) | ❌ | `systemctl` |
 
-The binary mode is lighter (no Docker daemon overhead). The Docker Compose mode bundles Caddy for automatic HTTPS. Both are equally capable — the choice only affects how you host the controller itself.
-
-**Option A: Binary + systemd (lightweight)**
+**Option A: Binary + native Caddy (lightweight + auto HTTPS) — recommended**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
-# Select mode 2 (Binary + systemd)
+# Select mode 3 (Binary + Caddy)
+sudo systemctl start dockify-caddy
+```
+
+Dockify + Caddy run as native binaries (no Docker). Caddy auto-obtains Let's Encrypt certificates and proxies to Dockify on `127.0.0.1:8080`.
+
+**Option B: Binary only (lightest)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+# Select mode 2 (Binary only)
 sudo systemctl start dockify
 ```
 
-**Option B: Docker Compose (with bundled Caddy, auto HTTPS)**
+No Caddy, no Docker. Access at `http://<ip>:8080`. Add a reverse proxy manually if needed.
+
+**Option C: Docker Compose (bundled Caddy)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
 # Select mode 1 (Docker Compose) - default
 cd /opt/dockify && docker compose up -d
-```
-
-**Option C: Build from source (development)**
-
-```bash
-git clone https://github.com/coderbuzz/dockify.git
-cd dockify
-go build -o dockify ./cmd/dockify
-./dockify serve
 ```
 
 **All installation methods share the same architecture for worker VMs:**

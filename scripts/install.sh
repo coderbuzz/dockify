@@ -37,9 +37,9 @@ prompt_secret() {
   printf -v "$var" "%s" "$val"
 }
 
-prompt MODE "Install mode (1=Docker Compose with Caddy, 2=Binary + systemd) [1]: " "1"
+prompt MODE "Install mode (1=Docker Compose with Caddy, 2=Binary only, 3=Binary + Caddy) [1]: " "1"
 
-if [ "$MODE" = "2" ]; then
+if [ "$MODE" = "2" ] || [ "$MODE" = "3" ]; then
   INSTALL_BIN="${INSTALL_BIN:-/usr/local/bin}"
   echo ""
   echo "Admin credentials (optional - empty password = no auth)"
@@ -49,8 +49,12 @@ if [ "$MODE" = "2" ]; then
   prompt CF_ZONE  "Cloudflare Zone ID (optional): "
   prompt BASE_PATH "Base path (optional): "
 
+  if [ "$MODE" = "3" ]; then
+    prompt DOMAIN "Domain for Dockify (e.g., dockify.amg.id): " "" required
+  fi
+
   echo ""
-  echo "Fetching latest version..."
+  echo "Fetching latest Dockify version..."
   VERSION=$(curl -fsSL "https://api.github.com/repos/coderbuzz/dockify/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
   [ -z "$VERSION" ] && VERSION="0.1.0"
 
@@ -87,14 +91,61 @@ SYSTEMD
   sudo systemctl daemon-reload
   sudo systemctl enable dockify
 
+  # Mode 3: install native Caddy
+  if [ "$MODE" = "3" ]; then
+    echo ""
+    echo "Downloading Caddy..."
+    curl -fsSL "https://caddyserver.com/api/download?os=linux&arch=amd64" -o "$TMP_DIR/caddy"
+    sudo mv "$TMP_DIR/caddy" "$INSTALL_BIN/caddy"
+    sudo chmod +x "$INSTALL_BIN/caddy"
+
+    sudo tee /etc/systemd/system/dockify-caddy.service > /dev/null << 'SYSCTY'
+[Unit]
+Description=Caddy reverse proxy for Dockify
+After=dockify.service
+Requires=dockify.service
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/caddy run --config /opt/dockify/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /opt/dockify/Caddyfile
+Restart=on-failure
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+SYSCTY
+
+    cat > "$INSTALL_DIR/Caddyfile" << CADDYEOF
+{
+	debug false
+	log { level error }
+}
+
+$DOMAIN {
+	reverse_proxy 127.0.0.1:8080
+}
+CADDYEOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable dockify-caddy
+  fi
+
   echo ""
-  echo "=== Dockify v${VERSION} installed! ==="
-  echo "Start:   sudo systemctl start dockify"
-  echo "Status:  sudo systemctl status dockify"
-  echo "Logs:    journalctl -u dockify -f"
-  echo "Config:  $INSTALL_DIR/.env"
-  echo ""
-  echo "Open http://<your-ip>:8080"
+  if [ "$MODE" = "3" ]; then
+    echo "=== Dockify v${VERSION} + Caddy installed! ==="
+    echo "Start:  sudo systemctl start dockify-caddy"
+    echo "        (starts dockify automatically)"
+    echo "Logs:   journalctl -u dockify-caddy -f"
+    echo "Config: $INSTALL_DIR/.env"
+    echo ""
+    echo "Open https://$DOMAIN"
+  else
+    echo "=== Dockify v${VERSION} installed! ==="
+    echo "Start:  sudo systemctl start dockify"
+    echo "Logs:   journalctl -u dockify -f"
+    echo "Config: $INSTALL_DIR/.env"
+    echo ""
+    echo "Open http://<your-ip>:8080"
+  fi
 
 else
   prompt DOMAIN "Domain for Dockify (e.g., dockify.amg.id): " "" required
