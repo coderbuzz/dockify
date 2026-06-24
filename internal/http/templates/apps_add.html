@@ -6,7 +6,7 @@
 <main class="container">
   <hgroup>
     <h1>Deploy App</h1>
-    <p>Deploy a Docker Compose stack to a worker VM</p>
+    <p>Deploy a Docker container to a worker VM</p>
   </hgroup>
 
   {{if .Error}}
@@ -28,7 +28,7 @@
       <div class="grid">
         <label>
           Port
-          <input type="number" name="port" placeholder="3000" required>
+          <input type="number" name="port" placeholder="80" required>
           <small>Internal container port</small>
         </label>
         <label>
@@ -45,10 +45,36 @@
     </fieldset>
 
     <fieldset>
-      <label>
-        Docker Compose
-        <textarea name="compose" rows="12" placeholder="version: '3'&#10;services:&#10;  web:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '3000:80'" required></textarea>
-      </label>
+      <legend>
+        <label style="display:inline;margin-right:1em">
+          <input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'">
+          Simple Mode
+        </label>
+        <label style="display:inline">
+          <input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''">
+          Advanced Mode
+        </label>
+      </legend>
+
+      <div id="simple-section">
+        <label>
+          Docker Image
+          <input type="text" name="image" placeholder="nginx:alpine">
+        </label>
+        <label>
+          Environment Variables
+          <input type="text" name="env_vars" placeholder="KEY=val, FOO=bar">
+          <small>Comma-separated key=value pairs</small>
+        </label>
+      </div>
+
+      <div id="advanced-section" style="display:none">
+        <label>
+          Docker Compose
+          <textarea name="compose" rows="14" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify"></textarea>
+          <small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small>
+        </label>
+      </div>
     </fieldset>
 
     <fieldset>

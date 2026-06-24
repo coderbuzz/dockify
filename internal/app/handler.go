@@ -33,6 +33,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Domain    string `json:"domain"`
 		Port      int    `json:"port"`
 		Compose   string `json:"compose"`
+		Image     string `json:"image"`
+		EnvVars   string `json:"env_vars"`
 		GitRepo   string `json:"git_repo"`
 		GitBranch string `json:"git_branch"`
 	}
@@ -42,8 +44,17 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Name == "" || input.Domain == "" || input.Port == 0 || input.Compose == "" {
-		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "name, domain, port, and compose are required"})
+	if input.Name == "" || input.Domain == "" || input.Port == 0 {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "name, domain, and port are required"})
+		return
+	}
+
+	compose := input.Compose
+	if compose == "" && input.Image != "" {
+		compose = generateCompose(input.Image, input.Port, input.EnvVars)
+	}
+	if compose == "" {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "provide either compose or image"})
 		return
 	}
 
@@ -61,7 +72,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ServerID:  input.ServerID,
 		Domain:    input.Domain,
 		Port:      input.Port,
-		Compose:   input.Compose,
+		Compose:   compose,
 		GitRepo:   input.GitRepo,
 		GitBranch: input.GitBranch,
 	}
@@ -225,12 +236,20 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		gitBranch = "main"
 	}
 
+	compose := strings.TrimSpace(r.FormValue("compose"))
+	image := strings.TrimSpace(r.FormValue("image"))
+	envVars := strings.TrimSpace(r.FormValue("env_vars"))
+
+	if compose == "" && image != "" {
+		compose = generateCompose(image, port, envVars)
+	}
+
 	app := &App{
 		Name:      strings.TrimSpace(r.FormValue("name")),
 		ServerID:  serverID,
 		Domain:    strings.TrimSpace(r.FormValue("domain")),
 		Port:      port,
-		Compose:   strings.TrimSpace(r.FormValue("compose")),
+		Compose:   compose,
 		GitRepo:   strings.TrimSpace(r.FormValue("git_repo")),
 		GitBranch: gitBranch,
 	}
@@ -240,7 +259,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
 			"Title":   "Deploy App",
 			"Servers": servers,
-			"Error":   "name, domain, port, and compose are required",
+			"Error":   "name, domain, port, and either compose or image are required",
 		})
 		return
 	}

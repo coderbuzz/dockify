@@ -118,7 +118,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		return
 	}
 
-	target := fmt.Sprintf("%s:%d", app.Name, app.Port)
+	target := fmt.Sprintf("%s:%d", getServiceName(app.Compose), app.Port)
 	caddyClient := caddy.NewClient(client)
 	if err := caddyClient.AddRoute(app.Domain, target); err != nil {
 		log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, err)
