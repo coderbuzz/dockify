@@ -1,0 +1,153 @@
+# AGENTS.md
+
+## Project Overview
+
+Dockify is a self-hosted Docker app deployment platform. Single Go binary with embedded web UI, SQLite database, SSH-based worker management, Caddy reverse proxy integration, and Cloudflare DNS automation.
+
+## Tech Stack
+
+- **Language:** Go 1.25+
+- **Database:** SQLite via `modernc.org/sqlite` (pure Go, no CGo)
+- **Router:** `github.com/go-chi/chi/v5`
+- **SSH:** `golang.org/x/crypto/ssh`
+- **Web UI:** Go `html/template` + HTMX + Pico CSS (embedded via `embed`, no build step)
+- **Docker:** Multi-stage build, published to `ghcr.io/coderbuzz/dockify`
+
+## Build
+
+```bash
+go build -o dockify ./cmd/dockify
+./dockify serve        # start server
+./dockify version      # print version
+```
+
+## Project Structure
+
+```
+cmd/dockify/main.go           # entry point, wires dependencies
+internal/
+  config/config.go            # env var config
+  db/db.go + schema.sql       # SQLite setup + schema
+  ssh/client.go               # SSH client (connect, exec, write file)
+  server/                     # VM/Server CRUD, resource monitoring
+  app/                        # App CRUD, deploy/undeploy/redeploy/rollback
+  caddy/client.go             # Caddy Admin API via SSH
+  cloudflare/client.go        # Cloudflare DNS API v4
+  webhook/handler.go          # GitHub + GitLab webhook handler
+  scheduler/scheduler.go      # Auto-select least-loaded VM
+  http/                       # Chi router, templates (embedded), renderer
+    templates/                # HTML templates (Pico CSS + HTMX)
+scripts/
+  install.sh                  # One-liner install script
+  release.sh                  # Version bump + tag helper
+Dockerfile                    # Multi-stage Docker build
+docker-compose.yml            # Dockify + Caddy reverse proxy
+.github/workflows/build.yml   # CI: vet, test, build binary + Docker, release on tag
+```
+
+## How to Release a New Version
+
+### Option 1: Interactive script (recommended)
+
+```bash
+./scripts/release.sh patch    # bump 0.1.0 -> 0.1.1
+./scripts/release.sh minor    # bump 0.1.1 -> 0.2.0
+./scripts/release.sh major    # bump 0.2.0 -> 1.0.0
+./scripts/release.sh 1.5.0    # set exact version
+```
+
+The script will:
+1. Detect the latest git tag
+2. Calculate the next version
+3. Create a git tag
+4. Push the tag to origin
+
+### Option 2: Manual
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+### CI Automation
+
+Pushing a `v*` tag triggers `.github/workflows/build.yml` which automatically:
+1. Builds the Go binary for linux/amd64 with the version injected via ldflags
+2. Creates a GitHub Release with the binary as an asset (`dockify-linux-amd64`)
+3. Pushes a Docker image tagged with the version to `ghcr.io/coderbuzz/dockify`
+
+No manual GitHub UI interaction needed. The install script auto-detects the latest release.
+
+## Key Commands
+
+```bash
+# Development
+go build ./...           # build all packages
+go vet ./...             # lint
+go mod tidy              # clean dependencies
+
+# Run locally
+DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
+
+# Build and run with Docker
+docker build -t dockify .
+docker run -p 8080:8080 -v $(pwd)/data:/var/lib/dockify dockify
+```
+
+## Environment Variables
+
+| Variable | Default | Required |
+|---|---|---|
+| `DOCKIFY_HOST` | `0.0.0.0` | No |
+| `DOCKIFY_PORT` | `8080` | No |
+| `DOCKIFY_DATA_DIR` | `/var/lib/dockify` | No |
+| `DOCKIFY_SSH_KEY_DIR` | `/var/lib/dockify/keys` | No |
+| `CLOUDFLARE_API_TOKEN` | - | For DNS |
+| `CLOUDFLARE_ZONE_ID` | - | For DNS |
+
+## API Endpoints
+
+### Servers
+```
+GET    /api/servers              List all servers
+POST   /api/servers              Add a new server
+GET    /api/servers/:id          Get server details
+DELETE /api/servers/:id          Remove server
+POST   /api/servers/:id/init     Initialize worker (install Docker + Caddy)
+```
+
+### Apps
+```
+GET    /api/apps                 List all apps
+POST   /api/apps                 Create and deploy app (server_id=0 for auto-select)
+GET    /api/apps/:id             Get app details
+DELETE /api/apps/:id             Undeploy and remove app
+POST   /api/apps/:id/redeploy    Redeploy app
+POST   /api/apps/:id/rollback    Rollback to last successful deployment
+GET    /api/apps/:id/deployments Deployment history
+GET    /api/apps/:id/logs        Stream app logs (SSH docker compose logs)
+```
+
+### Webhooks
+```
+POST   /api/webhook/github      GitHub push webhook
+POST   /api/webhook/gitlab      GitLab push webhook
+```
+
+## Deploy Flow
+
+When an app is deployed:
+1. Select server (manual or auto-scheduler)
+2. SSH → write `docker-compose.yml` to `/opt/dockify/apps/:name/`
+3. SSH → `docker compose up -d`
+4. Inject Caddy route via Admin API
+5. Create Cloudflare DNS A record (if configured)
+6. Save compose snapshot for rollback
+7. Record deployment in history
+
+## Worker Init Flow
+
+`POST /api/servers/:id/init` triggers:
+1. SSH connect + verify
+2. Install Docker via `get.docker.com`
+3. Create `dockify` Docker network
+4. Deploy Caddy container (ports 80/443 + Admin API localhost:2019)
