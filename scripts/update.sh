@@ -41,11 +41,11 @@ sudo mv /tmp/dockify-update /usr/local/bin/dockify
 sudo chmod +x /usr/local/bin/dockify
 
 if [ "$MODE" = "binary+caddy" ]; then
-  echo "Restarting services..."
-  sudo systemctl restart dockify-caddy
+  echo "Restarting Dockify..."
+  sudo systemctl restart dockify
   echo ""
   echo "Dockify updated to $VERSION"
-  echo "Logs: journalctl -u dockify-caddy -f"
+  echo "Logs: journalctl -u dockify -f | journalctl -u dockify-caddy -f"
 else
   echo "Restarting service..."
   sudo systemctl restart dockify
