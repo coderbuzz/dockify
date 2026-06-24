@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/coderbuzz/dockify/internal/app"
@@ -127,13 +128,12 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 func PrefixMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prefix := r.Header.Get("X-Forwarded-Prefix")
+		if prefix == "" {
+			prefix = os.Getenv("DOCKIFY_BASE_PATH")
+		}
 		if prefix != "" {
-			prefix = strings.TrimSuffix(prefix, "/")
-			r = SetBasePath(r, prefix+"/")
-			r.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
-			if r.URL.Path == "" {
-				r.URL.Path = "/"
-			}
+			prefix = strings.TrimSuffix(prefix, "/") + "/"
+			r = SetBasePath(r, prefix)
 		}
 		next.ServeHTTP(w, r)
 	})
