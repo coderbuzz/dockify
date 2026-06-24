@@ -36,22 +36,22 @@ Worker VM
 
 ### Controller VM (where Dockify runs)
 
-**Minimum** — Dockify can run on these specs:
+**Minimum** — Dockify can run on these specs (free space after OS):
 
 | Requirement | Mode 1 (Docker Compose) | Mode 2 (Binary only) | Mode 3 (Binary + Caddy) |
 |---|---|---|---|
 | **RAM** | 256 MB | 128 MB | 192 MB |
-| **Disk** | 5 GB | 3 GB | 3 GB |
+| **Free disk** | 5 GB | 3 GB | 3 GB |
 | **CPU** | 1 core | 1 core | 1 core |
 | **Docker needed?** | ✅ Yes | ❌ No | ❌ No |
 | **Ports** | 80 / 443 (Caddy container) | 8080 (no HTTPS) | 80 / 443 (Caddy native) |
 
-**Recommended for production:**
+**Recommended for production** (free space after OS):
 
 | Requirement | Mode 1 (Docker Compose) | Mode 2 (Binary only) | Mode 3 (Binary + Caddy) |
 |---|---|---|---|
 | **RAM** | 1 GB | 512 MB | 512 MB |
-| **Disk** | 10 GB | 5 GB | 5 GB |
+| **Free disk** | 10 GB | 5 GB | 5 GB |
 | **CPU** | 2 cores | 1 core | 1 core |
 
 The Go binary is ~20 MB with near-zero CPU at idle. All modes run on Linux (any distro).
