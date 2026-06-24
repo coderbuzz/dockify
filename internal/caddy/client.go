@@ -75,6 +75,12 @@ func (c *Client) AddRouteWithAuth(domain, target, user, pass string) error {
 }
 
 func (c *Client) postRoute(route Route) error {
+	// Hapus route lama dengan ID yang sama (kalau ada, ignore error)
+	c.ssh.Exec(fmt.Sprintf(
+		`docker exec caddy curl -s -o /dev/null -X DELETE http://localhost:2019/id/%s`,
+		route.ID,
+	))
+
 	body, err := json.Marshal(route)
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
