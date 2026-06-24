@@ -158,17 +158,19 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 ### Step 4: Deploy Your First App
 
 1. Go to **Apps** → **Deploy App**
-2. Paste a `docker-compose.yml`, set domain + port
-3. Select server (or **Auto-select** for least-loaded)
-4. Click **Deploy App**
+2. Choose **Simple Mode** (just an image name) or **Advanced Mode** (full `docker-compose.yml`)
+3. Set domain, port, and select a server (or **Auto-select** for least-loaded)
+4. Optional: fill **Basic Auth** username/password to protect the app behind HTTP basic auth
+5. Click **Deploy App**
 
 **What happens on deploy:**
 1. SSH → write compose file to `/opt/dockify/apps/<name>/`
 2. SSH → `docker compose up -d`
 3. Inject Caddy route via Admin API (domain → container:port)
-4. Create Cloudflare DNS A record (if configured)
-5. Record deployment + save compose snapshot for rollback
-6. Status → **running**
+4. If basic auth is set, Caddy requires username/password before proxying
+5. Create Cloudflare DNS A record (if configured)
+6. Record deployment + save compose snapshot for rollback
+7. Status → **running**
 
 ## Git Webhook CI/CD
 
