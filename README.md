@@ -61,41 +61,47 @@ Worker VMs need zero setup — Dockify installs Docker and Caddy automatically v
 
 ### Step 1: Install Dockify on Controller VM
 
-Choose one option:
+**Choose the right mode for your controller:**
 
-**Option A: Docker Compose (recommended)** — Includes Caddy reverse proxy with auto HTTPS. Best for production.
+| Mode | RAM | HTTPS dashboard | Manage via | Use case |
+|---|---|---|---|---|
+| **Binary + systemd** | ~30 MB | Manual (Caddy/nginx) | `systemctl` | Production, lightweight |
+| **Docker Compose** | ~100 MB | Auto (Caddy, Let's Encrypt) | `docker compose` | Production, convenience |
 
-```bash
-git clone https://github.com/coderbuzz/dockify.git && cd dockify
-cp .env.example .env
-docker compose up -d
-```
+The binary mode is lighter (no Docker daemon overhead). The Docker Compose mode bundles Caddy for automatic HTTPS. Both are equally capable — the choice only affects how you host the controller itself.
 
-Dockify + Caddy run in the same Docker network (`dockify`). Caddy listens on port 80/443, auto-proxies to Dockify on `dockify:8080`, and auto-obtains Let's Encrypt certificates. The `Caddyfile` uses `{$DOMAIN}` from your `.env`.
-
-**Option B: One-liner script** — Interactive installer. Prompts for domain + Cloudflare keys, downloads `docker-compose.yml` + `Caddyfile`, creates `.env`, and sets up everything.
+**Option A: Binary + systemd (lightweight)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+# Select mode 2 (Binary + systemd)
+sudo systemctl start dockify
+```
+
+**Option B: Docker Compose (with bundled Caddy, auto HTTPS)**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+# Select mode 1 (Docker Compose) - default
 cd /opt/dockify && docker compose up -d
 ```
 
-Runs Dockify as a standalone binary behind systemd. The dashboard is accessible at `http://<ip>:8080` (plain HTTP). If you want HTTPS for the dashboard, add a reverse proxy (Caddy, nginx) manually, or use Docker Compose (Option A) instead.
-
-**Option C: Build from source** — Same as install script but manual. Good for development.
+**Option C: Build from source (development)**
 
 ```bash
+git clone https://github.com/coderbuzz/dockify.git
+cd dockify
 go build -o dockify ./cmd/dockify
 ./dockify serve
 ```
 
-**All three options share the same architecture for worker VMs:**
+**All installation methods share the same architecture for worker VMs:**
 - Dockify connects to workers via SSH
-- Installs Docker + creates the `dockify` Docker network
+- Installs Docker + creates the `dockify` Docker network on each worker
 - Deploys Caddy on each worker (port 80/443 + Admin API on localhost:2019)
 - Apps communicate with Caddy through the `dockify` network
 
-The choice only affects how you host the Dockify controller itself.
+The choice between binary and Docker only affects how you host the Dockify controller itself. Worker VMs are identical either way.
 
 Open `https://<your-domain>` or `http://<controller-ip>:8080`.
 
