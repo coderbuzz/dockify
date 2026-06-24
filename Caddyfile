@@ -1,3 +1,10 @@
+{
+	debug false
+	log {
+		level error
+	}
+}
+
 {$DOMAIN:localhost} {
-    reverse_proxy dockify:8080
+	reverse_proxy dockify:8080
 }
