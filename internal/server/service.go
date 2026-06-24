@@ -1,0 +1,245 @@
+package server
+
+import (
+	"fmt"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/coderbuzz/dockify/internal/ssh"
+)
+
+const (
+	StatusPending  = "pending"
+	StatusOnline   = "online"
+	StatusOffline  = "offline"
+	StatusError    = "error"
+)
+
+type Service struct {
+	repo   *Repository
+	monitor *Monitor
+}
+
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
+}
+
+func (s *Service) List() ([]Server, error) {
+	return s.repo.List()
+}
+
+func (s *Service) Get(id int64) (*Server, error) {
+	return s.repo.Get(id)
+}
+
+func (s *Service) Create(server *Server) error {
+	if server.Port == 0 {
+		server.Port = 22
+	}
+	if server.User == "" {
+		server.User = "root"
+	}
+	return s.repo.Create(server)
+}
+
+func (s *Service) Update(server *Server) error {
+	return s.repo.Update(server)
+}
+
+func (s *Service) Delete(id int64) error {
+	return s.repo.Delete(id)
+}
+
+func (s *Service) TestConnection(id int64) error {
+	server, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	if server == nil {
+		return fmt.Errorf("server not found")
+	}
+
+	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusOffline)
+		return fmt.Errorf("SSH connect failed: %w", err)
+	}
+	defer client.Close()
+
+	out, err := client.Exec("uptime")
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusOffline)
+		return fmt.Errorf("SSH exec failed: %w", err)
+	}
+
+	s.repo.UpdateStatus(id, StatusOnline)
+	log.Printf("Server %q is online: %s", server.Name, strings.TrimSpace(out))
+	return nil
+}
+
+func (s *Service) InitWorker(id int64) error {
+	server, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	if server == nil {
+		return fmt.Errorf("server not found")
+	}
+
+	s.repo.UpdateStatus(id, "initializing")
+
+	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusError)
+		return fmt.Errorf("SSH connect: %w", err)
+	}
+	defer client.Close()
+
+	log.Printf("Installing Docker on %s...", server.Name)
+	_, err = client.Exec("command -v docker || curl -fsSL https://get.docker.com | sh")
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusError)
+		return fmt.Errorf("install docker: %w", err)
+	}
+
+	log.Printf("Creating dockify network on %s...", server.Name)
+	_, err = client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
+	if err != nil {
+		log.Printf("Warning: failed to create dockify network: %v", err)
+	}
+
+	log.Printf("Deploying Caddy on %s...", server.Name)
+	caddyRun := `docker rm -f caddy 2>/dev/null; docker run -d \
+  --name caddy \
+  --network dockify \
+  -p 80:80 \
+  -p 443:443 \
+  -p 127.0.0.1:2019:2019 \
+  -v caddy_data:/data \
+  --restart unless-stopped \
+  caddy:latest`
+	_, err = client.Exec(caddyRun)
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusError)
+		return fmt.Errorf("deploy caddy: %w", err)
+	}
+
+	s.repo.UpdateStatus(id, StatusOnline)
+	log.Printf("Worker %q initialized successfully", server.Name)
+
+	go s.RefreshResources(id)
+	return nil
+}
+
+func (s *Service) RefreshResources(id int64) error {
+	server, err := s.repo.Get(id)
+	if err != nil || server == nil {
+		return err
+	}
+
+	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	if err != nil {
+		s.repo.UpdateStatus(id, StatusOffline)
+		return err
+	}
+	defer client.Close()
+
+	cpuCores, _ := parseCPUCount(client)
+	ramMB, _ := parseRAM(client)
+	diskGB, _ := parseDisk(client)
+	cpuUsage, _ := parseCPUUsage(client)
+	ramUsage, _ := parseRAMUsage(client)
+
+	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage)
+
+	return nil
+}
+
+func (s *Service) StartMonitor() {
+	s.monitor = NewMonitor(s)
+	go s.monitor.Run()
+}
+
+func parseCPUCount(c *ssh.Client) (int, error) {
+	out, err := c.Exec("nproc")
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	fmt.Sscanf(strings.TrimSpace(out), "%d", &count)
+	return count, nil
+}
+
+func parseRAM(c *ssh.Client) (int, error) {
+	out, err := c.Exec("free -m | awk '/Mem:/ {print $2}'")
+	if err != nil {
+		return 0, err
+	}
+	var mb int
+	fmt.Sscanf(strings.TrimSpace(out), "%d", &mb)
+	return mb, nil
+}
+
+func parseDisk(c *ssh.Client) (int, error) {
+	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/G/,\"\"); print $2}'")
+	if err != nil {
+		return 0, err
+	}
+	var gb int
+	fmt.Sscanf(strings.TrimSpace(out), "%d", &gb)
+	return gb, nil
+}
+
+func parseCPUUsage(c *ssh.Client) (float64, error) {
+	out, err := c.Exec("top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'")
+	if err != nil {
+		return 0, err
+	}
+	var usage float64
+	fmt.Sscanf(strings.TrimSpace(out), "%f", &usage)
+	return usage, nil
+}
+
+func parseRAMUsage(c *ssh.Client) (float64, error) {
+	out, err := c.Exec("free -m | awk '/Mem:/ {printf \"%.1f\", $3/$2 * 100.0}'")
+	if err != nil {
+		return 0, err
+	}
+	var usage float64
+	fmt.Sscanf(strings.TrimSpace(out), "%f", &usage)
+	return usage, nil
+}
+
+type Monitor struct {
+	service *Service
+}
+
+func NewMonitor(svc *Service) *Monitor {
+	return &Monitor{service: svc}
+}
+
+func (m *Monitor) Run() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		servers, err := m.service.List()
+		if err != nil {
+			log.Printf("Monitor: failed to list servers: %v", err)
+			continue
+		}
+
+		for _, server := range servers {
+			if server.Status != StatusOnline && server.Status != StatusOffline {
+				continue
+			}
+
+			go func(id int64, name string) {
+				if err := m.service.RefreshResources(id); err != nil {
+					log.Printf("Monitor: refresh %q failed: %v", name, err)
+				}
+			}(server.ID, server.Name)
+		}
+	}
+}

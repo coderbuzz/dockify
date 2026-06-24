@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<main class="container">
+  <hgroup>
+    <h1>Add Server</h1>
+    <p>Register a new VM in the pool</p>
+  </hgroup>
+
+  {{if .Error}}
+  <article style="color:var(--pico-color-red-500)">{{.Error}}</article>
+  {{end}}
+
+  <form hx-post="/servers/add" hx-target="closest main" hx-swap="outerHTML">
+    <fieldset>
+      <label>
+        Name
+        <input type="text" name="name" placeholder="my-worker-01" required autofocus>
+      </label>
+      <label>
+        Host (IP or hostname)
+        <input type="text" name="host" placeholder="192.168.1.10" required>
+      </label>
+      <div class="grid">
+        <label>
+          Port
+          <input type="number" name="port" value="22" placeholder="22">
+        </label>
+        <label>
+          User
+          <input type="text" name="user" value="root" placeholder="root">
+        </label>
+      </div>
+      <label>
+        SSH Private Key Path
+        <input type="text" name="ssh_key" placeholder="/home/user/.ssh/id_rsa" required>
+        <small>Path to the SSH private key on the controller machine</small>
+      </label>
+    </fieldset>
+    <button type="submit">Add Server</button>
+  </form>
+</main>
+{{template "scripts" .}}
+</body>
+</html>

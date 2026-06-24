@@ -1,0 +1,42 @@
+services:
+  dockify:
+    image: ghcr.io/coderbuzz/dockify:latest
+    container_name: dockify
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - dockify_data:/var/lib/dockify
+      - ${HOME}/.ssh:/home/dockify/.ssh:ro
+    environment:
+      DOCKIFY_HOST: 0.0.0.0
+      DOCKIFY_PORT: 8080
+      DOCKIFY_DATA_DIR: /var/lib/dockify
+      DOCKIFY_SSH_KEY_DIR: /home/dockify/.ssh
+      # CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      # CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID}
+    networks:
+      - dockify
+
+  caddy:
+    image: caddy:latest
+    container_name: dockify-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    networks:
+      - dockify
+
+volumes:
+  dockify_data:
+  caddy_data:
+
+networks:
+  dockify:
+    name: dockify

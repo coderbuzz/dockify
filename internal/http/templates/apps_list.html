@@ -1,0 +1,40 @@
+{{define "apps_list"}}
+{{if .Apps}}
+<table role="grid">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Domain</th>
+      <th>Port</th>
+      <th>Status</th>
+      <th>Git</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Apps}}
+    <tr>
+      <td><a href="/apps/{{.ID}}">{{.Name}}</a></td>
+      <td>{{.Domain}}</td>
+      <td>{{.Port}}</td>
+      <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+      <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
+      <td>
+        <a href="/apps/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a>
+        <form method="post" action="/apps/{{.ID}}/undeploy" style="display:inline"
+              hx-delete="/apps/{{.ID}}/undeploy" hx-target="closest tr" hx-swap="outerHTML"
+              hx-confirm="Undeploy {{.Name}}? This will stop and remove the app.">
+          <button type="submit" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em;color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Undeploy</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<article>
+  <p>No apps deployed yet.</p>
+  <a href="/apps/add" role="button">Deploy Your First App</a>
+</article>
+{{end}}
+{{end}}

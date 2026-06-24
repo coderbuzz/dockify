@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<main class="container" hx-boost="true">
+  <nav aria-label="breadcrumb">
+    <ul>
+      <li><a href="/servers">Servers</a></li>
+      <li>{{.Server.Name}}</li>
+    </ul>
+  </nav>
+
+  <hgroup>
+    <h1>{{.Server.Name}} <span class="status-badge status-{{.Server.Status}}">{{.Server.Status}}</span></h1>
+    <p>{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
+  </hgroup>
+
+  <div class="grid">
+    <article>
+      <h3>Connection</h3>
+      <table>
+        <tr><td><strong>Host</strong></td><td>{{.Server.Host}}</td></tr>
+        <tr><td><strong>Port</strong></td><td>{{.Server.Port}}</td></tr>
+        <tr><td><strong>User</strong></td><td>{{.Server.User}}</td></tr>
+        <tr><td><strong>SSH Key</strong></td><td><code>{{.Server.SSHKey}}</code></td></tr>
+        <tr><td><strong>Status</strong></td><td><span class="status-badge status-{{.Server.Status}}">{{.Server.Status}}</span></td></tr>
+      </table>
+    </article>
+    <article>
+      <h3>Resources</h3>
+      <table>
+        <tr><td><strong>CPU Cores</strong></td><td>{{if .Server.CPUCores}}{{.Server.CPUCores}}{{else}}-{{end}}</td></tr>
+        <tr><td><strong>CPU Usage</strong></td><td>{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}%{{else}}-{{end}}</td></tr>
+        <tr><td><strong>RAM</strong></td><td>{{if .Server.RAMMB}}{{.Server.RAMMB}} MB{{else}}-{{end}}</td></tr>
+        <tr><td><strong>RAM Usage</strong></td><td>{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}%{{else}}-{{end}}</td></tr>
+        <tr><td><strong>Disk</strong></td><td>{{if .Server.DiskGB}}{{.Server.DiskGB}} GB{{else}}-{{end}}</td></tr>
+      </table>
+    </article>
+  </div>
+
+  <div role="group">
+    {{if eq .Server.Status "pending" "offline" "error"}}
+    <form method="post" action="/servers/{{.Server.ID}}/init" style="display:inline"
+          hx-post="/servers/{{.Server.ID}}/init"
+          hx-swap="none">
+      <button type="submit">Initialize Worker</button>
+    </form>
+    {{end}}
+    <form method="post" action="/servers/{{.Server.ID}}" style="display:inline"
+          hx-delete="/servers/{{.Server.ID}}"
+          hx-target="closest main"
+          hx-swap="outerHTML"
+          hx-confirm="Remove {{.Server.Name}}? This cannot be undone.">
+      <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove Server</button>
+    </form>
+  </div>
+</main>
+{{template "scripts" .}}
+</body>
+</html>

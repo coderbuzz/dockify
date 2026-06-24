@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<main class="container" hx-boost="true">
+  <nav aria-label="breadcrumb">
+    <ul>
+      <li><a href="/apps">Apps</a></li>
+      <li>{{.App.Name}}</li>
+    </ul>
+  </nav>
+
+  <hgroup>
+    <h1>{{.App.Name}} <span class="status-badge status-{{.App.Status}}">{{.App.Status}}</span></h1>
+    <p>{{.App.Domain}}:{{.App.Port}}</p>
+  </hgroup>
+
+  <div class="grid">
+    <article>
+      <h3>Details</h3>
+      <table>
+        <tr><td><strong>Domain</strong></td><td>{{.App.Domain}}</td></tr>
+        <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
+        <tr><td><strong>Server</strong></td><td>#{{.App.ServerID}}</td></tr>
+        <tr><td><strong>Status</strong></td><td><span class="status-badge status-{{.App.Status}}">{{.App.Status}}</span></td></tr>
+        {{if .App.GitRepo}}
+        <tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
+        <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>
+        {{end}}
+      </table>
+    </article>
+    <article>
+      <h3>Docker Compose</h3>
+      <pre style="max-height:200px;overflow:auto"><code>{{.App.Compose}}</code></pre>
+    </article>
+  </div>
+
+  <div role="group">
+    <form method="post" action="/apps/{{.App.ID}}/redeploy" style="display:inline">
+      <button type="submit">Redeploy</button>
+    </form>
+    <form method="post" action="/apps/{{.App.ID}}/rollback" style="display:inline"
+          hx-post="/apps/{{.App.ID}}/rollback"
+          hx-confirm="Rollback to the last successful deployment? Current compose will be replaced.">
+      <button type="submit" class="outline contrast secondary-outline">Rollback</button>
+    </form>
+    {{if eq .App.Status "running"}}
+    <form method="post" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+          hx-delete="/apps/{{.App.ID}}/undeploy"
+          hx-target="closest main"
+          hx-swap="outerHTML"
+          hx-confirm="Undeploy {{.App.Name}}? This will stop and remove the app.">
+      <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Undeploy</button>
+    </form>
+    {{else}}
+    <form method="post" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+          hx-delete="/apps/{{.App.ID}}/undeploy"
+          hx-target="closest main"
+          hx-swap="outerHTML"
+          hx-confirm="Remove {{.App.Name}}? This cannot be undone.">
+      <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove</button>
+    </form>
+    {{end}}
+  </div>
+
+  {{if .Deployments}}
+  <h2>Deployment History</h2>
+  <table role="grid">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Status</th>
+        <th>Commit</th>
+        <th>Log</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Deployments}}
+      <tr>
+        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+        <td><span class="status-badge status-{{.Status}}">{{or .Status "unknown"}}</span></td>
+        <td>{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  {{if eq .App.Status "running"}}
+  <h2>Logs</h2>
+  <div id="logs-area">
+    <div role="group" style="margin-bottom:0.5em">
+      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=50" hx-target="#logs-content" hx-swap="innerHTML">Tail 50</button>
+      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=200" hx-target="#logs-content" hx-swap="innerHTML">Tail 200</button>
+      <button hx-get="/api/apps/{{.App.ID}}/logs?tail=500" hx-target="#logs-content" hx-swap="innerHTML">Tail 500</button>
+    </div>
+    <pre id="logs-content" style="max-height:400px;overflow:auto;background:var(--pico-color-grey-900);padding:0.5em;font-size:0.8em;border-radius:4px">
+      {{if .Logs}}{{.Logs}}{{else}}Click to load logs...{{end}}
+    </pre>
+  </div>
+  {{end}}
+</main>
+{{template "scripts" .}}
+</body>
+</html>

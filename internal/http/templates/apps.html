@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<main class="container" hx-boost="true">
+  <hgroup>
+    <h1>Apps</h1>
+    <a href="/apps/add" role="button">Deploy App</a>
+  </hgroup>
+
+  {{template "apps_list" .}}
+</main>
+{{template "scripts" .}}
+</body>
+</html>
