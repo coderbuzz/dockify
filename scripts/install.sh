@@ -61,12 +61,25 @@ if [ "$MODE" = "2" ] || [ "$MODE" = "3" ]; then
   echo "Downloading Dockify v${VERSION}..."
   sudo mkdir -p "$INSTALL_DIR" "$INSTALL_DIR/keys"
   TMP_DIR=$(mktemp -d)
+
+  # Mode 3: download Caddy too while tmp dir exists
+  if [ "$MODE" = "3" ]; then
+    echo "Downloading Caddy..."
+    curl -fsSL -o "$TMP_DIR/caddy" "https://caddyserver.com/api/download?os=linux&arch=amd64"
+  fi
+
   curl -fsSL "https://github.com/coderbuzz/dockify/releases/download/v${VERSION}/dockify-linux-amd64" -o "$TMP_DIR/dockify"
   sudo mv "$TMP_DIR/dockify" "$INSTALL_BIN/dockify"
   sudo chmod +x "$INSTALL_BIN/dockify"
+
+  if [ "$MODE" = "3" ]; then
+    sudo mv "$TMP_DIR/caddy" "$INSTALL_BIN/caddy"
+    sudo chmod +x "$INSTALL_BIN/caddy"
+  fi
+
   rm -rf "$TMP_DIR"
 
-  cat > "$INSTALL_DIR/.env" << ENVEOF
+  sudo tee "$INSTALL_DIR/.env" > /dev/null << ENVEOF
 DOCKIFY_ADMIN_USER=$ADMIN_USER
 DOCKIFY_ADMIN_PASSWORD=$ADMIN_PASS
 CLOUDFLARE_API_TOKEN=$CF_TOKEN
@@ -93,12 +106,6 @@ SYSTEMD
 
   # Mode 3: install native Caddy
   if [ "$MODE" = "3" ]; then
-    echo ""
-    echo "Downloading Caddy..."
-    curl -fsSL "https://caddyserver.com/api/download?os=linux&arch=amd64" -o "$TMP_DIR/caddy"
-    sudo mv "$TMP_DIR/caddy" "$INSTALL_BIN/caddy"
-    sudo chmod +x "$INSTALL_BIN/caddy"
-
     sudo tee /etc/systemd/system/dockify-caddy.service > /dev/null << 'SYSCTY'
 [Unit]
 Description=Caddy reverse proxy for Dockify
@@ -114,7 +121,7 @@ RestartSec=10
 WantedBy=multi-user.target
 SYSCTY
 
-    cat > "$INSTALL_DIR/Caddyfile" << CADDYEOF
+    sudo tee "$INSTALL_DIR/Caddyfile" > /dev/null << CADDYEOF
 {
 	debug false
 	log { level error }
@@ -162,10 +169,10 @@ else
   echo ""
   echo "Downloading files..."
   sudo mkdir -p "$INSTALL_DIR"
-  curl -fsSL "$RAW/docker-compose.yml" -o "$INSTALL_DIR/docker-compose.yml"
-  curl -fsSL "$RAW/Caddyfile" -o "$INSTALL_DIR/Caddyfile"
+  sudo curl -fsSL "$RAW/docker-compose.yml" -o "$INSTALL_DIR/docker-compose.yml"
+  sudo curl -fsSL "$RAW/Caddyfile" -o "$INSTALL_DIR/Caddyfile"
 
-  cat > "$INSTALL_DIR/.env" << ENVEOF
+  sudo tee "$INSTALL_DIR/.env" > /dev/null << ENVEOF
 DOMAIN=$DOMAIN
 DOCKIFY_ADMIN_USER=$ADMIN_USER
 DOCKIFY_ADMIN_PASSWORD=$ADMIN_PASS
