@@ -81,7 +81,7 @@ func (c *Client) postRoute(route Route) error {
 	}
 
 	cmd := fmt.Sprintf(
-		`curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://127.0.0.1:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; cat /tmp/cr.txt`,
+		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; docker exec caddy cat /tmp/cr.txt`,
 		escapeShell(string(body)),
 	)
 	out, err := c.ssh.Exec(cmd)
@@ -103,7 +103,7 @@ func (c *Client) postRoute(route Route) error {
 func (c *Client) RemoveRoute(domain string) error {
 	id := sanitizeID(domain)
 	cmd := fmt.Sprintf(
-		`curl -s -w '%%{http_code}' -o /tmp/cr.txt -X DELETE http://127.0.0.1:2019/id/%s; echo; cat /tmp/cr.txt`,
+		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X DELETE http://localhost:2019/id/%s; echo; docker exec caddy cat /tmp/cr.txt`,
 		id,
 	)
 	out, err := c.ssh.Exec(cmd)
