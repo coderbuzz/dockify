@@ -32,45 +32,74 @@ Worker VM
 
 ## Quick Start
 
-### Option 1: Docker Compose (recommended)
+### Step 1: Install Dockify on Controller VM
 
 ```bash
-git clone https://github.com/coderbuzz/dockify.git
-cd dockify
-cp .env.example .env
-# Edit .env → set DOMAIN=your-domain.com
-# Uncomment CLOUDFLARE_API_TOKEN + CLOUDFLARE_ZONE_ID for DNS automation
-docker compose up -d
-# Open https://your-domain.com (auto HTTPS via Caddy)
-```
+# Option A: Docker Compose (recommended)
+git clone https://github.com/coderbuzz/dockify.git && cd dockify
+cp .env.example .env   # edit DOMAIN + Cloudflare keys
+docker compose up -d    # auto HTTPS via Caddy
 
-### Option 2: Docker
-
-```bash
-docker run -d \
-  --name dockify \
-  -p 8080:8080 \
-  -v dockify_data:/var/lib/dockify \
-  -v ~/.ssh:/home/dockify/.ssh:ro \
-  -e CLOUDFLARE_API_TOKEN=xxx \
-  -e CLOUDFLARE_ZONE_ID=xxx \
-  ghcr.io/coderbuzz/dockify:latest
-```
-
-### Option 3: Install script
-
-```bash
+# Option B: One-liner install script
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/install.sh | bash
+
+# Option C: Build from source
+go build -o dockify ./cmd/dockify && ./dockify serve
 ```
 
-### Option 4: Build from source
+Open `https://<your-domain>` or `http://<controller-ip>:8080`.
+
+### Step 2: Prepare a Worker VM
+
+Fresh Ubuntu/Debian VM. Zero dependencies needed — Dockify installs everything.
+
+**Generate SSH key on the controller:**
 
 ```bash
-git clone https://github.com/coderbuzz/dockify.git
-cd dockify
-go build -o dockify ./cmd/dockify
-./dockify serve
+ssh-keygen -t ed25519 -f ~/.ssh/dockify -N ""
 ```
+
+**Copy the public key to the worker VM:**
+
+```bash
+ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
+```
+
+> This appends the key to `/root/.ssh/authorized_keys` on the worker. From this point, the controller can SSH into the worker as root without a password.
+
+### Step 3: Register + Initialize in Web UI
+
+1. Go to **Servers** → **Add Server**
+2. Fill in:
+   - **Name:** `worker-01`
+   - **Host:** `<worker-ip>`
+   - **User:** `root`
+   - **SSH Private Key Path:** `/home/user/.ssh/dockify` (path on controller)
+3. Click **Add Server** → redirects to server detail
+4. Click **Initialize Worker**
+
+**What "Initialize Worker" does automatically:**
+1. SSH connect + verify
+2. Install Docker via `get.docker.com` (if not present)
+3. Create `dockify` Docker network
+4. Deploy Caddy container (port 80/443 + Admin API on localhost:2019)
+5. Collect CPU, RAM, Disk info
+6. Status → **online**. Ready to deploy apps.
+
+### Step 4: Deploy Your First App
+
+1. Go to **Apps** → **Deploy App**
+2. Paste a `docker-compose.yml`, set domain + port
+3. Select server (or **Auto-select** for least-loaded)
+4. Click **Deploy App**
+
+**What happens on deploy:**
+1. SSH → write compose file to `/opt/dockify/apps/<name>/`
+2. SSH → `docker compose up -d`
+3. Inject Caddy route via Admin API (domain → container:port)
+4. Create Cloudflare DNS A record (if configured)
+5. Record deployment + save compose snapshot for rollback
+6. Status → **running**
 
 ## Project Structure
 
