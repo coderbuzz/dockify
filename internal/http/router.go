@@ -12,7 +12,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass string) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -23,8 +23,8 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	authEnabled := cfgPass != ""
 
-	apiHandler := server.NewHandler(svc)
-	webHandler := server.NewWebHandler(svc)
+	apiHandler := server.NewHandler(svc, sshKeyDir)
+	webHandler := server.NewWebHandler(svc, sshKeyDir)
 
 	appAPIHandler := app.NewHandler(appSvc)
 	appWebHandler := app.NewWebHandler(appSvc, serverListAdapter)

@@ -21,7 +21,7 @@
         <label>Port<input type="number" name="port" value="22" placeholder="22"></label>
         <label>User<input type="text" name="user" value="root" placeholder="root"></label>
       </div>
-      <label>SSH Private Key Path<input type="text" name="ssh_key" placeholder="/home/user/.ssh/id_rsa" required><small>Path to the SSH private key on the controller machine</small></label>
+      <label>SSH Private Key<textarea name="ssh_key" rows="8" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" required></textarea><small>Paste the full private key content (not a file path)</small></label>
     </fieldset>
     <button type="submit" class="btn btn-primary">Add Server</button>
   </form>

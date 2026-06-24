@@ -2,7 +2,10 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -10,11 +13,12 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service   *Service
+	sshKeyDir string
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, sshKeyDir string) *Handler {
+	return &Handler{service: service, sshKeyDir: sshKeyDir}
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -50,10 +54,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Host:   input.Host,
 		Port:   input.Port,
 		User:   input.User,
-		SSHKey: input.SSHKey,
+		SSHKey: "pending",
 	}
 
 	if err := h.service.Create(server); err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	path, err := saveKeyFile(h.sshKeyDir, server.ID, input.SSHKey)
+	if err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	server.SSHKey = path
+	if err := h.service.Update(server); err != nil {
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
@@ -114,11 +130,20 @@ func (h *Handler) Init(w http.ResponseWriter, r *http.Request) {
 }
 
 type WebHandler struct {
-	service *Service
+	service   *Service
+	sshKeyDir string
 }
 
-func NewWebHandler(service *Service) *WebHandler {
-	return &WebHandler{service: service}
+func NewWebHandler(service *Service, sshKeyDir string) *WebHandler {
+	return &WebHandler{service: service, sshKeyDir: sshKeyDir}
+}
+
+func saveKeyFile(dir string, id int64, content string) (string, error) {
+	path := filepath.Join(dir, fmt.Sprintf("%d.pem", id))
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		return "", fmt.Errorf("save SSH key: %w", err)
+	}
+	return path, nil
 }
 
 func (h *WebHandler) ServerListPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -158,15 +183,11 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		user = "root"
 	}
 
-	server := &Server{
-		Name:   strings.TrimSpace(r.FormValue("name")),
-		Host:   strings.TrimSpace(r.FormValue("host")),
-		Port:   port,
-		User:   user,
-		SSHKey: strings.TrimSpace(r.FormValue("ssh_key")),
-	}
+	keyContent := strings.TrimSpace(r.FormValue("ssh_key"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	host := strings.TrimSpace(r.FormValue("host"))
 
-	if server.Name == "" || server.Host == "" || server.SSHKey == "" {
+	if name == "" || host == "" || keyContent == "" {
 		render(w, r, http.StatusBadRequest, "servers_add.html", map[string]interface{}{
 			"Title": "Add Server",
 			"Error": "name, host, and ssh_key are required",
@@ -174,7 +195,33 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		return
 	}
 
+	server := &Server{
+		Name:   name,
+		Host:   host,
+		Port:   port,
+		User:   user,
+		SSHKey: "pending",
+	}
+
 	if err := h.service.Create(server); err != nil {
+		render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
+			"Title": "Add Server",
+			"Error": err.Error(),
+		})
+		return
+	}
+
+	path, err := saveKeyFile(h.sshKeyDir, server.ID, keyContent)
+	if err != nil {
+		render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
+			"Title": "Add Server",
+			"Error": err.Error(),
+		})
+		return
+	}
+
+	server.SSHKey = path
+	if err := h.service.Update(server); err != nil {
 		render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
 			"Title": "Add Server",
 			"Error": err.Error(),
