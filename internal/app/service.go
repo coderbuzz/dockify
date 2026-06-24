@@ -141,6 +141,8 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	logs := []string{}
 
+	client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
+
 	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
