@@ -35,12 +35,10 @@ if [ "$MODE" = "docker" ]; then
 fi
 
 echo "Downloading Dockify $VERSION..."
-TMP_FILE=$(mktemp)
-curl -fsSL -o "$TMP_FILE" \
+curl -fsSL -o /tmp/dockify-update \
   "https://github.com/coderbuzz/dockify/releases/download/${VERSION}/dockify-linux-amd64"
-sudo mv "$TMP_FILE" /usr/local/bin/dockify
+sudo mv /tmp/dockify-update /usr/local/bin/dockify
 sudo chmod +x /usr/local/bin/dockify
-rm -f "$TMP_FILE"
 
 if [ "$MODE" = "binary+caddy" ]; then
   echo "Restarting services..."
