@@ -33,13 +33,13 @@
 
     <fieldset>
       <legend>
-        <label style="display:inline;margin-right:1em"><input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'"> Simple Mode</label>
-        <label style="display:inline"><input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''"> Advanced Mode</label>
+        <label style="display:inline-flex;align-items:center;margin-right:1em;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'" style="margin:0 0.3em 0 0"> Simple</label>
+        <label style="display:inline-flex;align-items:center;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''" style="margin:0 0.3em 0 0"> Advanced</label>
       </legend>
 
       <div id="simple-section">
         <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine"></label>
-        <label>Environment Variables<input type="text" name="env_vars" placeholder="KEY=val, FOO=bar"><small>Comma-separated key=value pairs</small></label>
+        <label>Environment Variables<textarea name="env_vars" rows="3" placeholder="KEY=value&#10;FOO=bar"></textarea><small>One KEY=value per line</small></label>
       </div>
 
       <div id="advanced-section" style="display:none">

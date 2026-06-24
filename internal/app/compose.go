@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -63,17 +64,22 @@ networks:
 
 func splitEnvVars(envVars string) []string {
 	var result []string
-	current := ""
-	for _, c := range envVars {
-		if c == ',' && current != "" {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(c)
+	lines := strings.Split(envVars, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
-	}
-	if current != "" {
-		result = append(result, current)
+		if strings.Contains(line, ",") {
+			for _, kv := range strings.Split(line, ",") {
+				kv = strings.TrimSpace(kv)
+				if kv != "" {
+					result = append(result, kv)
+				}
+			}
+		} else {
+			result = append(result, line)
+		}
 	}
 	return result
 }
