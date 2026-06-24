@@ -48,6 +48,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		r.Post("/{id}/init", func(w http.ResponseWriter, r *http.Request) {
 			webHandler.ServerInit(w, r, render)
 		})
+		r.Post("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+			webHandler.ServerDeleteWeb(w, r, render)
+		})
 		r.Delete("/{id}", func(w http.ResponseWriter, r *http.Request) {
 			webHandler.ServerDeleteWeb(w, r, render)
 		})

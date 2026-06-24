@@ -13,7 +13,7 @@
   <article style="color:var(--pico-color-red-500)">{{.Error}}</article>
   {{end}}
 
-  <form hx-post="/servers/add" hx-target="closest main" hx-swap="outerHTML">
+  <form method="POST" action="/servers/add">
     <fieldset>
       <label>
         Name

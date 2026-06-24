@@ -187,15 +187,7 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		h.service.RefreshResources(id)
 	}(server.ID)
 
-	servers, err := h.service.List()
-	if err != nil {
-		http.Redirect(w, r, "/servers", http.StatusSeeOther)
-		return
-	}
-
-	render(w, r, http.StatusOK, "servers_list.html", map[string]interface{}{
-		"Servers": servers,
-	})
+	http.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -224,16 +216,7 @@ func (h *WebHandler) ServerInit(w http.ResponseWriter, r *http.Request, render f
 		h.service.InitWorker(id)
 	}(id)
 
-	server, err := h.service.Get(id)
-	if err != nil || server == nil {
-		w.Header().Set("HX-Redirect", "/servers")
-		return
-	}
-
-	render(w, r, http.StatusOK, "servers_detail.html", map[string]interface{}{
-		"Title":  server.Name,
-		"Server": server,
-	})
+	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -244,15 +227,7 @@ func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, ren
 		return
 	}
 
-	servers, err := h.service.List()
-	if err != nil {
-		w.Header().Set("HX-Redirect", "/servers")
-		return
-	}
-
-	render(w, r, http.StatusOK, "servers_list.html", map[string]interface{}{
-		"Servers": servers,
-	})
+	http.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
 
 func JSON(w http.ResponseWriter, status int, data interface{}) {

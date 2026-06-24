@@ -3,7 +3,7 @@
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
-<main class="container" hx-boost="true">
+<main class="container">
   <nav aria-label="breadcrumb">
     <ul>
       <li><a href="/servers">Servers</a></li>
@@ -41,17 +41,12 @@
 
   <div role="group">
     {{if eq .Server.Status "pending" "offline" "error"}}
-    <form method="post" action="/servers/{{.Server.ID}}/init" style="display:inline"
-          hx-post="/servers/{{.Server.ID}}/init"
-          hx-swap="none">
+    <form method="POST" action="/servers/{{.Server.ID}}/init" style="display:inline">
       <button type="submit">Initialize Worker</button>
     </form>
     {{end}}
-    <form method="post" action="/servers/{{.Server.ID}}" style="display:inline"
-          hx-delete="/servers/{{.Server.ID}}"
-          hx-target="closest main"
-          hx-swap="outerHTML"
-          hx-confirm="Remove {{.Server.Name}}? This cannot be undone.">
+    <form method="POST" action="/servers/{{.Server.ID}}/delete" style="display:inline"
+          onsubmit="return confirm('Remove {{.Server.Name}}? This cannot be undone.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove Server</button>
     </form>
   </div>

@@ -323,15 +323,7 @@ func (h *WebHandler) AppDeleteWeb(w http.ResponseWriter, r *http.Request, render
 
 	go h.service.Undeploy(id)
 
-	apps, err := h.service.List()
-	if err != nil {
-		w.Header().Set("HX-Redirect", "/apps")
-		return
-	}
-
-	render(w, r, http.StatusOK, "apps_list.html", map[string]interface{}{
-		"Apps": apps,
-	})
+	http.Redirect(w, r, "/apps", http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {

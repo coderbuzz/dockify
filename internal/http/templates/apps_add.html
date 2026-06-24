@@ -13,7 +13,7 @@
   <article style="color:var(--pico-color-red-500)">{{.Error}}</article>
   {{end}}
 
-  <form hx-post="/apps/add" hx-target="body" hx-swap="outerHTML">
+  <form method="POST" action="/apps/add">
     <fieldset>
       <div class="grid">
         <label>

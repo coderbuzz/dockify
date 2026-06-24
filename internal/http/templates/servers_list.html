@@ -23,9 +23,8 @@
       <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>
         <a href="/servers/{{.ID}}" role="button" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em">View</a>
-        <form method="POST" action="/api/servers/{{.ID}}" style="display:inline"
-              hx-delete="/servers/{{.ID}}" hx-target="closest tr" hx-swap="outerHTML"
-              hx-confirm="Delete {{.Name}}? This cannot be undone.">
+        <form method="POST" action="/servers/{{.ID}}/delete" style="display:inline"
+              onsubmit="return confirm('Delete {{.Name}}? This cannot be undone.')">
           <button type="submit" class="outline contrast secondary-outline" style="padding:0.2em 0.6em;font-size:0.8em;color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Delete</button>
         </form>
       </td>

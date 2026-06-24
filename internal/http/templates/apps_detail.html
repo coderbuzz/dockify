@@ -3,7 +3,7 @@
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
-<main class="container" hx-boost="true">
+<main class="container">
   <nav aria-label="breadcrumb">
     <ul>
       <li><a href="/apps">Apps</a></li>
@@ -37,28 +37,21 @@
   </div>
 
   <div role="group">
-    <form method="post" action="/apps/{{.App.ID}}/redeploy" style="display:inline">
+    <form method="POST" action="/apps/{{.App.ID}}/redeploy" style="display:inline">
       <button type="submit">Redeploy</button>
     </form>
-    <form method="post" action="/apps/{{.App.ID}}/rollback" style="display:inline"
-          hx-post="/apps/{{.App.ID}}/rollback"
-          hx-confirm="Rollback to the last successful deployment? Current compose will be replaced.">
+    <form method="POST" action="/apps/{{.App.ID}}/rollback" style="display:inline"
+          onsubmit="return confirm('Rollback to the last successful deployment? Current compose will be replaced.')">
       <button type="submit" class="outline contrast secondary-outline">Rollback</button>
     </form>
     {{if eq .App.Status "running"}}
-    <form method="post" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
-          hx-delete="/apps/{{.App.ID}}/undeploy"
-          hx-target="closest main"
-          hx-swap="outerHTML"
-          hx-confirm="Undeploy {{.App.Name}}? This will stop and remove the app.">
+    <form method="POST" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+          onsubmit="return confirm('Undeploy {{.App.Name}}? This will stop and remove the app.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Undeploy</button>
     </form>
     {{else}}
-    <form method="post" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
-          hx-delete="/apps/{{.App.ID}}/undeploy"
-          hx-target="closest main"
-          hx-swap="outerHTML"
-          hx-confirm="Remove {{.App.Name}}? This cannot be undone.">
+    <form method="POST" action="/apps/{{.App.ID}}/undeploy" style="display:inline"
+          onsubmit="return confirm('Remove {{.App.Name}}? This cannot be undone.')">
       <button type="submit" class="outline contrast secondary-outline" style="color:var(--pico-color-red-500);border-color:var(--pico-color-red-500)">Remove</button>
     </form>
     {{end}}
