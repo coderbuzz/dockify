@@ -11,10 +11,21 @@ delete /id/dockify-kv-amg-id
 post /routes/0 → route baru
 ```
 
-## Permanent Fix
-Kode di `internal/caddy/client.go` sudah diubah jadi `/routes/0`. Tinggal release.
+## Verifikasi
+```bash
+# Dari luar VM
+curl -v https://kv.amg.id/
+# Dari controller VM
+curl -k https://kv.amg.id/
+```
 
-## Steps
-1. Update binary controller via update script
-2. Redeploy app dari UI
-3. Route akan otomatis di posisi 0 tanpa perlu manual delete + post
+> Jangan test localhost:2019 — itu Admin API, bukan HTTP server.
+
+## Permanent Fix
+Kode `postRoute()` sudah diubah dari `/routes` menjadi `/routes/0`. Setelah CI selesai, update controller:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
+```
+
+Lalu redeploy app dari UI.
