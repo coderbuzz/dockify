@@ -4,6 +4,8 @@ Self-hosted Docker app deployment platform. Deploy Docker Compose stacks to your
 
 **Inspired by Coolify. Built for simplicity.**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 ## Why Dockify
 
 - **Single binary** — Go + SQLite, no external dependencies
@@ -120,3 +122,7 @@ dockify/
 ├── scripts/           # Worker init scripts
 └── docs/              # Documentation
 ```
+
+## License
+
+MIT © 2025 CoderBuzz
