@@ -208,22 +208,23 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 
 Dockify can auto-deploy on every push via GitHub or GitLab webhooks. When an app is created with a `Git Repo URL` and `Branch`, Dockify matches incoming webhooks by repo + branch and triggers a redeploy.
 
+Each app with a Git repo gets an auto-generated **webhook secret** (64-character hex string). You can view and roll (re-generate) it in the app detail page.
+
 ### Setup
 
-1. In your **app repo** (the one you want to auto-deploy), go to **Settings → Webhooks**
-2. Add a webhook pointing to your Dockify instance:
-
-```
-Payload URL: https://dockify.example.com/api/webhook/github
-Content type: application/json
-Events: Just the push event
-```
-
-For GitLab, use `/api/webhook/gitlab` instead.
-
+1. In your **app repo** (the one you want to auto-deploy), go to **Settings → Webhooks → Add webhook**
+2. Fill in:
+   ```
+   Payload URL: https://dockify.amg.id/api/webhook/github
+   Content type: application/json
+   Secret: <copy from Dockify app detail — Webhook Secret field>
+   Events: Just the push event
+   ```
 3. In the Dockify UI, when creating the app, fill in:
    - **Git Repo URL:** `https://github.com/user/repo.git`
    - **Branch:** `main`
+
+Dockify verifies incoming webhooks using HMAC-SHA256 (GitHub) or secret token (GitLab). If the secret doesn't match, the webhook is rejected with 401. Apps created before the secret feature still work without verification (no secret set).
 
 Dockify ignores non-push events gracefully (returns 200 with `"ignored"`).
 
