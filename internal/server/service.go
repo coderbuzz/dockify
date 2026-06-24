@@ -109,13 +109,19 @@ func (s *Service) InitWorker(id int64) error {
 		log.Printf("Warning: failed to create dockify network: %v", err)
 	}
 	log.Printf("Deploying Caddy on %s...", server.Name)
-	caddyRun := `docker rm -f caddy 2>/dev/null; docker run -d \
+	caddyRun := `mkdir -p /opt/dockify/caddy && cat > /opt/dockify/caddy/Caddyfile << 'CADDYEOF'
+:80, :443 {
+}
+CADDYEOF
+docker rm -f caddy 2>/dev/null
+docker run -d \
   --name caddy \
   --network dockify \
   -p 80:80 \
   -p 443:443 \
   -p 127.0.0.1:2019:2019 \
   -v caddy_data:/data \
+  -v /opt/dockify/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   --restart unless-stopped \
   caddy:latest`
 	_, err = client.Exec(caddyRun)
