@@ -144,6 +144,75 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 5. Record deployment + save compose snapshot for rollback
 6. Status → **running**
 
+## Git Webhook CI/CD
+
+Dockify can auto-deploy on every push via GitHub or GitLab webhooks. When an app is created with a `Git Repo URL` and `Branch`, Dockify matches incoming webhooks by repo + branch and triggers a redeploy.
+
+### Setup
+
+1. In your **app repo** (the one you want to auto-deploy), go to **Settings → Webhooks**
+2. Add a webhook pointing to your Dockify instance:
+
+```
+Payload URL: https://dockify.amg.id/api/webhook/github
+Content type: application/json
+Events: Just the push event
+```
+
+For GitLab, use `/api/webhook/gitlab` instead.
+
+3. In the Dockify UI, when creating the app, fill in:
+   - **Git Repo URL:** `https://github.com/user/repo.git`
+   - **Branch:** `main`
+
+Dockify ignores non-push events gracefully (returns 200 with `"ignored"`).
+
+### Sample GitHub Actions Workflow
+
+You can also trigger deploy from GitHub Actions directly, without setting up a webhook. This gives you more control (run tests first, then deploy):
+
+```yaml
+name: Deploy via Dockify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          # npm test, go test, etc.
+
+      - name: Trigger Dockify deploy
+        run: |
+          curl -s -X POST https://dockify.amg.id/api/webhook/github \
+            -H "Content-Type: application/json" \
+            -d '{
+              "ref": "refs/heads/main",
+              "after": "${{ github.sha }}",
+              "repository": {
+                "clone_url": "https://github.com/${{ github.repository }}.git"
+              }
+            }'
+```
+
+Dockify matches the `clone_url` and `ref` against registered apps, then redeploys the matching app with the commit SHA recorded in deployment history.
+
+### How It Works
+
+1. GitHub sends a push event to `POST /api/webhook/github`
+2. Dockify parses `ref` → branch (`refs/heads/main` → `main`), `after` → commit SHA, `clone_url` → repo URL
+3. Finds the matching app by `git_repo` + `git_branch`
+4. Triggers `deployWithCommit(app.ID, commitSHA)` — same deploy flow as UI
+5. Records the deployment with commit SHA in history
+
 ## Project Structure
 
 ```
