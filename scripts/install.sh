@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
-DOCKIFY_VERSION="${DOCKIFY_VERSION:-0.1.0}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 DATA_DIR="${DATA_DIR:-/var/lib/dockify}"
 SERVICE_USER="${SERVICE_USER:-dockify}"
+
+if [ -z "$DOCKIFY_VERSION" ]; then
+    echo "Fetching latest release version..."
+    DOCKIFY_VERSION=$(curl -fsSL https://api.github.com/repos/coderbuzz/dockify/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+    if [ -z "$DOCKIFY_VERSION" ]; then
+        echo "Error: could not determine latest version. Set DOCKIFY_VERSION manually."
+        exit 1
+    fi
+fi
 
 echo "=== Dockify v${DOCKIFY_VERSION} Installer ==="
 

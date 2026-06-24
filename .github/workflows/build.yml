@@ -32,6 +32,26 @@ jobs:
       - name: Test
         run: go test ./... || true
 
+      - name: Build binary
+        run: |
+          VERSION="${GITHUB_REF##*/}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION=$(echo "$VERSION" | sed 's/^v//')
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.version=${VERSION}" \
+            -o dockify-linux-amd64 \
+            ./cmd/dockify
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockify-linux-amd64
+          path: dockify-linux-amd64
+          retention-days: 7
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -54,7 +74,7 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -63,3 +83,22 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: dockify-linux-amd64
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dockify-linux-amd64
+          generate_release_notes: true
