@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     expose:
       - "8080"
+    env_file: .env
     volumes:
       - dockify_data:/var/lib/dockify
       - ${HOME}/.ssh:/home/dockify/.ssh:ro
@@ -13,8 +14,6 @@ services:
       DOCKIFY_PORT: 8080
       DOCKIFY_DATA_DIR: /var/lib/dockify
       DOCKIFY_SSH_KEY_DIR: /home/dockify/.ssh
-      # CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
-      # CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID}
     networks:
       - dockify
 
