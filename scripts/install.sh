@@ -168,8 +168,13 @@ else
   echo ""
   echo "Downloading files..."
   sudo mkdir -p "$INSTALL_DIR"
-  sudo curl -fsSL "$RAW/docker-compose.yml" -o "$INSTALL_DIR/docker-compose.yml"
-  sudo curl -fsSL "$RAW/Caddyfile" -o "$INSTALL_DIR/Caddyfile"
+  TMP_YAML=$(mktemp)
+  TMP_CADDY=$(mktemp)
+  curl -fsSL -o "$TMP_YAML" "$RAW/docker-compose.yml"
+  curl -fsSL -o "$TMP_CADDY" "$RAW/Caddyfile"
+  sudo mv "$TMP_YAML" "$INSTALL_DIR/docker-compose.yml"
+  sudo mv "$TMP_CADDY" "$INSTALL_DIR/Caddyfile"
+  rm -f "$TMP_YAML" "$TMP_CADDY"
 
   sudo tee "$INSTALL_DIR/.env" > /dev/null << ENVEOF
 DOMAIN=$DOMAIN
