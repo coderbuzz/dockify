@@ -125,7 +125,9 @@ SYSCTY
     sudo tee "$INSTALL_DIR/Caddyfile" > /dev/null << CADDYEOF
 {
 	debug false
-	log { level error }
+	log {
+		level error
+	}
 }
 
 $DOMAIN {
