@@ -40,6 +40,7 @@
       <div id="simple-section">
         <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine"></label>
         <label>Environment Variables<textarea name="env_vars" rows="3" placeholder="KEY=value&#10;FOO=bar"></textarea><small>One KEY=value per line</small></label>
+        <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config"></textarea><small>One volume mount per line (host:container)</small></label>
       </div>
 
       <div id="advanced-section" style="display:none">

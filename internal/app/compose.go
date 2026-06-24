@@ -34,7 +34,7 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func generateCompose(image string, port int, envVars string) string {
+func generateCompose(image string, port int, envVars string, volumes string) string {
 	compose := fmt.Sprintf(`services:
   app:
     image: %s
@@ -51,6 +51,13 @@ func generateCompose(image string, port int, envVars string) string {
 
 	if port > 0 {
 		compose += fmt.Sprintf("\n    expose:\n      - \"%d\"", port)
+	}
+
+	if volumes != "" {
+		compose += "\n    volumes:"
+		for _, vol := range splitEnvVars(volumes) {
+			compose += fmt.Sprintf("\n      - %s", vol)
+		}
 	}
 
 	compose += `

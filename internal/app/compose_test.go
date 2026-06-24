@@ -1,9 +1,12 @@
 package app
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGenerateSimple(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux")
+	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -19,6 +22,16 @@ func TestGenerateSimple(t *testing.T) {
 	sn := getServiceName(c)
 	if sn != "app" {
 		t.Fatalf("expected app, got %s", sn)
+	}
+}
+
+func TestGenerateWithVolumes(t *testing.T) {
+	c := generateCompose("postgres:16", 5432, "POSTGRES_PASSWORD=secret", "./db:/var/lib/postgresql/data")
+	if c == "" {
+		t.Fatal("empty compose")
+	}
+	if !strings.Contains(c, "./db:/var/lib/postgresql/data") {
+		t.Fatal("expected volume mount in compose")
 	}
 }
 

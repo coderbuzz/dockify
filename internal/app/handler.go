@@ -35,6 +35,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Compose   string `json:"compose"`
 		Image     string `json:"image"`
 		EnvVars   string `json:"env_vars"`
+		Volumes   string `json:"volumes"`
 		GitRepo   string `json:"git_repo"`
 		GitBranch string `json:"git_branch"`
 		AuthUser  string `json:"auth_user"`
@@ -53,7 +54,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	compose := input.Compose
 	if compose == "" && input.Image != "" {
-		compose = generateCompose(input.Image, input.Port, input.EnvVars)
+		compose = generateCompose(input.Image, input.Port, input.EnvVars, input.Volumes)
 	}
 	if compose == "" {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "provide either compose or image"})
@@ -243,9 +244,10 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	compose := strings.TrimSpace(r.FormValue("compose"))
 	image := strings.TrimSpace(r.FormValue("image"))
 	envVars := strings.TrimSpace(r.FormValue("env_vars"))
+	volumes := strings.TrimSpace(r.FormValue("volumes"))
 
 	if compose == "" && image != "" {
-		compose = generateCompose(image, port, envVars)
+		compose = generateCompose(image, port, envVars, volumes)
 	}
 
 	app := &App{
