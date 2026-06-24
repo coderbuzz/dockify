@@ -40,6 +40,7 @@ internal/
 scripts/
   install.sh                  # One-liner install script
   setup-worker.sh             # Generate SSH key on worker, output for Dockify UI
+  update.sh                   # Auto-detect mode, download & restart latest
   release.sh                  # Version bump + tag helper
 Dockerfile                    # Multi-stage Docker build
 docker-compose.yml            # Dockify + Caddy reverse proxy

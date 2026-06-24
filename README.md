@@ -273,6 +273,30 @@ Dockify matches the `clone_url` and `ref` against registered apps, then redeploy
 4. Triggers `deployWithCommit(app.ID, commitSHA)` — same deploy flow as UI
 5. Records the deployment with commit SHA in history
 
+## Updating Dockify
+
+A universal update script detects your install mode and updates accordingly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
+```
+
+Or manually per mode:
+
+**Mode 1 (Docker Compose):**
+```bash
+cd /opt/dockify && docker compose pull && docker compose up -d
+```
+
+**Mode 2 & 3 (Binary):**
+```bash
+sudo systemctl stop dockify
+sudo curl -fsSL -o /usr/local/bin/dockify \
+  "https://github.com/coderbuzz/dockify/releases/latest/download/dockify-linux-amd64"
+sudo chmod +x /usr/local/bin/dockify
+sudo systemctl start dockify
+```
+
 ## Project Structure
 
 ```
