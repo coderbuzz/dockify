@@ -32,6 +32,31 @@ Worker VM
   └── Caddy routes to containers via Docker network
 ```
 
+## System Requirements
+
+### Controller VM (where Dockify runs)
+
+| Resource | Minimum | Recommended |
+|---|---|---|
+| CPU | 1 core | 2 cores |
+| RAM | 256 MB | 512 MB - 1 GB |
+| Disk | 5 GB | 10 - 20 GB |
+| OS | Linux (any distro) | Linux |
+
+Dockify is extremely lightweight — the Go binary is ~20 MB, uses ~25-35 MB RAM at idle, and near-zero CPU. It can run on the cheapest VPS (DigitalOcean $6, Oracle free tier) or even a Raspberry Pi 4.
+
+### Worker VMs (where apps run)
+
+| Resource | Notes |
+|---|---|
+| CPU | Depends on your apps |
+| RAM | Depends on your apps |
+| Disk | Depends on your apps |
+| OS | Ubuntu / Debian recommended |
+| Docker | Auto-installed by Dockify on init |
+
+Worker VMs need zero setup — Dockify installs Docker and Caddy automatically via SSH.
+
 ## Quick Start
 
 ### Step 1: Install Dockify on Controller VM
