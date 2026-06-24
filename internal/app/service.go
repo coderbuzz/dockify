@@ -97,6 +97,8 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 	}
 	defer client.Close()
 
+	composeCmd := dockerComposeCmd(client)
+
 	remoteDir := fmt.Sprintf("/opt/dockify/apps/%s", app.Name)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
@@ -110,7 +112,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	logs := []string{}
 
-	if out, err := client.Exec(fmt.Sprintf("docker compose -f %s up -d 2>&1", composePath)); err != nil {
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
@@ -193,8 +195,8 @@ func (s *Service) FetchLogs(id int64, tail int) (string, error) {
 	defer client.Close()
 
 	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
-	cmd := fmt.Sprintf("docker compose -f %s logs --tail=%d 2>&1", composePath, tail)
-	out, err := client.Exec(cmd)
+	dc := dockerComposeCmd(client)
+	out, err := client.Exec(fmt.Sprintf("%s -f %s logs --tail=%d 2>&1", dc, composePath, tail))
 	if err != nil {
 		return "", err
 	}
@@ -240,12 +242,14 @@ func (s *Service) Undeploy(id int64) error {
 	}
 	defer client.Close()
 
+	dc := dockerComposeCmd(client)
+
 	remoteDir := fmt.Sprintf("/opt/dockify/apps/%s", app.Name)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
 
-	client.Exec(fmt.Sprintf("docker compose -f %s down 2>&1 || true", composePath))
+	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
 
 	caddyClient := caddy.NewClient(client)
 	caddyClient.RemoveRoute(app.Domain)
@@ -326,4 +330,12 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 	return s.repo.GetDeployment(id)
 }
 
-var _ = time.Now
+	var _ = time.Now
+
+func dockerComposeCmd(c *ssh.Client) string {
+	out, err := c.Exec("command -v docker-compose 2>/dev/null || echo docker compose")
+	if err != nil {
+		return "docker compose"
+	}
+	return strings.TrimSpace(out)
+}
