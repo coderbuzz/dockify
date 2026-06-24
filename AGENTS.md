@@ -10,7 +10,7 @@ Dockify is a self-hosted Docker app deployment platform. Single Go binary with e
 - **Database:** SQLite via `modernc.org/sqlite` (pure Go, no CGo)
 - **Router:** `github.com/go-chi/chi/v5`
 - **SSH:** `golang.org/x/crypto/ssh`
-- **Web UI:** Go `html/template` + HTMX + Pico CSS (embedded via `embed`, no build step)
+- **Web UI:** Go `html/template` + HTMX (embedded via `embed`, no build step) — fully custom CSS, no framework
 - **Docker:** Multi-stage build, published to `ghcr.io/coderbuzz/dockify`
 
 ## Build
@@ -36,7 +36,7 @@ internal/
   webhook/handler.go          # GitHub + GitLab webhook handler
   scheduler/scheduler.go      # Auto-select least-loaded VM
   http/                       # Chi router, templates (embedded), renderer
-    templates/                # HTML templates (Pico CSS + HTMX)
+    templates/                # HTML templates (custom CSS + HTMX)
 scripts/
   install.sh                  # One-liner install script
   release.sh                  # Version bump + tag helper
@@ -44,6 +44,76 @@ Dockerfile                    # Multi-stage Docker build
 docker-compose.yml            # Dockify + Caddy reverse proxy
 .github/workflows/build.yml   # CI: vet, test, build binary + Docker, release on tag
 ```
+
+## UI Style Guide
+
+### Typography
+- **Font:** `"Berkeley Mono", "IBM Plex Mono", ui-monospace, monospace`
+- **Base size:** 15px
+- **Line height:** 1.5
+- **Headings:** weight 600, sizes: h1=1.35em, h2=1.1em
+
+### Color System
+All colors are defined as CSS custom properties in `:root` (light) and `html.dark` (dark) in `internal/http/templates/layout.html`.
+
+| Token | Light | Dark |
+|---|---|---|
+| `--bg` | `#f5f5f5` | `#0d0d0d` |
+| `--bg-elevated` | `#fff` | `#141414` |
+| `--bg-card` | `#fff` | `#1a1a1a` |
+| `--border` | `#d4d4d4` | `#2a2a2a` |
+| `--text` | `#1a1a1a` | `#cfcecd` |
+| `--text-muted` | `#666` | `#888` |
+| `--link` | `#2563eb` | `#8ab4f8` |
+
+Status colors: `--green`, `--red`, `--yellow`, `--orange` (both themes).
+
+### Dark/Light Mode
+- Default: light (`<html>` without class)
+- Dark: `<html class="dark">`
+- Toggle button in nav uses `localStorage('dockify-theme')`
+- Icons: ☀ (light mode toggle button), ☾ (dark mode toggle button)
+
+### Component Patterns
+
+**Nav:** `<div class="top-nav">` with `.logo` + `.nav-links`. Compact, bottom border separator.
+
+**Cards:** `<div class="card">` — border `1px solid var(--border)`, border-radius 6px, background `var(--bg-card)`.
+  - Card title: `<h3>` with uppercase, muted, letter-spaced.
+
+**Buttons:** `<button class="btn">` or `<a class="btn">`.
+  - `btn-primary`: for primary actions (filled accent)
+  - `btn-ghost`: for secondary actions (transparent, muted text)
+  - `btn-red`: danger/delete actions (red text, red border on hover)
+
+**Tables:** `<table>` with `<thead>` (uppercase th) and `<tbody>`.
+  - Row hover: subtle background.
+
+**Forms:** `<form method="POST" action="relative-path">` (never use `hx-boost`; use normal POST for forms).
+  - Labels wrap inputs: `<label>Text<input></label>`
+  - Grid layout: `<div class="grid">` for 2-column form rows
+  - Form grid adds `.7em` margin-bottom automatically
+  - Inline labels inside grids use `margin-bottom: 0`
+  - Legend: uppercase, muted, no border-bottom
+  - Radio: `display:inline-flex;align-items:center` on `<label>`, `input[type=radio]` has `margin: 0 .7em 0 0`
+  - Error messages: `<div class="card" style="color:var(--red)">`
+
+**Badges:** `<span class="badge badge-{status}">`. Statuses: online/offline/pending/error, running/stopped/created/deploying/failed/success.
+
+**Breadcrumb:** `<div class="breadcrumb">` — links separated by `/`.
+
+**Empty states:** `<div class="empty-state">` centered text + primary button.
+
+**Logs viewer:** `<div class="log-container">` with `.log-toolbar` (buttons) + `.log-content` (pre, monospace).
+
+**Stats dashboard:** `.stat` cards in `.grid` — number `h2`, label `small`.
+
+### CSS Conventions
+- All styles are in `internal/http/templates/layout.html` (single `<style>` block).
+- No Pico CSS, no CSS framework — fully custom.
+- Class naming: lowercase with hyphens.
+- Use CSS variables (custom properties) for theming.
+- Responsive: single `@media (max-width: 600px)` breakpoint.
 
 ## How to Release a New Version
 
