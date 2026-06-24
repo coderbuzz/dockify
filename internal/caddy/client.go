@@ -81,9 +81,6 @@ func (c *Client) postRoute(route Route) error {
 		route.ID,
 	))
 
-	// Ensure server listens on both HTTP and HTTPS for auto-TLS (ignore error if already set)
-	c.ssh.Exec(`docker exec caddy curl -s -o /dev/null -X PUT http://localhost:2019/config/apps/http/servers/srv0/listen -H 'Content-Type: application/json' -d '[":80",":443"]'`)
-
 	body, err := json.Marshal(route)
 	if err != nil {
 		return fmt.Errorf("marshal route: %w", err)
