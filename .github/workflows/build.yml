@@ -30,7 +30,10 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test ./... || true
+        run: go test ./...
+
+      - name: Smoke test
+        run: bash scripts/smoke-test.sh
 
       - name: Build binary
         if: startsWith(github.ref, 'refs/tags/v')
