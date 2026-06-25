@@ -34,11 +34,6 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func appNetworkAlias(name string) string {
-	r := strings.NewReplacer(".", "-", "_", "-", " ", "-")
-	return r.Replace(name)
-}
-
 func generateCompose(image string, port int, envVars string, volumes string) string {
 	compose := fmt.Sprintf(`services:
   app:
@@ -75,6 +70,10 @@ networks:
 }
 
 func ensureDockifyNetwork(compose string) string {
+	if strings.Contains(compose, "dockify") {
+		return compose
+	}
+
 	var doc map[string]interface{}
 	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
 		return compose
@@ -91,39 +90,14 @@ func ensureDockifyNetwork(compose string) string {
 			svc = make(map[string]interface{})
 			services[name] = svc
 		}
-
-		nets := getNetworksList(svc)
-		hasDockify := false
-		for _, net := range nets {
-			switch n := net.(type) {
-			case string:
-				if n == "dockify" {
-					hasDockify = true
-				}
-			case map[string]interface{}:
-				if _, ok := n["dockify"]; ok {
-					hasDockify = true
-				}
-			}
-		}
-		if !hasDockify {
-			svc["networks"] = append(nets, "dockify")
-		}
+		nets, _ := svc["networks"].([]interface{})
+		svc["networks"] = append(nets, "dockify")
 	}
 
-	if _, ok := doc["networks"].(map[string]interface{}); !ok {
-		doc["networks"] = map[string]interface{}{
-			"dockify": map[string]interface{}{
-				"external": true,
-			},
-		}
-	} else {
-		networks := doc["networks"].(map[string]interface{})
-		if _, ok := networks["dockify"]; !ok {
-			networks["dockify"] = map[string]interface{}{
-				"external": true,
-			}
-		}
+	doc["networks"] = map[string]interface{}{
+		"dockify": map[string]interface{}{
+			"external": true,
+		},
 	}
 
 	out, err := yaml.Marshal(doc)
@@ -133,28 +107,54 @@ func ensureDockifyNetwork(compose string) string {
 	return string(out)
 }
 
-func getNetworksList(svc map[string]interface{}) []interface{} {
-	netsRaw, ok := svc["networks"]
-	if !ok {
-		return nil
+func sanitizeAppName(name string) string {
+	r := strings.NewReplacer(".", "-", "_", "-", " ", "-")
+	return r.Replace(name)
+}
+
+func renameFirstService(compose string, newName string) string {
+	if !strings.Contains(compose, "services:") {
+		return compose
 	}
 
-	switch nets := netsRaw.(type) {
-	case []interface{}:
-		return nets
-	case map[string]interface{}:
-		result := make([]interface{}, 0, len(nets))
-		for netName, netCfg := range nets {
-			if netCfg == nil {
-				result = append(result, netName)
-			} else {
-				result = append(result, map[string]interface{}{netName: netCfg})
-			}
-		}
-		return result
-	default:
-		return nil
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
+		return compose
 	}
+
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return compose
+	}
+
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return compose
+	}
+
+	var servicesNode *yaml.Node
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value == "services" {
+			servicesNode = root.Content[i+1]
+			break
+		}
+	}
+
+	if servicesNode == nil || servicesNode.Kind != yaml.MappingNode || len(servicesNode.Content) < 2 {
+		return compose
+	}
+
+	firstKey := servicesNode.Content[0]
+	if firstKey.Value == newName {
+		return compose
+	}
+
+	firstKey.Value = newName
+
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return compose
+	}
+	return string(out)
 }
 
 func splitEnvVars(envVars string) []string {

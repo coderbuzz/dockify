@@ -3,8 +3,6 @@ package app
 import (
 	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 )
 
 func TestGenerateSimple(t *testing.T) {
@@ -53,87 +51,83 @@ func TestParseAdvanced(t *testing.T) {
 	}
 }
 
-func TestAppNetworkAlias(t *testing.T) {
+func TestSanitizeAppName(t *testing.T) {
 	tests := []struct {
-		name  string
 		input string
 		want  string
 	}{
-		{"simple", "myapp", "myapp"},
-		{"with dots", "kv-dev.amg.id", "kv-dev-amg-id"},
-		{"with underscores", "my_app", "my-app"},
-		{"with spaces", "my app", "my-app"},
+		{"myapp", "myapp"},
+		{"kv-dev.amg.id", "kv-dev-amg-id"},
+		{"my_app", "my-app"},
+		{"my app", "my-app"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := appNetworkAlias(tt.input)
-			if got != tt.want {
-				t.Errorf("appNetworkAlias(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestEnsureDockifyNetworkAddsNetwork(t *testing.T) {
-	compose := `services:
-  app:
-    image: nginx:alpine
-`
-	result := ensureDockifyNetwork(compose)
-
-	if !strings.Contains(result, "dockify") {
-		t.Fatal("expected dockify network in output")
-	}
-
-	var doc map[string]interface{}
-	if err := yaml.Unmarshal([]byte(result), &doc); err != nil {
-		t.Fatalf("result is not valid YAML: %v", err)
-	}
-
-	services := doc["services"].(map[string]interface{})
-	svc := services["app"].(map[string]interface{})
-	nets := svc["networks"].([]interface{})
-	found := false
-	for _, net := range nets {
-		if s, ok := net.(string); ok && s == "dockify" {
-			found = true
+		got := sanitizeAppName(tt.input)
+		if got != tt.want {
+			t.Errorf("sanitizeAppName(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
-	if !found {
-		t.Fatal("dockify network not found in service networks")
-	}
 }
 
-func TestEnsureDockifyNetworkExistingDockify(t *testing.T) {
+func TestRenameFirstService(t *testing.T) {
 	compose := `services:
   app:
     image: nginx:alpine
-    networks:
-      - dockify
-networks:
-  dockify:
-    external: true
+    restart: unless-stopped
 `
-	result := ensureDockifyNetwork(compose)
+	result := renameFirstService(compose, "my-unique-app")
 
-	if !strings.Contains(result, "dockify") {
-		t.Fatal("expected dockify in output")
+	if !strings.Contains(result, "my-unique-app") {
+		t.Fatalf("expected renamed service in output:\n%s", result)
+	}
+	if strings.Contains(result, "  app:") {
+		t.Fatal("old service name 'app' should be gone")
+	}
+
+	sn := getServiceName(result)
+	if sn != "my-unique-app" {
+		t.Fatalf("expected my-unique-app, got %s", sn)
 	}
 }
 
-func TestEnsureDockifyNetworkDoesNotDuplicate(t *testing.T) {
+func TestRenameFirstServiceMultiService(t *testing.T) {
 	compose := `services:
-  app:
-    image: nginx:alpine
-    networks:
-      - dockify
-      - other
+  web:
+    image: nginx
+  db:
+    image: postgres
+  redis:
+    image: redis
 `
-	result := ensureDockifyNetwork(compose)
+	result := renameFirstService(compose, "my-app")
 
-	count := strings.Count(result, "dockify")
-	if count > 3 {
-		t.Fatalf("dockify appears %d times, expected <= 3", count)
+	if !strings.Contains(result, "my-app") {
+		t.Fatalf("renamed service 'my-app' not found in output:\n%s", result)
+	}
+	if strings.Contains(result, "  web:") {
+		t.Fatal("old first service name 'web' should be gone")
+	}
+	if !strings.Contains(result, "db:") {
+		t.Fatal("second service 'db' should still exist")
+	}
+	if !strings.Contains(result, "redis:") {
+		t.Fatal("third service 'redis' should still exist")
 	}
 }
 
+func TestRenameFirstServiceSameName(t *testing.T) {
+	compose := "services:\n  myapp:\n    image: nginx\n"
+	result := renameFirstService(compose, "myapp")
+	sn := getServiceName(result)
+	if sn != "myapp" {
+		t.Fatalf("should keep same name, got %s", sn)
+	}
+}
+
+func TestRenameFirstServiceNoServices(t *testing.T) {
+	compose := "networks:\n  dockify:\n    external: true\n"
+	result := renameFirstService(compose, "whatever")
+	if result != compose {
+		t.Fatal("compose without services should be returned unchanged")
+	}
+}

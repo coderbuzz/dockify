@@ -16,19 +16,20 @@ CREATE TABLE IF NOT EXISTS servers (
 );
 
 CREATE TABLE IF NOT EXISTS apps (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    server_id   INTEGER REFERENCES servers(id),
-    domain      TEXT DEFAULT '',
-    port        INTEGER DEFAULT 0,
-    compose     TEXT NOT NULL,
-    git_repo    TEXT,
-    git_branch  TEXT DEFAULT 'main',
-    auth_user   TEXT DEFAULT '',
-    auth_pass   TEXT DEFAULT '',
-    status      TEXT DEFAULT 'created',
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                TEXT NOT NULL,
+    server_id           INTEGER REFERENCES servers(id),
+    domain              TEXT DEFAULT '',
+    port                INTEGER DEFAULT 0,
+    compose             TEXT NOT NULL,
+    git_repo            TEXT,
+    git_branch          TEXT DEFAULT 'main',
+    auth_user           TEXT DEFAULT '',
+    auth_pass           TEXT DEFAULT '',
+    status              TEXT DEFAULT 'created',
+    unique_service_name INTEGER DEFAULT 0,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS deployments (

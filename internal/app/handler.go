@@ -28,18 +28,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name      string `json:"name"`
-		ServerID  int64  `json:"server_id"`
-		Domain    string `json:"domain"`
-		Port      int    `json:"port"`
-		Compose   string `json:"compose"`
-		Image     string `json:"image"`
-		EnvVars   string `json:"env_vars"`
-		Volumes   string `json:"volumes"`
-		GitRepo   string `json:"git_repo"`
-		GitBranch string `json:"git_branch"`
-		AuthUser  string `json:"auth_user"`
-		AuthPass  string `json:"auth_pass"`
+		Name              string `json:"name"`
+		ServerID          int64  `json:"server_id"`
+		Domain            string `json:"domain"`
+		Port              int    `json:"port"`
+		Compose           string `json:"compose"`
+		Image             string `json:"image"`
+		EnvVars           string `json:"env_vars"`
+		Volumes           string `json:"volumes"`
+		GitRepo           string `json:"git_repo"`
+		GitBranch         string `json:"git_branch"`
+		AuthUser          string `json:"auth_user"`
+		AuthPass          string `json:"auth_pass"`
+		UniqueServiceName bool   `json:"unique_service_name"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -71,15 +72,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app := &App{
-		Name:      input.Name,
-		ServerID:  input.ServerID,
-		Domain:    input.Domain,
-		Port:      input.Port,
-		Compose:   compose,
-		GitRepo:   input.GitRepo,
-		GitBranch: input.GitBranch,
-		AuthUser:  input.AuthUser,
-		AuthPass:  input.AuthPass,
+		Name:              input.Name,
+		ServerID:          input.ServerID,
+		Domain:            input.Domain,
+		Port:              input.Port,
+		Compose:           compose,
+		GitRepo:           input.GitRepo,
+		GitBranch:         input.GitBranch,
+		AuthUser:          input.AuthUser,
+		AuthPass:          input.AuthPass,
+		UniqueServiceName: input.UniqueServiceName,
 	}
 
 	if err := h.service.Create(app); err != nil {
@@ -355,15 +357,16 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	}
 
 	app := &App{
-		Name:      strings.TrimSpace(r.FormValue("name")),
-		ServerID:  serverID,
-		Domain:    strings.TrimSpace(r.FormValue("domain")),
-		Port:      port,
-		Compose:   compose,
-		GitRepo:   strings.TrimSpace(r.FormValue("git_repo")),
-		GitBranch: gitBranch,
-		AuthUser:  strings.TrimSpace(r.FormValue("auth_user")),
-		AuthPass:  strings.TrimSpace(r.FormValue("auth_pass")),
+		Name:              strings.TrimSpace(r.FormValue("name")),
+		ServerID:          serverID,
+		Domain:            strings.TrimSpace(r.FormValue("domain")),
+		Port:              port,
+		Compose:           compose,
+		GitRepo:           strings.TrimSpace(r.FormValue("git_repo")),
+		GitBranch:         gitBranch,
+		AuthUser:          strings.TrimSpace(r.FormValue("auth_user")),
+		AuthPass:          strings.TrimSpace(r.FormValue("auth_pass")),
+		UniqueServiceName: r.FormValue("unique_service_name") == "1",
 	}
 
 	if app.Name == "" || app.Compose == "" {
@@ -471,6 +474,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.GitBranch = strings.TrimSpace(r.FormValue("git_branch"))
 	app.AuthUser = strings.TrimSpace(r.FormValue("auth_user"))
 	app.AuthPass = strings.TrimSpace(r.FormValue("auth_pass"))
+	app.UniqueServiceName = r.FormValue("unique_service_name") == "1"
 
 	if app.GitBranch == "" {
 		app.GitBranch = "main"

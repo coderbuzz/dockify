@@ -39,5 +39,8 @@ func Open(path string) (*sql.DB, error) {
 	// Migrasi: hapus kolom webhook_secret dari apps (global settings sekarang)
 	db.Exec("ALTER TABLE apps DROP COLUMN webhook_secret")
 
+	// Migrasi: tambah kolom unique_service_name (v0.3.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN unique_service_name INTEGER DEFAULT 0")
+
 	return db, nil
 }

@@ -134,7 +134,6 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
 
-	// Tulis .env file dari app secrets
 	secrets, _ := s.repo.ListSecrets(id)
 	if len(secrets) > 0 {
 		envPath := fmt.Sprintf("%s/.env", remoteDir)
@@ -147,7 +146,6 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		}
 	}
 
-	// Tulis config files (app_files)
 	files, _ := s.repo.ListFiles(id)
 	for _, f := range files {
 		filePath := fmt.Sprintf("%s/%s", remoteDir, f.Path)
@@ -157,6 +155,12 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 	}
 
 	composeContent := ensureDockifyNetwork(app.Compose)
+
+	if app.UniqueServiceName {
+		newName := sanitizeAppName(app.Name)
+		composeContent = renameFirstService(composeContent, newName)
+		log.Printf("Renamed first service to %q for unique service name", newName)
+	}
 
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
@@ -176,15 +180,8 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		return
 	}
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", composeCmd, composePath)); err == nil {
-		alias := appNetworkAlias(app.Name)
-		for _, cid := range strings.Fields(out) {
-			client.Exec(fmt.Sprintf("docker network connect --alias %s dockify %s 2>/dev/null || true", alias, cid))
-		}
-	}
-
 	if app.Domain != "" {
-		target := fmt.Sprintf("%s:%d", appNetworkAlias(app.Name), app.Port)
+		target := fmt.Sprintf("%s:%d", getServiceName(composeContent), app.Port)
 		caddyClient := caddy.NewClient(client)
 		var caddyErr error
 		if app.AuthUser != "" && app.AuthPass != "" {
