@@ -88,9 +88,12 @@
       <legend>Config Files (optional — mount via <code>./filename:/container/path</code> in compose)</legend>
       {{if .Files}}
       {{range .Files}}
-      <div class="grid" style="margin-bottom:0.4em">
-        <input type="text" name="file_path" value="{{.Path}}" placeholder="filename" autocomplete="off">
-        <textarea name="file_content" rows="2" placeholder="content" style="font-family:monospace;font-size:0.85em">{{.Content}}</textarea>
+      <div class="grid" style="margin-bottom:0.4em;align-items:center">
+        <input type="text" name="file_path" value="{{.Path}}" placeholder="filename" autocomplete="off" style="margin-bottom:0">
+        <input type="hidden" name="file_content" value="{{.Content}}">
+        <input type="file" style="display:none" onchange="uploadToFileRow(this)">
+        <button type="button" class="btn btn-ghost" style="padding:0.2em 0.5em;font-size:0.8em;margin-bottom:0" onclick="uploadClick(this)">Upload</button>
+        <button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em;margin-bottom:0" onclick="this.parentElement.remove()">x</button>
       </div>
       {{end}}
       {{end}}
@@ -115,10 +118,27 @@ function addFileRow() {
   var div = document.createElement('div');
   div.className = 'grid';
   div.style.marginBottom = '0.4em';
-  div.innerHTML = '<input type="text" name="file_path" placeholder="filename" autocomplete="off">'
-    + '<textarea name="file_content" rows="2" placeholder="content" style="font-family:monospace;font-size:0.85em"></textarea>'
-    + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em" onclick="this.parentElement.remove()">x</button>';
+  div.style.alignItems = 'center';
+  div.innerHTML = '<input type="text" name="file_path" placeholder="filename" autocomplete="off" style="margin-bottom:0">'
+    + '<input type="hidden" name="file_content">'
+    + '<input type="file" style="display:none" onchange="uploadToFileRow(this)">'
+    + '<button type="button" class="btn btn-ghost" style="padding:0.2em 0.5em;font-size:0.8em;margin-bottom:0" onclick="uploadClick(this)">Upload</button>'
+    + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em;margin-bottom:0" onclick="this.parentElement.remove()">x</button>';
   document.getElementById('file-rows').appendChild(div);
+}
+function uploadClick(btn) {
+  btn.parentElement.querySelector('input[type=file]').click();
+}
+function uploadToFileRow(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var row = input.parentElement;
+  row.querySelector('input[name=file_path]').value = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    row.querySelector('input[name=file_content]').value = e.target.result;
+  };
+  reader.readAsText(file);
 }
 </script>
 {{template "scripts" .}}

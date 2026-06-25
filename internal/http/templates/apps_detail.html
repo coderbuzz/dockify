@@ -67,15 +67,9 @@
     <div id="files-list">
       {{if .Files}}
       {{range .Files}}
-      <div style="padding:0.5em 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div>
-            <code style="font-size:0.85em">{{.Path}}</code>
-            <button class="btn btn-ghost" style="font-size:0.7em;padding:0.1em 0.4em;margin-left:0.5em" onclick="toggleFileContent('file-{{.ID}}')">Show</button>
-          </div>
-          <button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeFile('{{.Path}}')">✕</button>
-        </div>
-        <pre id="file-{{.ID}}" style="display:none;max-height:150px;overflow:auto;font-size:0.75em;margin:0.3em 0 0;background:var(--bg);padding:0.4em;border-radius:3px">{{.Content}}</pre>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.3em 0;border-bottom:1px solid var(--border)">
+        <code style="font-size:0.85em">{{.Path}}</code>
+        <button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeFile('{{.Path}}')">✕</button>
       </div>
       {{end}}
       {{else}}
@@ -84,7 +78,7 @@
     </div>
     <div style="margin-top:1em">
       <input type="text" id="file-path" placeholder="config.xml" autocomplete="off" style="width:25%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
-      <textarea id="file-content" placeholder="file content" rows="3" style="width:45%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px;vertical-align:top;font-family:monospace;font-size:0.85em"></textarea>
+      <input type="hidden" id="file-content">
       <input type="file" id="file-upload" style="display:none" onchange="uploadFile()">
       <button type="button" class="btn btn-ghost" onclick="document.getElementById('file-upload').click()" style="padding:0.4em 0.8em;font-size:0.85em">Upload</button>
       <button class="btn btn-primary" onclick="addFile()" style="padding:0.4em 1em">Add</button>
@@ -168,6 +162,7 @@ function addFile() {
   var path = document.getElementById('file-path').value.trim();
   var content = document.getElementById('file-content').value;
   if (!path) { alert('Path is required'); return; }
+  if (!content) { alert('Please upload a file first'); return; }
   fetch('api/apps/{{.App.ID}}/files', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -185,12 +180,6 @@ function uploadFile() {
     document.getElementById('file-content').value = e.target.result;
   };
   reader.readAsText(file);
-}
-function toggleFileContent(id) {
-  var el = document.getElementById(id);
-  var show = el.style.display === 'none';
-  el.style.display = show ? 'block' : 'none';
-  event.target.textContent = show ? 'Hide' : 'Show';
 }
 function removeFile(path) {
   if (!confirm('Delete config file "' + path + '"?')) return;
