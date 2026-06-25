@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<div class="container">
+  <div class="breadcrumb">
+    <a href=".">Dashboard</a>
+    <span>/</span>
+    <span>Import</span>
+  </div>
+
+  <hgroup><h1>Import Configuration</h1></hgroup>
+
+  {{if .Error}}
+  <div class="card" style="color:var(--red);margin-bottom:1em">{{.Error}}</div>
+  {{end}}
+  {{if .Message}}
+  <div class="card" style="color:var(--green);margin-bottom:1em">{{.Message}}</div>
+  {{end}}
+
+  <form method="POST" action="api/backup/import" enctype="multipart/form-data">
+    <div class="card">
+      <h3>Upload Export File</h3>
+      <label style="display:block;margin-bottom:1em">
+        <input type="file" name="file" accept=".yaml,.yml" style="display:block;margin-top:0.3em">
+      </label>
+
+      <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1em;margin:0 0 1em">
+        <legend style="text-transform:uppercase;font-size:0.78em;color:var(--text-muted);font-weight:600;letter-spacing:0.05em">Import Mode</legend>
+        <label style="display:inline-flex;align-items:center;margin-bottom:0">
+          <input type="radio" name="mode" value="merge" checked style="margin:0 0.7em 0 0">
+          <strong>Merge</strong>&nbsp;
+          <span style="color:var(--text-muted)">— Add new servers/apps, skip existing by name</span>
+        </label>
+        <br>
+        <label style="display:inline-flex;align-items:center;margin-bottom:0">
+          <input type="radio" name="mode" value="replace" style="margin:0 0.7em 0 0">
+          <strong>Replace</strong>&nbsp;
+          <span style="color:var(--red)">— Delete ALL existing servers and apps first, then import</span>
+        </label>
+      </fieldset>
+
+      <button type="submit" class="btn btn-primary">Import</button>
+    </div>
+  </form>
+
+  {{if .Log}}
+  <div class="card" style="margin-top:1em">
+    <h3>Import Log</h3>
+    <pre style="max-height:400px;overflow:auto;font-size:0.85em">{{.Log}}</pre>
+  </div>
+  {{end}}
+</div>
+{{template "scripts" .}}
+</body>
+</html>

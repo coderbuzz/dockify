@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/coderbuzz/dockify/internal/app"
+	"github.com/coderbuzz/dockify/internal/backup"
 	"github.com/coderbuzz/dockify/internal/cloudflare"
 	"github.com/coderbuzz/dockify/internal/config"
 	"github.com/coderbuzz/dockify/internal/db"
@@ -64,9 +65,12 @@ func main() {
 	webhookSecret, _ := settingsSvc.GetWebhookSecret()
 	settingsHandler := settings.NewHandler(settingsSvc)
 
+	backupSvc := backup.NewService(svc, appSvc, cfg.SSHKeyDir)
+	backupHandler := backup.NewHandler(backupSvc)
+
 	serverListAdapter := &serverLister{svc: svc}
 
-	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecret, settingsHandler)
+	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecret, settingsHandler, backupHandler)
 
 	if cfg.AdminPass == "" {
 		log.Println("WARNING: No admin password set (DOCKIFY_ADMIN_PASSWORD). Web UI has no authentication.")

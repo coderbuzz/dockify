@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/coderbuzz/dockify/internal/app"
+	"github.com/coderbuzz/dockify/internal/backup"
 	"github.com/coderbuzz/dockify/internal/server"
 	"github.com/coderbuzz/dockify/internal/settings"
 	"github.com/coderbuzz/dockify/internal/webhook"
@@ -13,7 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler, backupHandler *backup.Handler) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -138,6 +139,17 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
 		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
+
+		r.Get("/export", func(w http.ResponseWriter, r *http.Request) {
+			backupHandler.ExportPage(w, r, render)
+		})
+		r.Get("/api/backup/export", backupHandler.ExportDownload)
+		r.Get("/import", func(w http.ResponseWriter, r *http.Request) {
+			backupHandler.ImportPage(w, r, render)
+		})
+		r.Post("/api/backup/import", func(w http.ResponseWriter, r *http.Request) {
+			backupHandler.ImportUpload(w, r, render)
+		})
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			stats := appSvc.DashboardStats()

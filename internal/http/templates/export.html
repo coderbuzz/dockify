@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<div class="container">
+  <div class="breadcrumb">
+    <a href=".">Dashboard</a>
+    <span>/</span>
+    <span>Export</span>
+  </div>
+
+  <hgroup><h1>Export Configuration</h1></hgroup>
+
+  <div class="card">
+    <h3>Download Backup</h3>
+    <p style="color:var(--text-muted)">
+      Export all servers and apps configuration to a YAML file.
+      SSH keys are <strong>not</strong> exported — you must re-add them after import.
+    </p>
+    <a href="api/backup/export" class="btn btn-primary">Download YAML</a>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>What's exported</h3>
+    <ul style="color:var(--text-muted);font-size:0.9em">
+      <li>Server: name, host, port, user (no SSH key)</li>
+      <li>Apps: name, domain, port, compose, git repo/branch, auth credentials</li>
+      <li>You can edit the YAML file to remove entries before importing</li>
+    </ul>
+  </div>
+</div>
+{{template "scripts" .}}
+</body>
+</html>
