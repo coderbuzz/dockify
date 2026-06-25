@@ -379,6 +379,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	}
 
 	saveFormSecrets(r, h.service, app.ID)
+	saveFormFiles(r, h.service, app.ID)
 
 	go h.service.Deploy(app.ID)
 
@@ -394,11 +395,13 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 	}
 	servers, _ := h.serverRepo.List()
 	secrets, _ := h.service.ListSecrets(id)
+	files, _ := h.service.ListFiles(id)
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
 		"Title":   "Edit " + app.Name,
 		"Servers": servers,
 		"App":     app,
 		"Secrets": secrets,
+		"Files":   files,
 		"IsEdit":  true,
 	})
 }
@@ -475,6 +478,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	saveFormSecrets(r, h.service, id)
+	saveFormFiles(r, h.service, id)
 
 	go h.service.Redeploy(id)
 
@@ -551,6 +555,22 @@ func saveFormSecrets(r *http.Request, svc *Service, appID int64) {
 			continue
 		}
 		svc.SetSecret(appID, k, v)
+	}
+}
+
+func saveFormFiles(r *http.Request, svc *Service, appID int64) {
+	paths := r.Form["file_path"]
+	contents := r.Form["file_content"]
+	for i, p := range paths {
+		p = strings.TrimSpace(p)
+		if p == "" || i >= len(contents) {
+			continue
+		}
+		c := contents[i]
+		if c == "" {
+			continue
+		}
+		svc.SetFile(appID, p, c)
 	}
 }
 

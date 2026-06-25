@@ -84,6 +84,20 @@
       <button type="button" class="btn btn-ghost" onclick="addSecretRow()" style="margin-top:0.3em">+ Add Secret</button>
     </fieldset>
 
+    <fieldset>
+      <legend>Config Files (optional — mount via <code>./filename:/container/path</code> in compose)</legend>
+      {{if .Files}}
+      {{range .Files}}
+      <div class="grid" style="margin-bottom:0.4em">
+        <input type="text" name="file_path" value="{{.Path}}" placeholder="filename" autocomplete="off">
+        <textarea name="file_content" rows="2" placeholder="content" style="font-family:monospace;font-size:0.85em">{{.Content}}</textarea>
+      </div>
+      {{end}}
+      {{end}}
+      <div id="file-rows"></div>
+      <button type="button" class="btn btn-ghost" onclick="addFileRow()" style="margin-top:0.3em">+ Add File</button>
+    </fieldset>
+
     <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save & Redeploy{{else}}Deploy App{{end}}</button>
   </form>
 </div>
@@ -96,6 +110,15 @@ function addSecretRow() {
     + '<input type="text" name="secret_val" placeholder="value" autocomplete="off">'
     + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em" onclick="this.parentElement.remove()">x</button>';
   document.getElementById('secret-rows').appendChild(div);
+}
+function addFileRow() {
+  var div = document.createElement('div');
+  div.className = 'grid';
+  div.style.marginBottom = '0.4em';
+  div.innerHTML = '<input type="text" name="file_path" placeholder="filename" autocomplete="off">'
+    + '<textarea name="file_content" rows="2" placeholder="content" style="font-family:monospace;font-size:0.85em"></textarea>'
+    + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em" onclick="this.parentElement.remove()">x</button>';
+  document.getElementById('file-rows').appendChild(div);
 }
 </script>
 {{template "scripts" .}}
