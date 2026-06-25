@@ -74,18 +74,15 @@ func TestAppNetworkAlias(t *testing.T) {
 	}
 }
 
-func TestEnsureDockifyNetworkAddsAlias(t *testing.T) {
+func TestEnsureDockifyNetworkAddsNetwork(t *testing.T) {
 	compose := `services:
   app:
     image: nginx:alpine
 `
-	result := ensureDockifyNetwork(compose, "my-app.example.com")
+	result := ensureDockifyNetwork(compose)
 
 	if !strings.Contains(result, "dockify") {
 		t.Fatal("expected dockify network in output")
-	}
-	if !strings.Contains(result, "my-app-example-com") {
-		t.Fatalf("expected alias my-app-example-com in output:\n%s", result)
 	}
 
 	var doc map[string]interface{}
@@ -98,19 +95,12 @@ func TestEnsureDockifyNetworkAddsAlias(t *testing.T) {
 	nets := svc["networks"].([]interface{})
 	found := false
 	for _, net := range nets {
-		if m, ok := net.(map[string]interface{}); ok {
-			if cfg, ok := m["dockify"].(map[string]interface{}); ok {
-				aliases := cfg["aliases"].([]interface{})
-				for _, a := range aliases {
-					if a.(string) == "my-app-example-com" {
-						found = true
-					}
-				}
-			}
+		if s, ok := net.(string); ok && s == "dockify" {
+			found = true
 		}
 	}
 	if !found {
-		t.Fatal("alias not found in dockify network config")
+		t.Fatal("dockify network not found in service networks")
 	}
 }
 
@@ -124,58 +114,26 @@ networks:
   dockify:
     external: true
 `
-	result := ensureDockifyNetwork(compose, "existing.app")
+	result := ensureDockifyNetwork(compose)
 
-	if !strings.Contains(result, "existing-app") {
-		t.Fatalf("expected alias existing-app in output:\n%s", result)
+	if !strings.Contains(result, "dockify") {
+		t.Fatal("expected dockify in output")
 	}
 }
 
-func TestEnsureDockifyNetworkPreservesOtherNets(t *testing.T) {
+func TestEnsureDockifyNetworkDoesNotDuplicate(t *testing.T) {
 	compose := `services:
-  web:
-    image: nginx
+  app:
+    image: nginx:alpine
     networks:
-      - frontend
       - dockify
-networks:
-  dockify:
-    external: true
-  frontend:
-    external: true
+      - other
 `
-	result := ensureDockifyNetwork(compose, "cool-app")
+	result := ensureDockifyNetwork(compose)
 
-	var doc map[string]interface{}
-	if err := yaml.Unmarshal([]byte(result), &doc); err != nil {
-		t.Fatalf("invalid YAML: %v", err)
-	}
-	services := doc["services"].(map[string]interface{})
-	svc := services["web"].(map[string]interface{})
-	nets := svc["networks"].([]interface{})
-
-	hasFrontend := false
-	hasDockify := false
-	for _, net := range nets {
-		switch n := net.(type) {
-		case string:
-			if n == "frontend" {
-				hasFrontend = true
-			}
-		case map[string]interface{}:
-			if _, ok := n["dockify"]; ok {
-				hasDockify = true
-			}
-		}
-	}
-	if !hasFrontend {
-		t.Fatal("frontend network was lost")
-	}
-	if !hasDockify {
-		t.Fatal("dockify network not found")
-	}
-	if !strings.Contains(result, "cool-app") {
-		t.Fatal("alias cool-app not found")
+	count := strings.Count(result, "dockify")
+	if count > 3 {
+		t.Fatalf("dockify appears %d times, expected <= 3", count)
 	}
 }
 

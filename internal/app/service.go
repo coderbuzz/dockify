@@ -156,7 +156,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		}
 	}
 
-	composeContent := ensureDockifyNetwork(app.Compose, app.Name)
+	composeContent := ensureDockifyNetwork(app.Compose)
 
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
@@ -174,6 +174,13 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
 		return
+	}
+
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", composeCmd, composePath)); err == nil {
+		alias := appNetworkAlias(app.Name)
+		for _, cid := range strings.Fields(out) {
+			client.Exec(fmt.Sprintf("docker network connect --alias %s dockify %s 2>/dev/null || true", alias, cid))
+		}
 	}
 
 	if app.Domain != "" {

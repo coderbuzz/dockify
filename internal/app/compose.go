@@ -74,7 +74,7 @@ networks:
 	return compose
 }
 
-func ensureDockifyNetwork(compose string, appName string) string {
+func ensureDockifyNetwork(compose string) string {
 	var doc map[string]interface{}
 	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
 		return compose
@@ -85,8 +85,6 @@ func ensureDockifyNetwork(compose string, appName string) string {
 		return compose
 	}
 
-	alias := appNetworkAlias(appName)
-
 	for name := range services {
 		svc, _ := services[name].(map[string]interface{})
 		if svc == nil {
@@ -95,36 +93,22 @@ func ensureDockifyNetwork(compose string, appName string) string {
 		}
 
 		nets := getNetworksList(svc)
-
-		found := false
-		for i, net := range nets {
+		hasDockify := false
+		for _, net := range nets {
 			switch n := net.(type) {
 			case string:
 				if n == "dockify" {
-					nets[i] = map[string]interface{}{
-						"dockify": mergeDockifyCfg(nil, alias),
-					}
-					found = true
+					hasDockify = true
 				}
 			case map[string]interface{}:
-				if cfg, ok := n["dockify"]; ok {
-					if cfgMap, ok := cfg.(map[string]interface{}); ok {
-						n["dockify"] = mergeDockifyCfg(cfgMap, alias)
-					} else {
-						n["dockify"] = mergeDockifyCfg(nil, alias)
-					}
-					found = true
+				if _, ok := n["dockify"]; ok {
+					hasDockify = true
 				}
 			}
 		}
-
-		if !found {
-			nets = append(nets, map[string]interface{}{
-				"dockify": mergeDockifyCfg(nil, alias),
-			})
+		if !hasDockify {
+			svc["networks"] = append(nets, "dockify")
 		}
-
-		svc["networks"] = nets
 	}
 
 	if _, ok := doc["networks"].(map[string]interface{}); !ok {
@@ -171,15 +155,6 @@ func getNetworksList(svc map[string]interface{}) []interface{} {
 	default:
 		return nil
 	}
-}
-
-func mergeDockifyCfg(existing map[string]interface{}, alias string) map[string]interface{} {
-	if existing == nil {
-		existing = make(map[string]interface{})
-	}
-	aliases, _ := existing["aliases"].([]interface{})
-	existing["aliases"] = append(aliases, alias)
-	return existing
 }
 
 func splitEnvVars(envVars string) []string {
