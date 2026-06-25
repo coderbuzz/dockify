@@ -86,6 +86,16 @@
   </div>
 
   <div class="btn-group">
+    {{if eq .App.Status "running"}}
+    <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
+      <button type="submit" class="btn">Stop</button>
+    </form>
+    {{end}}
+    {{if eq .App.Status "stopped"}}
+    <form method="POST" action="apps/{{.App.ID}}/start" style="display:inline">
+      <button type="submit" class="btn btn-primary">Start</button>
+    </form>
+    {{end}}
     <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
     <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
       <button type="submit" class="btn">Redeploy</button>
@@ -126,7 +136,7 @@
   </table>
   {{end}}
 
-  {{if eq .App.Status "running"}}
+  {{if or (eq .App.Status "running") (eq .App.Status "stopped")}}
   <h2>Logs</h2>
   <div class="log-container">
     <div class="log-toolbar">

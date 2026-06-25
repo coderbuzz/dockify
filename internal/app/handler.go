@@ -135,6 +135,28 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusAccepted, map[string]string{"message": "rollback started"})
 }
 
+func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.Stop(id); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "stopped"})
+}
+
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.Start(id); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "started"})
+}
+
 func (h *Handler) ListSecrets(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	secrets, err := h.service.ListSecrets(id)
@@ -536,6 +558,28 @@ func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, rend
 
 	if err := h.service.Rollback(id); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) AppStopWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.Stop(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.Start(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
