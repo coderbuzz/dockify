@@ -60,6 +60,18 @@ func (s *Service) DeleteSecret(appID int64, key string) error {
 	return s.repo.DeleteSecret(appID, key)
 }
 
+func (s *Service) ListFiles(appID int64) ([]AppFile, error) {
+	return s.repo.ListFiles(appID)
+}
+
+func (s *Service) SetFile(appID int64, path, content string) error {
+	return s.repo.SetFile(appID, path, content)
+}
+
+func (s *Service) DeleteFile(appID int64, path string) error {
+	return s.repo.DeleteFile(appID, path)
+}
+
 func (s *Service) PickServerID() (int64, error) {
 	if s.scheduler == nil {
 		return 0, fmt.Errorf("scheduler not available")
@@ -132,6 +144,15 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		}
 		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
 			log.Printf("Warning: write .env: %v", err)
+		}
+	}
+
+	// Tulis config files (app_files)
+	files, _ := s.repo.ListFiles(id)
+	for _, f := range files {
+		filePath := fmt.Sprintf("%s/%s", remoteDir, f.Path)
+		if err := client.WriteFile(filePath, f.Content, 0644); err != nil {
+			log.Printf("Warning: write config file %s: %v", f.Path, err)
 		}
 	}
 

@@ -73,6 +73,14 @@ CREATE TABLE IF NOT EXISTS app_secrets (
     UNIQUE(app_id, key)
 );
 
+CREATE TABLE IF NOT EXISTS app_files (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id  INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    path    TEXT NOT NULL,
+    content TEXT NOT NULL,
+    UNIQUE(app_id, path)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL,

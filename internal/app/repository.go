@@ -417,6 +417,40 @@ func (r *Repository) DeleteSecrets(appID int64) error {
 	return err
 }
 
+type AppFile struct {
+	ID      int64
+	AppID   int64
+	Path    string
+	Content string
+}
+
+func (r *Repository) ListFiles(appID int64) ([]AppFile, error) {
+	rows, err := r.db.Query(`SELECT id, app_id, path, content FROM app_files WHERE app_id = ? ORDER BY path`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var files []AppFile
+	for rows.Next() {
+		var f AppFile
+		if err := rows.Scan(&f.ID, &f.AppID, &f.Path, &f.Content); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+func (r *Repository) SetFile(appID int64, path, content string) error {
+	_, err := r.db.Exec(`INSERT INTO app_files (app_id, path, content) VALUES (?, ?, ?) ON CONFLICT(app_id, path) DO UPDATE SET content = ?`, appID, path, content, content)
+	return err
+}
+
+func (r *Repository) DeleteFile(appID int64, path string) error {
+	_, err := r.db.Exec(`DELETE FROM app_files WHERE app_id = ? AND path = ?`, appID, path)
+	return err
+}
+
 func nullString(s string) interface{} {
 	if s == "" {
 		return nil

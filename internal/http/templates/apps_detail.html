@@ -59,6 +59,33 @@
     </div>
   </div>
 
+  <div class="card" style="margin-top:1em">
+    <h3>Config Files</h3>
+    <p style="color:var(--text-muted);margin-top:0;font-size:0.85em">
+      Files written to the app directory before deploy. Mount them via <code>./filename:/container/path</code> in compose.
+    </p>
+    <div id="files-list">
+      {{if .Files}}
+      {{range .Files}}
+      <div style="padding:0.5em 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <code style="font-size:0.85em">{{.Path}}</code>
+          <button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeFile('{{.Path}}')">✕</button>
+        </div>
+        <pre style="max-height:100px;overflow:auto;font-size:0.75em;margin:0.3em 0 0;background:var(--bg);padding:0.4em;border-radius:3px">{{.Content}}</pre>
+      </div>
+      {{end}}
+      {{else}}
+      <p style="color:var(--text-muted);font-size:0.85em">No config files.</p>
+      {{end}}
+    </div>
+    <div style="margin-top:1em">
+      <input type="text" id="file-path" placeholder="config.xml" autocomplete="off" style="width:30%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
+      <textarea id="file-content" placeholder="file content" rows="3" style="width:50%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px;vertical-align:top;font-family:monospace;font-size:0.85em"></textarea>
+      <button class="btn btn-primary" onclick="addFile()" style="padding:0.4em 1em">Add</button>
+    </div>
+  </div>
+
   <div class="btn-group">
     <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
     <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
@@ -128,6 +155,25 @@ function addSecret() {
 function removeSecret(key) {
   if (!confirm('Delete secret "' + key + '"?')) return;
   fetch('api/apps/{{.App.ID}}/secrets/' + encodeURIComponent(key), {method: 'DELETE'})
+    .then(r => r.json()).then(d => {
+      location.reload();
+    });
+}
+function addFile() {
+  var path = document.getElementById('file-path').value.trim();
+  var content = document.getElementById('file-content').value;
+  if (!path) { alert('Path is required'); return; }
+  fetch('api/apps/{{.App.ID}}/files', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: path, content: content})
+  }).then(r => r.json()).then(d => {
+    location.reload();
+  });
+}
+function removeFile(path) {
+  if (!confirm('Delete config file "' + path + '"?')) return;
+  fetch('api/apps/{{.App.ID}}/files/' + encodeURIComponent(path), {method: 'DELETE'})
     .then(r => r.json()).then(d => {
       location.reload();
     });

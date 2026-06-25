@@ -176,6 +176,47 @@ func (h *Handler) DeleteSecret(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
+func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	files, err := h.service.ListFiles(id)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, files)
+}
+
+func (h *Handler) SetFile(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var input struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	if input.Path == "" {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "path is required"})
+		return
+	}
+	if err := h.service.SetFile(id, input.Path, input.Content); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	path := chi.URLParam(r, "path")
+	if err := h.service.DeleteFile(id, path); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
 func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
@@ -459,12 +500,14 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 	}
 
 	secrets, _ := h.service.ListSecrets(id)
+	files, _ := h.service.ListFiles(id)
 
 	render(w, r, http.StatusOK, "apps_detail.html", map[string]interface{}{
 		"Title":       app.Name,
 		"App":         app,
 		"Deployments": deps,
 		"Secrets":     secrets,
+		"Files":       files,
 	})
 }
 
