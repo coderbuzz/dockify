@@ -86,6 +86,10 @@ func (c *Client) postRoute(route Route) error {
 		return fmt.Errorf("marshal route: %w", err)
 	}
 
+	// Pastikan routes array ada (bisa null di Caddy fresh). POST [] hanya
+	// berhasil kalau routes null; kalau sudah ada, gagal harmless tanpa side effect.
+	c.ssh.Exec(`docker exec caddy curl -s -o /dev/null -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '[]'`)
+
 	cmd := fmt.Sprintf(
 		`docker exec caddy curl -s -w '%%{http_code}' -o /tmp/cr.txt -X POST http://localhost:2019/config/apps/http/servers/srv0/routes -H 'Content-Type: application/json' -d '%s'; echo; docker exec caddy cat /tmp/cr.txt 2>/dev/null`,
 		escapeShell(string(body)),
