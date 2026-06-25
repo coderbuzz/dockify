@@ -60,6 +60,7 @@
   </div>
 
   <div class="btn-group">
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
     <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
       <button type="submit" class="btn">Redeploy</button>
     </form>

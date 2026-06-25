@@ -44,6 +44,10 @@ func (s *Service) Create(app *App) error {
 	return s.repo.Create(app)
 }
 
+func (s *Service) Update(app *App) error {
+	return s.repo.Update(app)
+}
+
 func (s *Service) ListSecrets(appID int64) ([]AppSecret, error) {
 	return s.repo.ListSecrets(appID)
 }

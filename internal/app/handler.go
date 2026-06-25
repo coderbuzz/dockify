@@ -342,6 +342,98 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
 }
 
+func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	app, err := h.service.Get(id)
+	if err != nil || app == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
+		return
+	}
+	servers, _ := h.serverRepo.List()
+	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
+		"Title":   "Edit " + app.Name,
+		"Servers": servers,
+		"App":     app,
+		"IsEdit":  true,
+	})
+}
+
+func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	app, err := h.service.Get(id)
+	if err != nil || app == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
+			"Title":   "Edit " + app.Name,
+			"Servers": servers,
+			"App":     app,
+			"IsEdit":  true,
+			"Error":   "invalid form data",
+		})
+		return
+	}
+
+	serverID, _ := strconv.ParseInt(r.FormValue("server_id"), 10, 64)
+	if serverID == 0 {
+		serverID = app.ServerID
+	}
+	port, _ := strconv.Atoi(r.FormValue("port"))
+
+	compose := strings.TrimSpace(r.FormValue("compose"))
+	image := strings.TrimSpace(r.FormValue("image"))
+	envVars := strings.TrimSpace(r.FormValue("env_vars"))
+	volumes := strings.TrimSpace(r.FormValue("volumes"))
+
+	if compose == "" && image != "" {
+		compose = generateCompose(image, port, envVars, volumes)
+	}
+
+	app.Name = strings.TrimSpace(r.FormValue("name"))
+	app.ServerID = serverID
+	app.Domain = strings.TrimSpace(r.FormValue("domain"))
+	app.Port = port
+	app.Compose = compose
+	app.GitRepo = strings.TrimSpace(r.FormValue("git_repo"))
+	app.GitBranch = strings.TrimSpace(r.FormValue("git_branch"))
+	app.AuthUser = strings.TrimSpace(r.FormValue("auth_user"))
+	app.AuthPass = strings.TrimSpace(r.FormValue("auth_pass"))
+
+	if app.GitBranch == "" {
+		app.GitBranch = "main"
+	}
+	if app.Name == "" || app.Compose == "" {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
+			"Title":   "Edit " + app.Name,
+			"Servers": servers,
+			"App":     app,
+			"IsEdit":  true,
+			"Error":   "name and compose are required",
+		})
+		return
+	}
+
+	if err := h.service.Update(app); err != nil {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusInternalServerError, "apps_add.html", map[string]interface{}{
+			"Title":   "Edit " + app.Name,
+			"Servers": servers,
+			"App":     app,
+			"IsEdit":  true,
+			"Error":   err.Error(),
+		})
+		return
+	}
+
+	go h.service.Redeploy(id)
+
+	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
 func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 

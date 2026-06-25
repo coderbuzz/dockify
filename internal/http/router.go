@@ -135,6 +135,12 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/rollback", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppRollbackWeb(w, r, render)
 			})
+			r.Get("/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppEditPage(w, r, render)
+			})
+			r.Post("/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppEditForm(w, r, render)
+			})
 		})
 
 		r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
