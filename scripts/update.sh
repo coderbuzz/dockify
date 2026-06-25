@@ -60,9 +60,16 @@ echo "Current version:    $CURRENT_VERSION"
 
 if [ "$NEW_VERSION" = "$CURRENT_VERSION" ]; then
   echo ""
-  echo -e "${GREEN}Already at latest version.${NC}"
-  rm -f /tmp/dockify-update
-  exit 0
+  echo "Already running $CURRENT_VERSION."
+  FORCE="${DOCKIFY_FORCE:-n}"
+  if [ "${FORCE,,}" != "y" ] && [ -c /dev/tty ]; then
+    read -p "Force reinstall? [y/N] " FORCE < /dev/tty
+  fi
+  if [ "${FORCE,,}" != "y" ]; then
+    rm -f /tmp/dockify-update
+    exit 0
+  fi
+  echo "Forcing reinstall..."
 fi
 
 echo ""
