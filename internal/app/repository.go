@@ -378,6 +378,45 @@ type DNSRecordInfo struct {
 	CreatedAt string
 }
 
+type AppSecret struct {
+	ID    int64
+	AppID int64
+	Key   string
+	Value string
+}
+
+func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
+	rows, err := r.db.Query(`SELECT id, app_id, key, value FROM app_secrets WHERE app_id = ? ORDER BY key`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var secrets []AppSecret
+	for rows.Next() {
+		var s AppSecret
+		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value); err != nil {
+			return nil, err
+		}
+		secrets = append(secrets, s)
+	}
+	return secrets, rows.Err()
+}
+
+func (r *Repository) SetSecret(appID int64, key, value string) error {
+	_, err := r.db.Exec(`INSERT INTO app_secrets (app_id, key, value) VALUES (?, ?, ?) ON CONFLICT(app_id, key) DO UPDATE SET value = ?`, appID, key, value, value)
+	return err
+}
+
+func (r *Repository) DeleteSecret(appID int64, key string) error {
+	_, err := r.db.Exec(`DELETE FROM app_secrets WHERE app_id = ? AND key = ?`, appID, key)
+	return err
+}
+
+func (r *Repository) DeleteSecrets(appID int64) error {
+	_, err := r.db.Exec(`DELETE FROM app_secrets WHERE app_id = ?`, appID)
+	return err
+}
+
 func nullString(s string) interface{} {
 	if s == "" {
 		return nil

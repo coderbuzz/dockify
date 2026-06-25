@@ -44,6 +44,18 @@ func (s *Service) Create(app *App) error {
 	return s.repo.Create(app)
 }
 
+func (s *Service) ListSecrets(appID int64) ([]AppSecret, error) {
+	return s.repo.ListSecrets(appID)
+}
+
+func (s *Service) SetSecret(appID int64, key, value string) error {
+	return s.repo.SetSecret(appID, key, value)
+}
+
+func (s *Service) DeleteSecret(appID int64, key string) error {
+	return s.repo.DeleteSecret(appID, key)
+}
+
 func (s *Service) PickServerID() (int64, error) {
 	if s.scheduler == nil {
 		return 0, fmt.Errorf("scheduler not available")
@@ -106,6 +118,19 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
 
+	// Tulis .env file dari app secrets
+	secrets, _ := s.repo.ListSecrets(id)
+	if len(secrets) > 0 {
+		envPath := fmt.Sprintf("%s/.env", remoteDir)
+		var envLines []string
+		for _, sec := range secrets {
+			envLines = append(envLines, sec.Key+"="+sec.Value)
+		}
+		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
+			log.Printf("Warning: write .env: %v", err)
+		}
+	}
+
 	if err := client.WriteFile(composePath, app.Compose, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
@@ -124,37 +149,40 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		return
 	}
 
-	target := fmt.Sprintf("%s:%d", getServiceName(app.Compose), app.Port)
-	caddyClient := caddy.NewClient(client)
-	var caddyErr error
-	if app.AuthUser != "" && app.AuthPass != "" {
-		caddyErr = caddyClient.AddRouteWithAuth(app.Domain, target, app.AuthUser, app.AuthPass)
-		log.Printf("Caddy route (with auth) added: %s -> %s", app.Domain, target)
-	} else {
-		caddyErr = caddyClient.AddRoute(app.Domain, target)
-		log.Printf("Caddy route added: %s -> %s", app.Domain, target)
-	}
-	if caddyErr != nil {
-		log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, caddyErr)
-		logs = append(logs, fmt.Sprintf("caddy: %v", caddyErr))
-	}
-
-	s.repo.SaveRoute(&Route{
-		AppID:    id,
-		ServerID: svr.ID,
-		Domain:   app.Domain,
-		Target:   target,
-	})
-
-	if s.cf != nil && s.cf.Enabled() {
-		record, err := s.cf.CreateRecord(app.Domain, svr.Host, false)
-		if err != nil {
-			log.Printf("Warning: Cloudflare DNS failed for %q: %v", app.Name, err)
-			logs = append(logs, fmt.Sprintf("dns: %v", err))
+	if app.Domain != "" {
+		target := fmt.Sprintf("%s:%d", getServiceName(app.Compose), app.Port)
+		caddyClient := caddy.NewClient(client)
+		var caddyErr error
+		if app.AuthUser != "" && app.AuthPass != "" {
+			caddyErr = caddyClient.AddRouteWithAuth(app.Domain, target, app.AuthUser, app.AuthPass)
+			log.Printf("Caddy route (with auth) added: %s -> %s", app.Domain, target)
 		} else {
-			log.Printf("DNS record created: %s -> %s", record.Name, record.Content)
-			s.repo.SaveDNSRecord(id, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
+			caddyErr = caddyClient.AddRoute(app.Domain, target)
+			log.Printf("Caddy route added: %s -> %s", app.Domain, target)
 		}
+		if caddyErr != nil {
+			log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, caddyErr)
+			logs = append(logs, fmt.Sprintf("caddy: %v", caddyErr))
+		}
+		s.repo.SaveRoute(&Route{
+			AppID:    id,
+			ServerID: svr.ID,
+			Domain:   app.Domain,
+			Target:   target,
+		})
+
+		if s.cf != nil && s.cf.Enabled() {
+			record, err := s.cf.CreateRecord(app.Domain, svr.Host, false)
+			if err != nil {
+				log.Printf("Warning: Cloudflare DNS failed for %q: %v", app.Name, err)
+				logs = append(logs, fmt.Sprintf("dns: %v", err))
+			} else {
+				log.Printf("DNS record created: %s -> %s", record.Name, record.Content)
+				s.repo.SaveDNSRecord(id, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
+			}
+		}
+	} else {
+		log.Printf("App %q deployed as internal service (no domain, no Caddy route)", app.Name)
 	}
 
 	s.repo.UpdateStatus(id, StatusRunning)
@@ -261,8 +289,10 @@ func (s *Service) Undeploy(id int64) error {
 
 	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
 
-	caddyClient := caddy.NewClient(client)
-	caddyClient.RemoveRoute(app.Domain)
+	if app.Domain != "" {
+		caddyClient := caddy.NewClient(client)
+		caddyClient.RemoveRoute(app.Domain)
+	}
 
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDNSRecords(app.ID)

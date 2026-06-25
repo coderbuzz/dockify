@@ -103,6 +103,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/rollback", appAPIHandler.Rollback)
 			r.Get("/{id}/deployments", appAPIHandler.ListDeployments)
 			r.Get("/{id}/logs", appAPIHandler.Logs)
+			r.Get("/{id}/secrets", appAPIHandler.ListSecrets)
+			r.Post("/{id}/secrets", appAPIHandler.SetSecret)
+			r.Delete("/{id}/secrets/{key}", appAPIHandler.DeleteSecret)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)

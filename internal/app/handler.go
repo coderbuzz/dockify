@@ -47,8 +47,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Name == "" || input.Domain == "" || input.Port == 0 {
-		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "name, domain, and port are required"})
+	if input.Name == "" {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
 		return
 	}
 
@@ -133,6 +133,47 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusAccepted, map[string]string{"message": "rollback started"})
+}
+
+func (h *Handler) ListSecrets(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	secrets, err := h.service.ListSecrets(id)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, secrets)
+}
+
+func (h *Handler) SetSecret(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var input struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	if input.Key == "" {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "key is required"})
+		return
+	}
+	if err := h.service.SetSecret(id, input.Key, input.Value); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+func (h *Handler) DeleteSecret(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	key := chi.URLParam(r, "key")
+	if err := h.service.DeleteSecret(id, key); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
 func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
@@ -262,7 +303,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		AuthPass:  strings.TrimSpace(r.FormValue("auth_pass")),
 	}
 
-	if app.Name == "" || app.Domain == "" || app.Port == 0 || app.Compose == "" {
+	if app.Name == "" || app.Compose == "" {
 		servers, _ := h.serverRepo.List()
 		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
 			"Title":   "Deploy App",
@@ -319,10 +360,13 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		deps = nil
 	}
 
+	secrets, _ := h.service.ListSecrets(id)
+
 	render(w, r, http.StatusOK, "apps_detail.html", map[string]interface{}{
 		"Title":       app.Name,
 		"App":         app,
 		"Deployments": deps,
+		"Secrets":     secrets,
 	})
 }
 

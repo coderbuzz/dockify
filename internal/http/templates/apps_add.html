@@ -17,10 +17,10 @@
     <fieldset>
       <div class="grid">
         <label>App Name<input type="text" name="name" placeholder="my-web-app" required autofocus></label>
-        <label>Domain<input type="text" name="domain" placeholder="app.example.com" required></label>
+        <label>Domain<input type="text" name="domain" placeholder="app.example.com"><small>Leave empty for internal services</small></label>
       </div>
       <div class="grid">
-        <label>Port<input type="number" name="port" placeholder="80" required><small>Internal container port</small></label>
+        <label>Port<input type="number" name="port" placeholder="80"><small>Internal container port (optional)</small></label>
         <label>Server
           <select name="server_id" required>
             <option value="">Select a server...</option>

@@ -4,9 +4,11 @@ set -euo pipefail
 echo "=== Dockify Updater ==="
 echo ""
 
-if systemctl is-active --quiet dockify-caddy 2>/dev/null; then
+if systemctl cat dockify-caddy >/dev/null 2>&1; then
   MODE="binary+caddy"
-elif systemctl is-active --quiet dockify 2>/dev/null; then
+elif systemctl cat dockify >/dev/null 2>&1; then
+  MODE="binary"
+elif [ -x /usr/local/bin/dockify ]; then
   MODE="binary"
 elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q dockify; then
   MODE="docker"

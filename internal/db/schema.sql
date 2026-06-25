@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS apps (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
     server_id   INTEGER REFERENCES servers(id),
-    domain      TEXT NOT NULL,
-    port        INTEGER NOT NULL,
+    domain      TEXT DEFAULT '',
+    port        INTEGER DEFAULT 0,
     compose     TEXT NOT NULL,
     git_repo    TEXT,
     git_branch  TEXT DEFAULT 'main',
@@ -63,6 +63,14 @@ CREATE TABLE IF NOT EXISTS dns_records (
     content     TEXT NOT NULL,
     proxied     INTEGER DEFAULT 0,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS app_secrets (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id   INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    UNIQUE(app_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS settings (

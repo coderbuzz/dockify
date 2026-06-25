@@ -12,7 +12,7 @@
 
   <hgroup>
     <h1>{{.App.Name}} <span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></h1>
-    <p>{{.App.Domain}}:{{.App.Port}}</p>
+    <p>{{if .App.Domain}}{{.App.Domain}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
   </hgroup>
 
   <div class="grid">
@@ -31,6 +31,31 @@
     <div class="card">
       <h3>Docker Compose</h3>
       <pre style="max-height:200px">{{.App.Compose}}</pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Secrets</h3>
+    <p style="color:var(--text-muted);margin-top:0;font-size:0.85em">
+      Use <code>${SECRET_KEY}</code> in your compose to reference these values.
+    </p>
+    <div id="secrets-list">
+      {{if .Secrets}}
+      {{range .Secrets}}
+      <div style="display:flex;align-items:center;padding:0.3em 0;border-bottom:1px solid var(--border)">
+        <code style="flex:1;font-size:0.85em">{{.Key}}</code>
+        <span style="color:var(--text-muted);font-size:0.8em;margin:0 1em">••••••••</span>
+        <button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeSecret('{{.Key}}')">✕</button>
+      </div>
+      {{end}}
+      {{else}}
+      <p style="color:var(--text-muted);font-size:0.85em">No secrets configured.</p>
+      {{end}}
+    </div>
+    <div style="margin-top:1em">
+      <input type="text" id="secret-key" placeholder="KEY" style="width:30%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
+      <input type="password" id="secret-value" placeholder="value" style="width:40%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
+      <button class="btn btn-primary" onclick="addSecret()" style="padding:0.4em 1em">Add</button>
     </div>
   </div>
 
@@ -87,6 +112,26 @@
   {{end}}
 </div>
 <script>
+function addSecret() {
+  var key = document.getElementById('secret-key').value.trim();
+  var val = document.getElementById('secret-value').value;
+  if (!key) { alert('Key is required'); return; }
+  fetch('api/apps/{{.App.ID}}/secrets', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({key: key, value: val})
+  }).then(r => r.json()).then(d => {
+    location.reload();
+  });
+}
+function removeSecret(key) {
+  if (!confirm('Delete secret "' + key + '"?')) return;
+  fetch('api/apps/{{.App.ID}}/secrets/' + encodeURIComponent(key), {method: 'DELETE'})
+    .then(r => r.json()).then(d => {
+      location.reload();
+    });
+}
+</script>
 {{template "scripts" .}}
 </body>
 </html>
