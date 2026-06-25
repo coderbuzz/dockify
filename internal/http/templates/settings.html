@@ -26,9 +26,9 @@
       <strong>GitHub Actions workflow snippet:</strong>
       <pre style="font-size:0.78em;background:var(--bg);padding:0.5em;border-radius:4px;overflow-x:auto">- name: Notify Dockify
   env:
-    DOCKIFY_WEBHOOK_SECRET: ${{ secrets.DOCKIFY_WEBHOOK_SECRET }}
+    DOCKIFY_WEBHOOK_SECRET: ${{"{{"}} secrets.DOCKIFY_WEBHOOK_SECRET {{"}}"}}
   run: |
-    PAYLOAD='{"ref":"refs/heads/'${GITHUB_REF#refs/heads/}'","after":"'${{ github.sha }}'","repository":{"clone_url":"https://github.com/'${{ github.repository }}'.git"}}'
+    PAYLOAD='{"ref":"refs/heads/'${GITHUB_REF#refs/heads/}'","after":"'${{"{{"}} github.sha {{"}}"}}'","repository":{"clone_url":"https://github.com/'${{"{{"}} github.repository {{"}}"}}'.git"}}'
     SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$DOCKIFY_WEBHOOK_SECRET" | sed 's/^.* //')
     curl -s -X POST https://dockify.amg.id/api/webhook/github \
       -H "Content-Type: application/json" \
