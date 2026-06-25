@@ -108,30 +108,6 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, app)
 }
 
-func (h *Handler) GetWebhookSecret(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	app, err := h.service.Get(id)
-	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	if app == nil {
-		jsonResponse(w, http.StatusNotFound, map[string]string{"error": "app not found"})
-		return
-	}
-	jsonResponse(w, http.StatusOK, map[string]string{"secret": app.WebhookSecret})
-}
-
-func (h *Handler) RollWebhookSecret(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	secret, err := h.service.RollWebhookSecret(id)
-	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	jsonResponse(w, http.StatusOK, map[string]string{"secret": secret})
-}
-
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 

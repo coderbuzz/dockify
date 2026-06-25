@@ -13,15 +13,15 @@ import (
 
 type WebhookService interface {
 	DeployByGit(repo, branch, commitSHA string)
-	GetWebhookSecrets(repo, branch string) []string
 }
 
 type Handler struct {
-	service WebhookService
+	service       WebhookService
+	webhookSecret string
 }
 
-func NewHandler(service WebhookService) *Handler {
-	return &Handler{service: service}
+func NewHandler(service WebhookService, webhookSecret string) *Handler {
+	return &Handler{service: service, webhookSecret: webhookSecret}
 }
 
 func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
@@ -54,21 +54,11 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Repo.CloneURL
 	commitSHA := payload.After
 
-	secrets := h.service.GetWebhookSecrets(repo, branch)
-	if len(secrets) > 0 {
-		sig := r.Header.Get("X-Hub-Signature-256")
-		verified := false
-		for _, secret := range secrets {
-			if verifyHMACSHA256(sig, body, secret) {
-				verified = true
-				break
-			}
-		}
-		if !verified {
-			log.Printf("Webhook: invalid signature for %s@%s", repo, branch)
-			http.Error(w, "invalid signature", http.StatusUnauthorized)
-			return
-		}
+	sig := r.Header.Get("X-Hub-Signature-256")
+	if h.webhookSecret != "" && !verifyHMACSHA256(sig, body, h.webhookSecret) {
+		log.Printf("Webhook: invalid signature for %s@%s", repo, branch)
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
 	}
 
 	log.Printf("GitHub webhook: repo=%s branch=%s commit=%s", repo, branch, commitSHA)
@@ -106,21 +96,11 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Project.GitHTTPURL
 	commitSHA := payload.After
 
-	secrets := h.service.GetWebhookSecrets(repo, branch)
-	if len(secrets) > 0 {
-		token := r.Header.Get("X-Gitlab-Token")
-		verified := false
-		for _, secret := range secrets {
-			if token == secret {
-				verified = true
-				break
-			}
-		}
-		if !verified {
-			log.Printf("Webhook: invalid token for %s@%s", repo, branch)
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
+	token := r.Header.Get("X-Gitlab-Token")
+	if h.webhookSecret != "" && token != h.webhookSecret {
+		log.Printf("Webhook: invalid token for %s@%s", repo, branch)
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
 	}
 
 	log.Printf("GitLab webhook: repo=%s branch=%s commit=%s", repo, branch, commitSHA)

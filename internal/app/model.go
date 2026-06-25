@@ -13,7 +13,6 @@ type App struct {
 	GitBranch     string    `json:"git_branch"`
 	AuthUser      string    `json:"auth_user"`
 	AuthPass      string    `json:"auth_pass"`
-	WebhookSecret string    `json:"webhook_secret"`
 	Status        string    `json:"status"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`

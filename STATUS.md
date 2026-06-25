@@ -5,24 +5,17 @@
 - ✅ Domain: dockify.amg.id (https)
 - ✅ Worker register + init (Docker, network, Caddy)
 - ✅ Login page admin
-- ✅ Route inject via Admin API
-- ✅ HTTPS di worker port 443 (manual DELETE+PUT listen)
-- ✅ Route posisi 0 (manual POST ke /routes/0)
+- ✅ Route inject via Admin API (fixed: initialize routes array sebelum POST)
+- ✅ HTTPS di worker port 443
+- ✅ Multi-instance webhook deploy (1 push → redeploy semua app)
+- ✅ Global webhook secret via Settings page
+- ✅ Settings page (view/copy/roll webhook secret)
 
-## Yang belum
-- ❌ Route inject via `postRoute()` selalu error 500 `cannot unmarshal object...`
-  - Penyebab: Admin API Caddy tidak terima format JSON route setelah listen diubah
-  - Coba tanpa Caddyfile (revert commit Caddyfile)
-- ❌ Caddyfile approach juga gagal (route inject error sama)
-- ❌ Route tidak match untuk domain `kv.amg.id` (selalu "Caddy works!")
+## Fix terbaru (25 Jun)
+1. **Caddy route injection** — POST `[]` dulu ke `/routes` untuk inisialisasi array (fresh Caddy routes null)
+2. **Multi-instance webhook** — `DeployByGit` loop semua app yang match repo+branch, bukan cuma 1
+3. **Global webhook secret** — pindah dari per-app ke global di table settings. Hapus kolom `webhook_secret` dari apps. Settings page di UI untuk copy/roll secret.
 
-## Ringkasan error
-1. `routes` → 500 unmarshal error (POST route setelah listen diubah)
-2. `routes/0` → 500 same error
-3. Caddyfile → same error
-
-## Rencana besok
-1. Jalankan dari worker VM
-2. Debug langsung SSH ke Caddy Admin API
-3. Cek response body curl langsung
-4. Fix format JSON route biar sesuai Caddy v2 API spec
+## Rencana
+- Setup CI GitHub Action utk auto-deploy via webhook
+- Test multi-instance webhook dengan kvs-server-app

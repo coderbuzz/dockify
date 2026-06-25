@@ -25,11 +25,7 @@
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
         {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
         {{if .App.GitRepo}}<tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
-        <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>
-        <tr><td><strong>Webhook Secret</strong></td><td><code style="font-size:0.78em" id="wh-secret">{{.App.WebhookSecret}}</code>
-          <button class="btn btn-ghost" style="font-size:0.75em;padding:0.1em 0.4em;margin-left:0.3em" onclick="rollSecret({{.App.ID}})" title="Generate new secret">↻</button>
-          <button class="btn btn-ghost" style="font-size:0.75em;padding:0.1em 0.4em" onclick="copySecret()" title="Copy secret">📋</button>
-        </td></tr>{{end}}
+        <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>{{end}}
       </table>
     </div>
     <div class="card">
@@ -91,19 +87,6 @@
   {{end}}
 </div>
 <script>
-function rollSecret(id) {
-  if (!confirm('Generate a new webhook secret? The old one will stop working immediately.')) return;
-  fetch('api/apps/' + id + '/webhook-secret/roll', {method:'POST'})
-    .then(r => r.json())
-    .then(d => {
-      document.getElementById('wh-secret').textContent = d.secret;
-    });
-}
-function copySecret() {
-  var s = document.getElementById('wh-secret').textContent;
-  navigator.clipboard.writeText(s);
-}
-</script>
 {{template "scripts" .}}
 </body>
 </html>

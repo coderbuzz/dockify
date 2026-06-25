@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<div class="container">
+  <div class="breadcrumb">
+    <span>Settings</span>
+  </div>
+
+  <hgroup><h1>Settings</h1></hgroup>
+
+  <div class="card">
+    <h3>Webhook Secret</h3>
+    <p style="color:var(--text-muted);margin-top:0">
+      Use this secret in GitHub Actions to authenticate webhook deploy notifications.
+    </p>
+    <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap">
+      <input type="password" id="wh-secret" value="{{.WebhookSecret}}" readonly
+             style="flex:1;font-family:monospace;font-size:0.85em;min-width:280px;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+      <button class="btn btn-ghost" onclick="toggleSecret()" style="font-size:0.85em" id="toggle-btn">Show</button>
+      <button class="btn btn-ghost" onclick="copySecret()" style="font-size:0.85em">Copy</button>
+      <button class="btn btn-ghost btn-red" onclick="rollSecret()" style="font-size:0.85em">Roll</button>
+    </div>
+    <div style="margin-top:1em;font-size:0.8em;color:var(--text-muted)">
+      <strong>GitHub Actions workflow snippet:</strong>
+      <pre style="font-size:0.78em;background:var(--bg);padding:0.5em;border-radius:4px;overflow-x:auto">- name: Notify Dockify
+  env:
+    DOCKIFY_WEBHOOK_SECRET: ${{ secrets.DOCKIFY_WEBHOOK_SECRET }}
+  run: |
+    PAYLOAD='{"ref":"refs/heads/'${GITHUB_REF#refs/heads/}'","after":"'${{ github.sha }}'","repository":{"clone_url":"https://github.com/'${{ github.repository }}'.git"}}'
+    SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$DOCKIFY_WEBHOOK_SECRET" | sed 's/^.* //')
+    curl -s -X POST https://dockify.amg.id/api/webhook/github \
+      -H "Content-Type: application/json" \
+      -H "X-GitHub-Event: push" \
+      -H "X-Hub-Signature-256: sha256=$SIG" \
+      -d "$PAYLOAD"</pre>
+    </div>
+  </div>
+</div>
+<script>
+var visible = false;
+function toggleSecret() {
+  var el = document.getElementById('wh-secret');
+  var btn = document.getElementById('toggle-btn');
+  visible = !visible;
+  el.type = visible ? 'text' : 'password';
+  btn.textContent = visible ? 'Hide' : 'Show';
+}
+function copySecret() {
+  navigator.clipboard.writeText(document.getElementById('wh-secret').value);
+}
+function rollSecret() {
+  if (!confirm('Generate a new webhook secret? The old one will stop working immediately. Update your CI secrets.')) return;
+  fetch('api/settings/webhook-secret/roll', {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('wh-secret').value = d.secret;
+      if (visible) document.getElementById('wh-secret').type = 'text';
+    });
+}
+</script>
+{{template "scripts" .}}
+</body>
+</html>

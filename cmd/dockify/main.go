@@ -15,6 +15,7 @@ import (
 	httppkg "github.com/coderbuzz/dockify/internal/http"
 	"github.com/coderbuzz/dockify/internal/scheduler"
 	"github.com/coderbuzz/dockify/internal/server"
+	"github.com/coderbuzz/dockify/internal/settings"
 )
 
 var version = "0.1.0"
@@ -59,9 +60,13 @@ func main() {
 	appRepo := app.NewRepository(database)
 	appSvc := app.NewService(appRepo, serverRepo, cfClient, sch)
 
+	settingsSvc := settings.NewService(database)
+	webhookSecret, _ := settingsSvc.GetWebhookSecret()
+	settingsHandler := settings.NewHandler(settingsSvc)
+
 	serverListAdapter := &serverLister{svc: svc}
 
-	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir)
+	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecret, settingsHandler)
 
 	if cfg.AdminPass == "" {
 		log.Println("WARNING: No admin password set (DOCKIFY_ADMIN_PASSWORD). Web UI has no authentication.")

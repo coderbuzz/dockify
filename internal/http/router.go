@@ -7,12 +7,13 @@ import (
 
 	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/server"
+	"github.com/coderbuzz/dockify/internal/settings"
 	"github.com/coderbuzz/dockify/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -29,7 +30,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	appAPIHandler := app.NewHandler(appSvc)
 	appWebHandler := app.NewWebHandler(appSvc, serverListAdapter)
 
-	whHandler := webhook.NewHandler(appSvc)
+	whHandler := webhook.NewHandler(appSvc, webhookSecret)
 
 	// Public routes (no auth required)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -101,8 +102,6 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/rollback", appAPIHandler.Rollback)
 			r.Get("/{id}/deployments", appAPIHandler.ListDeployments)
 			r.Get("/{id}/logs", appAPIHandler.Logs)
-			r.Get("/{id}/webhook-secret", appAPIHandler.GetWebhookSecret)
-			r.Post("/{id}/webhook-secret/roll", appAPIHandler.RollWebhookSecret)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)
@@ -133,6 +132,12 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 				appWebHandler.AppRollbackWeb(w, r, render)
 			})
 		})
+
+		r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
+			settingsHandler.SettingsPage(w, r, render)
+		})
+		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
+		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			stats := appSvc.DashboardStats()

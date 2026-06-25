@@ -36,5 +36,8 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
+	// Migrasi: hapus kolom webhook_secret dari apps (global settings sekarang)
+	db.Exec("ALTER TABLE apps DROP COLUMN webhook_secret")
+
 	return db, nil
 }

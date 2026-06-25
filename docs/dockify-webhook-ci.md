@@ -28,7 +28,7 @@ Saat create/edit app, isi field:
 - **Git Branch:** branch yang ditrigger, misal `main`
 - **Image:** gunakan tag `latest` atau `main` agar CI update otomatis terpakai
 
-Dockify akan auto-generate **Webhook Secret**. Copy secret ini dari app detail page.
+Webhook secret bersifat **global** (1 secret untuk semua app). Copy dari **Settings page** di Dockify UI.
 
 ### 2. Di GitHub repo — tambah secret
 **Settings → Secrets and variables → Actions → New repository secret:**
@@ -128,6 +128,6 @@ saat create/edit app. Tidak perlu `.env` di repo atau CI — semua config via Do
 
 ## Debug
 
-- **Webhook return 401:** secret tidak cocok. Cek `DOCKIFY_WEBHOOK_SECRET` di GitHub secrets.
+- **Webhook return 401:** secret tidak cocok. Cek webhook secret di Settings page Dockify vs `DOCKIFY_WEBHOOK_SECRET` di GitHub secrets.
 - **App tidak redeploy:** cek `git_repo` dan `git_branch` di Dockify app detail.
 - **Docker build gagal:** cek GitHub Actions log.

@@ -1,8 +1,6 @@
 package app
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -43,26 +41,7 @@ func (s *Service) Get(id int64) (*App, error) {
 }
 
 func (s *Service) Create(app *App) error {
-	if app.GitRepo != "" && app.WebhookSecret == "" {
-		app.WebhookSecret = generateSecret()
-	}
 	return s.repo.Create(app)
-}
-
-func (s *Service) RollWebhookSecret(id int64) (string, error) {
-	secret := generateSecret()
-	if err := s.repo.UpdateWebhookSecret(id, secret); err != nil {
-		return "", err
-	}
-	return secret, nil
-}
-
-func generateSecret() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b)
 }
 
 func (s *Service) PickServerID() (int64, error) {
@@ -94,20 +73,6 @@ func (s *Service) DeployByGit(repo, branch, commitSHA string) {
 		log.Printf("Webhook triggered deploy for %q (commit %s)", app.Name, commitSHA)
 		go s.deployWithCommit(app.ID, commitSHA)
 	}
-}
-
-func (s *Service) GetWebhookSecrets(repo, branch string) []string {
-	apps, err := s.repo.FindAllByGitRepo(repo, branch)
-	if err != nil || len(apps) == 0 {
-		return nil
-	}
-	secrets := make([]string, 0, len(apps))
-	for _, a := range apps {
-		if a.WebhookSecret != "" {
-			secrets = append(secrets, a.WebhookSecret)
-		}
-	}
-	return secrets
 }
 
 func (s *Service) deployWithCommit(id int64, commitSHA string) {
