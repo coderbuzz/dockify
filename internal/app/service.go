@@ -342,6 +342,66 @@ func (s *Service) Redeploy(id int64) {
 	s.deployWithCommit(id, "")
 }
 
+func (s *Service) Stop(id int64) error {
+	app, err := s.repo.Get(id)
+	if err != nil || app == nil {
+		return fmt.Errorf("app not found")
+	}
+
+	svr, err := s.serverRepo.Get(app.ServerID)
+	if err != nil || svr == nil {
+		return fmt.Errorf("server not found")
+	}
+
+	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	if err != nil {
+		return fmt.Errorf("SSH connect: %w", err)
+	}
+	defer client.Close()
+
+	dc := dockerComposeCmd(client)
+	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
+	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
+
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s stop 2>&1", dc, composePath)); err != nil {
+		return fmt.Errorf("compose stop: %w\n%s", err, out)
+	}
+
+	s.repo.UpdateStatus(id, StatusStopped)
+	log.Printf("App %q stopped", app.Name)
+	return nil
+}
+
+func (s *Service) Start(id int64) error {
+	app, err := s.repo.Get(id)
+	if err != nil || app == nil {
+		return fmt.Errorf("app not found")
+	}
+
+	svr, err := s.serverRepo.Get(app.ServerID)
+	if err != nil || svr == nil {
+		return fmt.Errorf("server not found")
+	}
+
+	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	if err != nil {
+		return fmt.Errorf("SSH connect: %w", err)
+	}
+	defer client.Close()
+
+	dc := dockerComposeCmd(client)
+	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
+	log.Printf("Starting %q on %s...", app.Name, svr.Name)
+
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s start 2>&1", dc, composePath)); err != nil {
+		return fmt.Errorf("compose start: %w\n%s", err, out)
+	}
+
+	s.repo.UpdateStatus(id, StatusRunning)
+	log.Printf("App %q started", app.Name)
+	return nil
+}
+
 func (s *Service) DashboardStats() *DashboardStats {
 	apps, _ := s.repo.List()
 	servers, _ := s.serverRepo.List()
