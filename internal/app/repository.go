@@ -63,13 +63,41 @@ func (r *Repository) Get(id int64) (*App, error) {
 	return a, nil
 }
 
+func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, server_id, domain, port, compose,
+		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
+		FROM apps WHERE git_repo = ? AND git_branch = ? ORDER BY id
+	`, repo, branch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apps []App
+	for rows.Next() {
+		var a App
+		var gitRepo, gitBranch sql.NullString
+		if err := rows.Scan(
+			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		a.GitRepo = gitRepo.String
+		a.GitBranch = gitBranch.String
+		apps = append(apps, a)
+	}
+	return apps, rows.Err()
+}
+
 func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 	a := &App{}
 	var gitRepo, gitBranch sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, webhook_secret, status, created_at, updated_at
-		FROM apps WHERE git_repo = ? AND git_branch = ?
+		FROM apps WHERE git_repo = ? AND git_branch = ? LIMIT 1
 	`, repo, branch).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.WebhookSecret, &a.Status, &a.CreatedAt, &a.UpdatedAt,

@@ -85,21 +85,29 @@ func (s *Service) Deploy(id int64) {
 }
 
 func (s *Service) DeployByGit(repo, branch, commitSHA string) {
-	app, err := s.repo.FindByGitRepo(repo, branch)
-	if err != nil || app == nil {
+	apps, err := s.repo.FindAllByGitRepo(repo, branch)
+	if err != nil || len(apps) == 0 {
 		log.Printf("Webhook: no app found for %s@%s", repo, branch)
 		return
 	}
-	log.Printf("Webhook triggered deploy for %q (commit %s)", app.Name, commitSHA)
-	s.deployWithCommit(app.ID, commitSHA)
+	for _, app := range apps {
+		log.Printf("Webhook triggered deploy for %q (commit %s)", app.Name, commitSHA)
+		go s.deployWithCommit(app.ID, commitSHA)
+	}
 }
 
-func (s *Service) GetWebhookSecret(repo, branch string) string {
-	app, err := s.repo.FindByGitRepo(repo, branch)
-	if err != nil || app == nil {
-		return ""
+func (s *Service) GetWebhookSecrets(repo, branch string) []string {
+	apps, err := s.repo.FindAllByGitRepo(repo, branch)
+	if err != nil || len(apps) == 0 {
+		return nil
 	}
-	return app.WebhookSecret
+	secrets := make([]string, 0, len(apps))
+	for _, a := range apps {
+		if a.WebhookSecret != "" {
+			secrets = append(secrets, a.WebhookSecret)
+		}
+	}
+	return secrets
 }
 
 func (s *Service) deployWithCommit(id int64, commitSHA string) {
