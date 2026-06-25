@@ -33,20 +33,25 @@
     </fieldset>
 
     <fieldset>
+      {{if .IsEdit}}
+      <legend>Docker Compose</legend>
+      <label>Docker Compose<textarea name="compose" rows="14" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify">{{if .App}}{{.App.Compose}}{{end}}</textarea><small>Edit the raw docker-compose.yml directly. To update env vars, secrets, or volumes, edit the YAML above.</small></label>
+      {{else}}
       <legend>
-        <label style="display:inline-flex;align-items:center;margin-right:1em;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="simple" {{if not .IsEdit}}checked{{end}} onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'" style="margin:0 0.3em 0 0"> Simple</label>
-        <label style="display:inline-flex;align-items:center;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="advanced" {{if .IsEdit}}checked{{end}} onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''" style="margin:0 0.3em 0 0"> Advanced</label>
+        <label style="display:inline-flex;align-items:center;margin-right:1em;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="simple" checked onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'" style="margin:0 0.3em 0 0"> Simple</label>
+        <label style="display:inline-flex;align-items:center;margin-bottom:0;cursor:pointer"><input type="radio" name="mode" value="advanced" onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''" style="margin:0 0.3em 0 0"> Advanced</label>
       </legend>
 
-      <div id="simple-section"{{if .IsEdit}} style="display:none"{{end}}>
+      <div id="simple-section">
         <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine"></label>
         <label>Environment Variables<textarea name="env_vars" rows="3" placeholder="KEY=value&#10;FOO=bar"></textarea><small>One KEY=value per line</small></label>
         <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config"></textarea><small>One volume mount per line (host:container)</small></label>
       </div>
 
-      <div id="advanced-section"{{if not .IsEdit}} style="display:none"{{end}}>
-        <label>Docker Compose<textarea name="compose" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify">{{if .App}}{{.App.Compose}}{{end}}</textarea><small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small></label>
+      <div id="advanced-section" style="display:none">
+        <label>Docker Compose<textarea name="compose" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify"></textarea><small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small></label>
       </div>
+      {{end}}
     </fieldset>
 
     <fieldset>
