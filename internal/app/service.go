@@ -131,7 +131,9 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		}
 	}
 
-	if err := client.WriteFile(composePath, app.Compose, 0644); err != nil {
+	composeContent := ensureDockifyNetwork(app.Compose)
+
+	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
 		return

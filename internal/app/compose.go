@@ -69,6 +69,44 @@ networks:
 	return compose
 }
 
+func ensureDockifyNetwork(compose string) string {
+	if strings.Contains(compose, "dockify") {
+		return compose
+	}
+
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
+		return compose
+	}
+
+	services, ok := doc["services"].(map[string]interface{})
+	if !ok {
+		return compose
+	}
+
+	for name := range services {
+		svc, _ := services[name].(map[string]interface{})
+		if svc == nil {
+			svc = make(map[string]interface{})
+			services[name] = svc
+		}
+		nets, _ := svc["networks"].([]interface{})
+		svc["networks"] = append(nets, "dockify")
+	}
+
+	doc["networks"] = map[string]interface{}{
+		"dockify": map[string]interface{}{
+			"external": true,
+		},
+	}
+
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return compose
+	}
+	return string(out)
+}
+
 func splitEnvVars(envVars string) []string {
 	var result []string
 	lines := strings.Split(envVars, "\n")
