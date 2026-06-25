@@ -80,8 +80,10 @@
       {{end}}
     </div>
     <div style="margin-top:1em">
-      <input type="text" id="file-path" placeholder="config.xml" autocomplete="off" style="width:30%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
-      <textarea id="file-content" placeholder="file content" rows="3" style="width:50%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px;vertical-align:top;font-family:monospace;font-size:0.85em"></textarea>
+      <input type="text" id="file-path" placeholder="config.xml" autocomplete="off" style="width:25%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
+      <textarea id="file-content" placeholder="file content" rows="3" style="width:45%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px;vertical-align:top;font-family:monospace;font-size:0.85em"></textarea>
+      <input type="file" id="file-upload" style="display:none" onchange="uploadFile()">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('file-upload').click()" style="padding:0.4em 0.8em;font-size:0.85em">Upload</button>
       <button class="btn btn-primary" onclick="addFile()" style="padding:0.4em 1em">Add</button>
     </div>
   </div>
@@ -170,6 +172,16 @@ function addFile() {
   }).then(r => r.json()).then(d => {
     location.reload();
   });
+}
+function uploadFile() {
+  var file = document.getElementById('file-upload').files[0];
+  if (!file) return;
+  document.getElementById('file-path').value = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('file-content').value = e.target.result;
+  };
+  reader.readAsText(file);
 }
 function removeFile(path) {
   if (!confirm('Delete config file "' + path + '"?')) return;
