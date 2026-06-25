@@ -337,6 +337,8 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		return
 	}
 
+	saveFormSecrets(r, h.service, app.ID)
+
 	go h.service.Deploy(app.ID)
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
@@ -350,10 +352,12 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 	servers, _ := h.serverRepo.List()
+	secrets, _ := h.service.ListSecrets(id)
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
 		"Title":   "Edit " + app.Name,
 		"Servers": servers,
 		"App":     app,
+		"Secrets": secrets,
 		"IsEdit":  true,
 	})
 }
@@ -429,6 +433,8 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
+	saveFormSecrets(r, h.service, id)
+
 	go h.service.Redeploy(id)
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
@@ -487,6 +493,22 @@ func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, rend
 	}
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func saveFormSecrets(r *http.Request, svc *Service, appID int64) {
+	keys := r.Form["secret_key"]
+	vals := r.Form["secret_val"]
+	for i, k := range keys {
+		k = strings.TrimSpace(k)
+		if k == "" || i >= len(vals) {
+			continue
+		}
+		v := strings.TrimSpace(vals[i])
+		if v == "" {
+			continue
+		}
+		svc.SetSecret(appID, k, v)
+	}
 }
 
 type RenderFunc = func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})

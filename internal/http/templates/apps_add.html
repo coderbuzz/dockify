@@ -70,9 +70,34 @@
       </div>
     </fieldset>
 
+    <fieldset>
+      <legend>Secrets (optional — use <code>${KEY}</code> in compose to reference)</legend>
+      {{if .Secrets}}
+      {{range .Secrets}}
+      <div class="grid" style="margin-bottom:0.4em">
+        <input type="text" name="secret_key" value="{{.Key}}" placeholder="KEY" autocomplete="off">
+        <input type="text" name="secret_val" value="{{.Value}}" placeholder="value" autocomplete="off">
+      </div>
+      {{end}}
+      {{end}}
+      <div id="secret-rows"></div>
+      <button type="button" class="btn btn-ghost" onclick="addSecretRow()" style="margin-top:0.3em">+ Add Secret</button>
+    </fieldset>
+
     <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save & Redeploy{{else}}Deploy App{{end}}</button>
   </form>
 </div>
+<script>
+function addSecretRow() {
+  var div = document.createElement('div');
+  div.className = 'grid';
+  div.style.marginBottom = '0.4em';
+  div.innerHTML = '<input type="text" name="secret_key" placeholder="KEY" autocomplete="off">'
+    + '<input type="text" name="secret_val" placeholder="value" autocomplete="off">'
+    + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em" onclick="this.parentElement.remove()">x</button>';
+  document.getElementById('secret-rows').appendChild(div);
+}
+</script>
 {{template "scripts" .}}
 </body>
 </html>
