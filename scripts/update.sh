@@ -82,7 +82,7 @@ sleep 2
 
 if systemctl is-active --quiet dockify; then
   echo -e "${GREEN}Dockify started successfully.${NC}"
-  rm -f /usr/local/bin/dockify.bak
+  sudo rm -f /usr/local/bin/dockify.bak
 else
   echo -e "${RED}Error: new version failed to start. Rolling back...${NC}"
   sudo systemctl stop dockify 2>/dev/null || true
