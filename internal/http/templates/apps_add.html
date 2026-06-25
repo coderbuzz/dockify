@@ -33,7 +33,7 @@
       <div style="margin-top:0.5em">
         <input type="hidden" name="unique_service_name" value="0">
         <div style="margin-bottom:0.3em">
-          <input type="checkbox" name="unique_service_name" value="1" id="unique_svc_name" {{if .App}}{{if .App.UniqueServiceName}}checked{{end}}{{end}} style="margin:0 0.4em 0 0;vertical-align:middle">
+          <input type="checkbox" name="unique_service_name" value="1" id="unique_svc_name" {{if .App}}{{if .App.UniqueServiceName}}checked{{end}}{{end}}>
           <label for="unique_svc_name" style="display:inline;font-weight:600;cursor:pointer">Unique service name</label>
         </div>
         <div style="color:var(--text-muted);font-size:0.9em">Rename the first service to match the app name to avoid conflicts with other apps on the same server</div>
