@@ -34,6 +34,11 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
+func appNetworkAlias(name string) string {
+	r := strings.NewReplacer(".", "-", "_", "-", " ", "-")
+	return r.Replace(name)
+}
+
 func generateCompose(image string, port int, envVars string, volumes string) string {
 	compose := fmt.Sprintf(`services:
   app:
@@ -69,11 +74,7 @@ networks:
 	return compose
 }
 
-func ensureDockifyNetwork(compose string) string {
-	if strings.Contains(compose, "dockify") {
-		return compose
-	}
-
+func ensureDockifyNetwork(compose string, appName string) string {
 	var doc map[string]interface{}
 	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
 		return compose
@@ -84,20 +85,61 @@ func ensureDockifyNetwork(compose string) string {
 		return compose
 	}
 
+	alias := appNetworkAlias(appName)
+
 	for name := range services {
 		svc, _ := services[name].(map[string]interface{})
 		if svc == nil {
 			svc = make(map[string]interface{})
 			services[name] = svc
 		}
-		nets, _ := svc["networks"].([]interface{})
-		svc["networks"] = append(nets, "dockify")
+
+		nets := getNetworksList(svc)
+
+		found := false
+		for i, net := range nets {
+			switch n := net.(type) {
+			case string:
+				if n == "dockify" {
+					nets[i] = map[string]interface{}{
+						"dockify": mergeDockifyCfg(nil, alias),
+					}
+					found = true
+				}
+			case map[string]interface{}:
+				if cfg, ok := n["dockify"]; ok {
+					if cfgMap, ok := cfg.(map[string]interface{}); ok {
+						n["dockify"] = mergeDockifyCfg(cfgMap, alias)
+					} else {
+						n["dockify"] = mergeDockifyCfg(nil, alias)
+					}
+					found = true
+				}
+			}
+		}
+
+		if !found {
+			nets = append(nets, map[string]interface{}{
+				"dockify": mergeDockifyCfg(nil, alias),
+			})
+		}
+
+		svc["networks"] = nets
 	}
 
-	doc["networks"] = map[string]interface{}{
-		"dockify": map[string]interface{}{
-			"external": true,
-		},
+	if _, ok := doc["networks"].(map[string]interface{}); !ok {
+		doc["networks"] = map[string]interface{}{
+			"dockify": map[string]interface{}{
+				"external": true,
+			},
+		}
+	} else {
+		networks := doc["networks"].(map[string]interface{})
+		if _, ok := networks["dockify"]; !ok {
+			networks["dockify"] = map[string]interface{}{
+				"external": true,
+			}
+		}
 	}
 
 	out, err := yaml.Marshal(doc)
@@ -105,6 +147,39 @@ func ensureDockifyNetwork(compose string) string {
 		return compose
 	}
 	return string(out)
+}
+
+func getNetworksList(svc map[string]interface{}) []interface{} {
+	netsRaw, ok := svc["networks"]
+	if !ok {
+		return nil
+	}
+
+	switch nets := netsRaw.(type) {
+	case []interface{}:
+		return nets
+	case map[string]interface{}:
+		result := make([]interface{}, 0, len(nets))
+		for netName, netCfg := range nets {
+			if netCfg == nil {
+				result = append(result, netName)
+			} else {
+				result = append(result, map[string]interface{}{netName: netCfg})
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func mergeDockifyCfg(existing map[string]interface{}, alias string) map[string]interface{} {
+	if existing == nil {
+		existing = make(map[string]interface{})
+	}
+	aliases, _ := existing["aliases"].([]interface{})
+	existing["aliases"] = append(aliases, alias)
+	return existing
 }
 
 func splitEnvVars(envVars string) []string {

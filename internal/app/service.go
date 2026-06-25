@@ -156,7 +156,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		}
 	}
 
-	composeContent := ensureDockifyNetwork(app.Compose)
+	composeContent := ensureDockifyNetwork(app.Compose, app.Name)
 
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
@@ -177,7 +177,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 	}
 
 	if app.Domain != "" {
-		target := fmt.Sprintf("%s:%d", getServiceName(app.Compose), app.Port)
+		target := fmt.Sprintf("%s:%d", appNetworkAlias(app.Name), app.Port)
 		caddyClient := caddy.NewClient(client)
 		var caddyErr error
 		if app.AuthUser != "" && app.AuthPass != "" {
