@@ -59,7 +59,37 @@ func (c *Client) Enabled() bool {
 }
 
 func (c *Client) CreateRecord(name, ip string, proxied bool) (*DNSRecord, error) {
+	return c.createOrUpdate(name, ip, proxied, "")
+}
+
+func (c *Client) UpdateRecord(id, name, ip string, proxied bool) (*DNSRecord, error) {
+	return c.createOrUpdate(name, ip, proxied, id)
+}
+
+func (c *Client) UpsertRecord(name, ip string, proxied bool) (*DNSRecord, error) {
+	records, err := c.ListRecords(name)
+	if err != nil {
+		return c.CreateRecord(name, ip, proxied)
+	}
+	for _, r := range records {
+		if r.Name == name && r.Type == "A" {
+			if r.Content == ip && r.Proxied == proxied {
+				return &r, nil
+			}
+			log.Printf("Cloudflare DNS: updating A record %s (%s) -> %s", name, r.ID, ip)
+			return c.UpdateRecord(r.ID, name, ip, proxied)
+		}
+	}
+	return c.CreateRecord(name, ip, proxied)
+}
+
+func (c *Client) createOrUpdate(name, ip string, proxied bool, updateID string) (*DNSRecord, error) {
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", c.zoneID)
+	method := "POST"
+	if updateID != "" {
+		url += "/" + updateID
+		method = "PUT"
+	}
 
 	reqBody := createRecordRequest{
 		Type:    "A",
@@ -70,7 +100,7 @@ func (c *Client) CreateRecord(name, ip string, proxied bool) (*DNSRecord, error)
 	}
 
 	body, _ := json.Marshal(reqBody)
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+	httpReq, _ := http.NewRequest(method, url, bytes.NewReader(body))
 	httpReq.Header.Set("Authorization", "Bearer "+c.token)
 	httpReq.Header.Set("Content-Type", "application/json")
 
@@ -100,7 +130,11 @@ func (c *Client) CreateRecord(name, ip string, proxied bool) (*DNSRecord, error)
 		return nil, fmt.Errorf("cloudflare result: %w", err)
 	}
 
-	log.Printf("Cloudflare DNS: created A record %s -> %s (proxied=%v)", name, ip, proxied)
+	if updateID != "" {
+		log.Printf("Cloudflare DNS: updated A record %s -> %s (proxied=%v)", name, ip, proxied)
+	} else {
+		log.Printf("Cloudflare DNS: created A record %s -> %s (proxied=%v)", name, ip, proxied)
+	}
 	return &record, nil
 }
 

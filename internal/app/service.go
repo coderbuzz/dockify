@@ -178,12 +178,13 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		})
 
 		if s.cf != nil && s.cf.Enabled() {
-			record, err := s.cf.CreateRecord(app.Domain, svr.Host, false)
+			s.repo.DeleteDNSRecords(id)
+			record, err := s.cf.UpsertRecord(app.Domain, svr.Host, false)
 			if err != nil {
 				log.Printf("Warning: Cloudflare DNS failed for %q: %v", app.Name, err)
 				logs = append(logs, fmt.Sprintf("dns: %v", err))
 			} else {
-				log.Printf("DNS record created: %s -> %s", record.Name, record.Content)
+				log.Printf("DNS record upserted: %s -> %s", record.Name, record.Content)
 				s.repo.SaveDNSRecord(id, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
 			}
 		}
