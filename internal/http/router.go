@@ -52,6 +52,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	r.Post("/api/webhook/github", whHandler.GitHub)
 	r.Post("/api/webhook/gitlab", whHandler.GitLab)
+	r.Get("/api/settings/update/check", settingsHandler.CheckUpdate)
 
 	staticDir := http.Dir("web/static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(staticDir)))
@@ -173,7 +174,6 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
 		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
-		r.Get("/api/settings/update/check", settingsHandler.CheckUpdate)
 		r.Post("/api/settings/update/run", settingsHandler.RunUpdate)
 
 		r.Get("/about", func(w http.ResponseWriter, r *http.Request) {
