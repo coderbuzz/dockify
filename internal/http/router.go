@@ -14,7 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler, backupHandler *backup.Handler) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -173,6 +173,15 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
 		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
+		r.Get("/api/settings/update/check", settingsHandler.CheckUpdate)
+		r.Post("/api/settings/update/run", settingsHandler.RunUpdate)
+
+		r.Get("/about", func(w http.ResponseWriter, r *http.Request) {
+			render(w, r, http.StatusOK, "about.html", map[string]interface{}{
+				"Title":   "About",
+				"Version": version,
+			})
+		})
 
 		r.Get("/export", func(w http.ResponseWriter, r *http.Request) {
 			backupHandler.ExportPage(w, r, render)

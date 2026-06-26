@@ -4,19 +4,82 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"time"
 )
 
 const webhookSecretKey = "webhook_secret"
 
-type Service struct {
-	db *sql.DB
+type UpdateInfo struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+	HasUpdate bool   `json:"has_update"`
 }
 
-func NewService(db *sql.DB) *Service {
-	s := &Service{db: db}
+type Service struct {
+	db      *sql.DB
+	version string
+}
+
+func NewService(db *sql.DB, version string) *Service {
+	s := &Service{db: db, version: version}
 	s.ensureWebhookSecret()
 	return s
+}
+
+func (s *Service) CheckUpdate() (*UpdateInfo, error) {
+	current := s.version
+	if current == "" {
+		current = "0.0.0"
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/coderbuzz/dockify/releases/latest")
+	if err != nil {
+		return &UpdateInfo{Current: current, Latest: "", HasUpdate: false}, fmt.Errorf("fetch latest: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return &UpdateInfo{Current: current, Latest: "", HasUpdate: false}, fmt.Errorf("decode: %w", err)
+	}
+
+	latest := result.TagName
+	hasUpdate := latest != "" && latest != "v"+current && latest != current
+
+	return &UpdateInfo{
+		Current:   current,
+		Latest:    latest,
+		HasUpdate: hasUpdate,
+	}, nil
+}
+
+func (s *Service) RunUpdate() error {
+	script := `#!/bin/bash
+sleep 1
+export DOCKIFY_FORCE=y
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
+`
+	path := "/tmp/dockify-upgrade.sh"
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		return fmt.Errorf("write upgrade script: %w", err)
+	}
+	cmd := exec.Command("setsid", path)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start upgrade: %w", err)
+	}
+	log.Printf("Update triggered: PID %d", cmd.Process.Pid)
+	return nil
 }
 
 func (s *Service) ensureWebhookSecret() {

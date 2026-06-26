@@ -34,6 +34,7 @@ func TestTemplatesLookup(t *testing.T) {
 		"apps_detail.html",
 		"login.html",
 		"error.html",
+		"about.html",
 		"settings.html",
 		"export.html",
 		"import.html",
@@ -49,6 +50,7 @@ func TestTemplatesRender(t *testing.T) {
 	data := map[string]interface{}{
 		"Title":   "Test",
 		"BasePath": "/",
+		"Version": "0.3.15",
 		"Stats": &struct {
 			TotalApps     int
 			RunningApps   int
@@ -93,6 +95,7 @@ func TestTemplatesRender(t *testing.T) {
 	}
 
 	pageTemplates := []string{
+		"about.html",
 		"dashboard.html",
 		"servers.html",
 		"servers_add.html",

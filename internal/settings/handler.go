@@ -39,6 +39,28 @@ func (h *Handler) GetWebhookSecret(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"secret": secret})
 }
 
+func (h *Handler) CheckUpdate(w http.ResponseWriter, r *http.Request) {
+	info, err := h.service.CheckUpdate()
+	if err != nil {
+		jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"current":    h.service.version,
+			"latest":     "",
+			"has_update": false,
+			"error":      err.Error(),
+		})
+		return
+	}
+	jsonResponse(w, http.StatusOK, info)
+}
+
+func (h *Handler) RunUpdate(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.RunUpdate(); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "update started"})
+}
+
 func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

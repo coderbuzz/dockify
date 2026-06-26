@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>{{template "head" .}}</head>
+<body>
+{{template "nav" .}}
+<div class="container">
+  <div class="breadcrumb">
+    <span>About</span>
+  </div>
+
+  <hgroup>
+    <h1>Dockify</h1>
+    <p>Self-hosted Docker deployment platform</p>
+  </hgroup>
+
+  <div class="card">
+    <h3>What is Dockify?</h3>
+    <p>Dockify is a self-hosted platform for deploying and managing Docker applications across multiple VMs. It combines a lightweight Go server, SQLite database, SSH-based worker management, and Caddy reverse proxy to provide a simple deployment workflow.</p>
+    <p>Built with Go, HTMX, SQLite, and a fully custom CSS interface — no JavaScript frameworks, no build steps.</p>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Update</h3>
+    <p style="color:var(--text-muted);margin-top:0">
+      Current: <strong id="cur-ver">-</strong><br>
+      Latest:  <strong id="lat-ver">-</strong>
+    </p>
+    <div class="btn-group">
+      <button class="btn btn-ghost" onclick="checkUpdate()">Check for Updates</button>
+      <button class="btn btn-primary" id="update-btn" style="display:none" onclick="runUpdate()">Update Now</button>
+    </div>
+    <pre id="update-log" style="display:none;margin-top:0.5em;font-size:0.8em;max-height:200px;overflow:auto"></pre>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Sponsor & Donation</h3>
+    <p>Dockify is open source and free to use. If you find it useful, consider supporting the project via GitHub Sponsors.</p>
+    <a href="https://github.com/sponsors/coderbuzz" class="btn" target="_blank" rel="noopener">Sponsor on GitHub</a>
+  </div>
+
+  <p style="text-align:center;color:var(--text-muted);margin-top:2em;font-size:0.85em">Version {{.Version}}</p>
+</div>
+<script>
+function checkUpdate() {
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  fetch('api/settings/update/check').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('cur-ver').textContent = 'v' + d.current;
+    if (d.latest) {
+      document.getElementById('lat-ver').textContent = d.latest;
+      if (d.has_update) {
+        document.getElementById('update-btn').style.display = 'inline-block';
+        document.getElementById('update-btn').textContent = 'Update to ' + d.latest;
+      } else {
+        document.getElementById('update-btn').style.display = 'none';
+      }
+    } else {
+      document.getElementById('lat-ver').textContent = d.error || 'failed';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Check for Updates';
+  });
+}
+function runUpdate() {
+  if (!confirm('Update Dockify now? The server will restart.')) return;
+  var btn = document.getElementById('update-btn');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+  var log = document.getElementById('update-log');
+  log.style.display = 'block';
+  log.textContent = 'Starting update...\n';
+  fetch('api/settings/update/run', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if (d.error) {
+      log.textContent += 'Error: ' + d.error + '\n';
+      btn.disabled = false;
+      btn.textContent = 'Update Failed';
+    } else {
+      log.textContent += 'Update started. Server may restart shortly.\n';
+    }
+  });
+}
+</script>
+{{template "scripts" .}}
+</body>
+</html>

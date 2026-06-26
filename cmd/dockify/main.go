@@ -61,7 +61,7 @@ func main() {
 	appRepo := app.NewRepository(database)
 	appSvc := app.NewService(appRepo, serverRepo, cfClient, sch)
 
-	settingsSvc := settings.NewService(database)
+	settingsSvc := settings.NewService(database, version)
 	webhookSecret, _ := settingsSvc.GetWebhookSecret()
 	settingsHandler := settings.NewHandler(settingsSvc)
 
@@ -70,7 +70,7 @@ func main() {
 
 	serverListAdapter := &serverLister{svc: svc}
 
-	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecret, settingsHandler, backupHandler)
+	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecret, settingsHandler, backupHandler, version)
 
 	if cfg.AdminPass == "" {
 		log.Println("WARNING: No admin password set (DOCKIFY_ADMIN_PASSWORD). Web UI has no authentication.")
