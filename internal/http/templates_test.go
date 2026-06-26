@@ -8,8 +8,9 @@ import (
 
 func TestTemplatesParse(t *testing.T) {
 	tmpl := template.New("").Funcs(template.FuncMap{
-		"lower": strings.ToLower,
-		"upper": strings.ToUpper,
+		"lower":        strings.ToLower,
+		"upper":        strings.ToUpper,
+		"relativeTime": relativeTime,
 	})
 	_, err := tmpl.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
@@ -24,6 +25,7 @@ func TestTemplatesLookup(t *testing.T) {
 		"servers.html",
 		"servers_add.html",
 		"servers_detail.html",
+		"servers_edit.html",
 		"apps.html",
 		"apps_add.html",
 		"apps_detail.html",
@@ -92,6 +94,7 @@ func TestTemplatesRender(t *testing.T) {
 		"servers.html",
 		"servers_add.html",
 		"servers_detail.html",
+		"servers_edit.html",
 		"apps.html",
 		"apps_add.html",
 		"apps_detail.html",

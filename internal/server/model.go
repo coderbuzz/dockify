@@ -15,6 +15,8 @@ type Server struct {
 	DiskGB    int       `json:"disk_gb"`
 	CPUUsage  float64   `json:"cpu_usage"`
 	RAMUsage  float64   `json:"ram_usage"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	DiskUsage         float64   `json:"disk_usage"`
+	ResourcesUpdatedAt time.Time `json:"resources_updated_at"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }

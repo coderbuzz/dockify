@@ -66,8 +66,10 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Get("/", apiHandler.List)
 			r.Post("/", apiHandler.Create)
 			r.Get("/{id}", apiHandler.Get)
+			r.Patch("/{id}", apiHandler.Update)
 			r.Delete("/{id}", apiHandler.Delete)
 			r.Post("/{id}/init", apiHandler.Init)
+			r.Post("/{id}/refresh", apiHandler.Refresh)
 		})
 
 		r.Route("/servers", func(r chi.Router) {
@@ -83,8 +85,17 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerDetailPage(w, r, render)
 			})
+			r.Get("/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerEditPage(w, r, render)
+			})
+			r.Post("/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerEditForm(w, r, render)
+			})
 			r.Post("/{id}/init", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerInit(w, r, render)
+			})
+			r.Post("/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerRefreshWeb(w, r, render)
 			})
 			r.Post("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerDeleteWeb(w, r, render)

@@ -155,8 +155,9 @@ func (s *Service) RefreshResources(id int64) error {
 	diskGB, _ := parseDisk(client)
 	cpuUsage, _ := parseCPUUsage(client)
 	ramUsage, _ := parseRAMUsage(client)
+	diskUsage, _ := parseDiskUsage(client)
 
-	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage)
+	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage, diskUsage)
 
 	return nil
 }
@@ -208,6 +209,16 @@ func parseCPUUsage(c *ssh.Client) (float64, error) {
 
 func parseRAMUsage(c *ssh.Client) (float64, error) {
 	out, err := c.Exec("free -m | awk '/Mem:/ {printf \"%.1f\", $3/$2 * 100.0}'")
+	if err != nil {
+		return 0, err
+	}
+	var usage float64
+	fmt.Sscanf(strings.TrimSpace(out), "%f", &usage)
+	return usage, nil
+}
+
+func parseDiskUsage(c *ssh.Client) (float64, error) {
+	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/%/,\"\"); print $5}'")
 	if err != nil {
 		return 0, err
 	}

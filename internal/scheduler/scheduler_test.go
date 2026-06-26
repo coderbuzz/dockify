@@ -30,7 +30,7 @@ func insertServer(t *testing.T, repo *server.Repository, name string, status str
 	if err := repo.Create(s); err != nil {
 		t.Fatalf("insert server: %v", err)
 	}
-	if err := repo.UpdateResources(s.ID, 4, 8192, 50, cpu, ram); err != nil {
+	if err := repo.UpdateResources(s.ID, 4, 8192, 50, cpu, ram, 0); err != nil {
 		t.Fatalf("update resources: %v", err)
 	}
 	return s.ID

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS servers (
     disk_gb     INTEGER,
     cpu_usage   REAL,
     ram_usage   REAL,
+    disk_usage  REAL,
+    resources_updated_at DATETIME,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );

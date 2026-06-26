@@ -99,6 +99,79 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, server)
 }
 
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	server, err := h.service.Get(id)
+	if err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if server == nil {
+		JSON(w, http.StatusNotFound, map[string]string{"error": "server not found"})
+		return
+	}
+
+	var input struct {
+		Name   string `json:"name"`
+		Host   string `json:"host"`
+		Port   int    `json:"port"`
+		User   string `json:"user"`
+		SSHKey string `json:"ssh_key"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if input.Name != "" {
+		server.Name = input.Name
+	}
+	if input.Host != "" {
+		server.Host = input.Host
+	}
+	if input.Port != 0 {
+		server.Port = input.Port
+	}
+	if input.User != "" {
+		server.User = input.User
+	}
+	if input.SSHKey != "" {
+		path, err := saveKeyFile(h.sshKeyDir, id, input.SSHKey)
+		if err != nil {
+			JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		server.SSHKey = path
+	}
+
+	if err := h.service.Update(server); err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	JSON(w, http.StatusOK, server)
+}
+
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	server, err := h.service.Get(id)
+	if err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if server == nil {
+		JSON(w, http.StatusNotFound, map[string]string{"error": "server not found"})
+		return
+	}
+
+	go h.service.RefreshResources(id)
+
+	JSON(w, http.StatusAccepted, map[string]string{"message": "refresh started"})
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
@@ -239,6 +312,99 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 	http.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
 
+func (h *WebHandler) ServerEditPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	server, err := h.service.Get(id)
+	if err != nil {
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": err.Error()})
+		return
+	}
+	if server == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "server not found"})
+		return
+	}
+
+	render(w, r, http.StatusOK, "servers_edit.html", map[string]interface{}{
+		"Title":  "Edit " + server.Name,
+		"Server": server,
+	})
+}
+
+func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	server, err := h.service.Get(id)
+	if err != nil {
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": err.Error()})
+		return
+	}
+	if server == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "server not found"})
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		render(w, r, http.StatusBadRequest, "servers_edit.html", map[string]interface{}{
+			"Title":  "Edit " + server.Name,
+			"Server": server,
+			"Error":  "invalid form data",
+		})
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	host := strings.TrimSpace(r.FormValue("host"))
+
+	if name == "" || host == "" {
+		render(w, r, http.StatusBadRequest, "servers_edit.html", map[string]interface{}{
+			"Title":  "Edit " + server.Name,
+			"Server": server,
+			"Error":  "name and host are required",
+		})
+		return
+	}
+
+	port, _ := strconv.Atoi(r.FormValue("port"))
+	if port == 0 {
+		port = 22
+	}
+	user := r.FormValue("user")
+	if user == "" {
+		user = "root"
+	}
+
+	server.Name = name
+	server.Host = host
+	server.Port = port
+	server.User = user
+
+	keyContent := strings.TrimSpace(r.FormValue("ssh_key"))
+	if keyContent != "" {
+		path, err := saveKeyFile(h.sshKeyDir, id, keyContent)
+		if err != nil {
+			render(w, r, http.StatusInternalServerError, "servers_edit.html", map[string]interface{}{
+				"Title":  "Edit " + server.Name,
+				"Server": server,
+				"Error":  err.Error(),
+			})
+			return
+		}
+		server.SSHKey = path
+	}
+
+	if err := h.service.Update(server); err != nil {
+		render(w, r, http.StatusInternalServerError, "servers_edit.html", map[string]interface{}{
+			"Title":  "Edit " + server.Name,
+			"Server": server,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
 func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
@@ -264,6 +430,14 @@ func (h *WebHandler) ServerInit(w http.ResponseWriter, r *http.Request, render f
 	go func(id int64) {
 		h.service.InitWorker(id)
 	}(id)
+
+	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) ServerRefreshWeb(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	go h.service.RefreshResources(id)
 
 	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
