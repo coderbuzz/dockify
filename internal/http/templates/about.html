@@ -76,20 +76,21 @@ function runUpdate() {
       btn.disabled = false;
       btn.textContent = 'Update Failed';
     } else {
-      log.textContent += 'Update started. Waiting for new version...\n';
-      var poll = setInterval(function(){
-        fetch('api/settings/update/check').then(function(r){return r.json()}).then(function(info){
+      log.textContent += 'Update started. Reloading in 10s...\n';
+      var c = 10;
+      var ival = setInterval(function(){
+        fetch('api/settings/update/check?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.json()}).then(function(info){
           if (info.current !== '{{.Version}}') {
+            clearInterval(ival);
             log.textContent += 'Updated to v' + info.current + '. Reloading...\n';
-            clearInterval(poll);
             location.reload(true);
-          } else {
-            log.textContent += '.';
+            return;
           }
-        }).catch(function(){
-          log.textContent += '.';
-        });
-      }, 2000);
+        }).catch(function(){});
+        c--;
+        if (c <= 0) { clearInterval(ival); location.reload(true); }
+        log.textContent = log.textContent.replace(/(\d+)s\.\.\./, c + 's...');
+      }, 1000);
     }
   });
 }
