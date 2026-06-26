@@ -119,33 +119,37 @@
   </div>
 
   {{if .Deployments}}
-  <h2>Deployment History</h2>
-  <table>
-    <thead>
-      <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>
-    </thead>
-    <tbody>
-      {{range .Deployments}}
-      <tr>
-        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-        <td><span class="badge badge-{{.Status}}">{{or .Status "unknown"}}</span></td>
-        <td>{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
-        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+  <div class="card" style="margin-top:1em">
+    <h3>Deployment History</h3>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>
+      </thead>
+      <tbody>
+        {{range .Deployments}}
+        <tr>
+          <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+          <td><span class="badge badge-{{.Status}}">{{or .Status "unknown"}}</span></td>
+          <td>{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
+          <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
   {{end}}
 
   {{if or (eq .App.Status "running") (eq .App.Status "stopped")}}
-  <h2>Logs</h2>
-  <div class="log-container">
-    <div class="log-toolbar">
-      <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=50" hx-target="#log-output" hx-swap="innerHTML">Tail 50</button>
-      <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=200" hx-target="#log-output" hx-swap="innerHTML">Tail 200</button>
-      <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=500" hx-target="#log-output" hx-swap="innerHTML">Tail 500</button>
+  <div class="card" style="margin-top:1em">
+    <h3>Logs</h3>
+    <div class="log-container">
+      <div class="log-toolbar">
+        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=50" hx-target="#log-output" hx-swap="innerHTML">Tail 50</button>
+        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=200" hx-target="#log-output" hx-swap="innerHTML">Tail 200</button>
+        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=500" hx-target="#log-output" hx-swap="innerHTML">Tail 500</button>
+      </div>
+      <pre id="log-output" class="log-content">Click to load logs…</pre>
     </div>
-    <pre id="log-output" class="log-content">Click to load logs…</pre>
   </div>
   {{end}}
 </div>
