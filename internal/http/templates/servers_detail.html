@@ -32,12 +32,12 @@
         <tr><td><strong>CPU Cores</strong></td><td>{{if .Server.CPUCores}}{{.Server.CPUCores}}{{else}}-{{end}}</td></tr>
         <tr><td><strong>CPU Usage</strong></td><td>{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}%{{else}}-{{end}}</td></tr>
         <tr><td><strong>RAM</strong></td><td>{{if .Server.RAMMB}}{{.Server.RAMMB}} MB{{else}}-{{end}}</td></tr>
-        <tr><td><strong>RAM Usage</strong></td><td>{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}%{{else}}-{{end}}</td></tr>
+        <tr><td><strong>RAM Usage</strong></td><td>{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}% ({{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB used, {{printf "%.0f" (freeAmount .Server.RAMMB .Server.RAMUsage)}} MB free){{else}}-{{end}}</td></tr>
         <tr><td><strong>Disk</strong></td><td>{{if .Server.DiskGB}}{{.Server.DiskGB}} GB{{else}}-{{end}}</td></tr>
-        <tr><td><strong>Disk Usage</strong></td><td>{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}%{{else}}-{{end}}</td></tr>
+        <tr><td><strong>Disk Usage</strong></td><td>{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}% ({{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB used, {{printf "%.0f" (freeAmount .Server.DiskGB .Server.DiskUsage)}} GB free){{else}}-{{end}}</td></tr>
       </table>
       {{if not .Server.ResourcesUpdatedAt.IsZero}}
-      <small style="color:var(--text-muted)">Updated {{relativeTime .Server.ResourcesUpdatedAt}}</small>
+      <small style="color:var(--text-muted);margin-top:.7em;padding-left:.6em">Updated {{relativeTime .Server.ResourcesUpdatedAt}}</small>
       {{end}}
     </div>
   </div>

@@ -47,10 +47,20 @@ func relativeTime(v interface{}) string {
 	}
 }
 
+func usedAmount(total int, pct float64) float64 {
+	return float64(total) * pct / 100.0
+}
+
+func freeAmount(total int, pct float64) float64 {
+	return float64(total) - usedAmount(total, pct)
+}
+
 var funcMap = template.FuncMap{
 	"lower":        strings.ToLower,
 	"upper":        strings.ToUpper,
 	"relativeTime": relativeTime,
+	"usedAmount":   usedAmount,
+	"freeAmount":   freeAmount,
 }
 
 var tmpl = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))

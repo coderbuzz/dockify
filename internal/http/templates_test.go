@@ -11,6 +11,8 @@ func TestTemplatesParse(t *testing.T) {
 		"lower":        strings.ToLower,
 		"upper":        strings.ToUpper,
 		"relativeTime": relativeTime,
+		"usedAmount":   usedAmount,
+		"freeAmount":   freeAmount,
 	})
 	_, err := tmpl.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
