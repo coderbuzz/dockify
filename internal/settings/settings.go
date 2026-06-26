@@ -63,19 +63,25 @@ func (s *Service) CheckUpdate() (*UpdateInfo, error) {
 }
 
 func (s *Service) RunUpdate() error {
+	f, err := os.CreateTemp("", "dockify-upgrade-*.sh")
+	if err != nil {
+		return fmt.Errorf("create temp script: %w", err)
+	}
+	path := f.Name()
+	f.Close()
+	defer os.Remove(path)
+
 	script := `#!/bin/bash
 exec > /tmp/dockify-update.log 2>&1
 echo "Update started $(date)"
 export DOCKIFY_FORCE=y
-rm -f /tmp/dockify-update
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
 echo "Update finished $(date)"
 `
-	path := "/tmp/dockify-upgrade.sh"
 	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
 		return fmt.Errorf("write upgrade script: %w", err)
 	}
-	cmd := exec.Command("systemd-run", "--on-active=1", "--unit=dockify-upgrade", path)
+	cmd := exec.Command("systemd-run", "--on-active=1", "--unit=dockify-upgrade", "--collect", path)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start upgrade: %w", err)
 	}
