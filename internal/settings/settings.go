@@ -64,21 +64,22 @@ func (s *Service) CheckUpdate() (*UpdateInfo, error) {
 
 func (s *Service) RunUpdate() error {
 	script := `#!/bin/bash
-sleep 1
+exec > /tmp/dockify-update.log 2>&1
+echo "Update started $(date)"
 export DOCKIFY_FORCE=y
+rm -f /tmp/dockify-update
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
+echo "Update finished $(date)"
 `
 	path := "/tmp/dockify-upgrade.sh"
 	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
 		return fmt.Errorf("write upgrade script: %w", err)
 	}
-	cmd := exec.Command("setsid", path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd := exec.Command("systemd-run", "--on-active=1", "--unit=dockify-upgrade", path)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start upgrade: %w", err)
 	}
-	log.Printf("Update triggered: PID %d", cmd.Process.Pid)
+	log.Printf("Update triggered via systemd-run (dockify-upgrade)")
 	return nil
 }
 
