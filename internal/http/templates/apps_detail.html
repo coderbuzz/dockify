@@ -121,16 +121,16 @@
   {{if .Deployments}}
   <div class="card" style="margin-top:1em">
     <h3>Deployment History</h3>
-    <table>
+    <table style="font-size:0.85em">
       <thead>
         <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>
       </thead>
       <tbody>
         {{range .Deployments}}
         <tr>
-          <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+          <td style="white-space:nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
           <td><span class="badge badge-{{.Status}}">{{or .Status "unknown"}}</span></td>
-          <td>{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
+          <td style="white-space:nowrap">{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
           <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
         </tr>
         {{end}}

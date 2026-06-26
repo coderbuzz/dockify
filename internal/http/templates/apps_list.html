@@ -7,12 +7,12 @@
   <tbody>
     {{range .Apps}}
     <tr>
-      <td><a href="apps/{{.ID}}">{{.Name}}</a></td>
+      <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
       <td>{{.Domain}}</td>
       <td>{{.Port}}</td>
       <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
       <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
-      <td>
+      <td style="width:1%;white-space:nowrap">
         <form method="POST" action="apps/{{.ID}}/undeploy" style="display:inline"
               onsubmit="return confirm('Undeploy {{.Name}}? This will stop and remove the app.')">
           <button type="submit" class="btn btn-ghost btn-red">Undeploy</button>

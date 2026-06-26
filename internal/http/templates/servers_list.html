@@ -7,14 +7,14 @@
   <tbody>
     {{range .Servers}}
     <tr>
-      <td><a href="servers/{{.ID}}">{{.Name}}</a></td>
+      <td style="white-space:nowrap"><a href="servers/{{.ID}}">{{.Name}}</a></td>
       <td>{{.Host}}:{{.Port}}</td>
       <td>{{.User}}</td>
       <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
       <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} ({{printf "%.1f" .DiskUsage}}%){{end}}{{else}}-{{end}}</td>
-      <td>
+      <td style="width:1%;white-space:nowrap">
         <form method="POST" action="servers/{{.ID}}/delete" style="display:inline"
               onsubmit="return confirm('Delete {{.Name}}? This cannot be undone.')">
           <button type="submit" class="btn btn-ghost btn-red">Delete</button>
