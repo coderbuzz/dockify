@@ -1,6 +1,6 @@
 {{define "apps_list"}}
 {{if .Apps}}
-<table>
+<table style="font-size:0.85em">
   <thead>
     <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th><th>Git</th><th></th></tr>
   </thead>
@@ -8,7 +8,7 @@
     {{range .Apps}}
     <tr>
       <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
-      <td>{{.Domain}}</td>
+      <td style="white-space:nowrap">{{.Domain}}</td>
       <td>{{.Port}}</td>
       <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
       <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
