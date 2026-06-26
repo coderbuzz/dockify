@@ -76,7 +76,13 @@ function runUpdate() {
       btn.disabled = false;
       btn.textContent = 'Update Failed';
     } else {
-      log.textContent += 'Update started. Server may restart shortly.\n';
+      log.textContent += 'Update started. Reloading in 10s...\n';
+      var c = 10;
+      var iv = setInterval(function(){
+        c--;
+        if (c <= 0) { clearInterval(iv); location.reload(true); }
+        log.textContent = log.textContent.replace(/\d+s\.\.\.$/, c + 's...');
+      }, 1000);
     }
   });
 }
