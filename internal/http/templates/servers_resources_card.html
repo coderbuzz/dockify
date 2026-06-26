@@ -1,7 +1,7 @@
 {{define "servers_resources_card"}}
 <div class="card" id="resources-card">
   <h3>Resources</h3>
-  <table>
+  <table style="font-size:0.85em">
     <tr><td><strong>CPU Cores</strong></td><td>{{if .Server.CPUCores}}{{.Server.CPUCores}}{{else}}-{{end}}</td></tr>
     <tr><td><strong>CPU Usage</strong></td><td>{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}%{{else}}-{{end}}</td></tr>
     <tr><td><strong>RAM</strong></td><td>{{if .Server.RAMMB}}{{.Server.RAMMB}} MB{{else}}-{{end}}</td></tr>
