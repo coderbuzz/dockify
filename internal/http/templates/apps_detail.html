@@ -128,7 +128,7 @@
       <tbody>
         {{range .Deployments}}
         <tr>
-          <td style="white-space:nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+          <td style="white-space:nowrap"><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</time></td>
           <td><span class="badge badge-{{.Status}}">{{or .Status "unknown"}}</span></td>
           <td style="white-space:nowrap">{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
           <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
