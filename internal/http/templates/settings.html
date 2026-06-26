@@ -37,6 +37,24 @@
       -d "$PAYLOAD"</pre>
     </div>
   </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Export</h3>
+    <p style="color:var(--text-muted);margin-top:0">
+      Export all servers and apps configuration to a YAML file.
+      SSH keys are <strong>not</strong> exported.
+    </p>
+    <a href="api/backup/export" class="btn btn-primary">Download YAML</a>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Import</h3>
+    <p style="color:var(--text-muted);margin-top:0">
+      Import servers and apps from a previously exported YAML file.
+      Supports merge and replace modes.
+    </p>
+    <a href="import" class="btn btn-ghost">Go to Import Page</a>
+  </div>
 </div>
 <script>
 var visible = false;
