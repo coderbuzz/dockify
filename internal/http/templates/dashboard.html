@@ -20,14 +20,14 @@
 
   {{if .Servers}}
   <h2>Servers ({{len .Servers}})</h2>
-  <table>
+  <table style="font-size:0.85em">
     <thead>
       <tr><th>Name</th><th>Host</th><th>Status</th><th>CPU</th><th>RAM</th></tr>
     </thead>
     <tbody>
       {{range .Servers}}
       <tr>
-        <td><a href="servers/{{.ID}}">{{.Name}}</a></td>
+        <td style="white-space:nowrap"><a href="servers/{{.ID}}">{{.Name}}</a></td>
         <td>{{.Host}}:{{.Port}}</td>
         <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
         <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
@@ -45,14 +45,14 @@
 
   {{if .Apps}}
   <h2>Apps ({{len .Apps}})</h2>
-  <table>
+  <table style="font-size:0.85em">
     <thead>
       <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th></tr>
     </thead>
     <tbody>
       {{range .Apps}}
       <tr>
-        <td><a href="apps/{{.ID}}">{{.Name}}</a></td>
+        <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
         <td>{{.Domain}}</td>
         <td>{{.Port}}</td>
         <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
