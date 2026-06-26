@@ -94,6 +94,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/init", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerInit(w, r, render)
 			})
+			r.Get("/{id}/resources", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerResourcesCard(w, r, render)
+			})
 			r.Post("/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerRefreshWeb(w, r, render)
 			})

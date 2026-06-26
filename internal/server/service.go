@@ -198,7 +198,7 @@ func parseDisk(c *ssh.Client) (int, error) {
 }
 
 func parseCPUUsage(c *ssh.Client) (float64, error) {
-	out, err := c.Exec("top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'")
+	out, err := c.Exec("awk '/^cpu / {printf \"%.1f\", ($2+$4)*100/($2+$4+$5)}' /proc/stat")
 	if err != nil {
 		return 0, err
 	}

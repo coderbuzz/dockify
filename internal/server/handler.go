@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -437,9 +438,27 @@ func (h *WebHandler) ServerInit(w http.ResponseWriter, r *http.Request, render f
 func (h *WebHandler) ServerRefreshWeb(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
-	go h.service.RefreshResources(id)
+	h.service.RefreshResources(id)
 
 	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) ServerResourcesCard(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.RefreshResources(id); err != nil {
+		log.Printf("refresh resources for server %d: %v", id, err)
+	}
+
+	server, err := h.service.Get(id)
+	if err != nil || server == nil {
+		render(w, r, http.StatusInternalServerError, "error.html", map[string]interface{}{"Message": "server not found"})
+		return
+	}
+
+	render(w, r, http.StatusOK, "servers_resources_card", map[string]interface{}{
+		"Server": server,
+	})
 }
 
 func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
