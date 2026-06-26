@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 )
 
@@ -81,11 +82,12 @@ echo "Update finished $(date)"
 	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
 		return fmt.Errorf("write upgrade script: %w", err)
 	}
-	cmd := exec.Command("systemd-run", "--on-active=1", "--unit=dockify-upgrade", "--collect", path)
+	cmd := exec.Command("bash", path)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start upgrade: %w", err)
 	}
-	log.Printf("Update triggered via systemd-run (dockify-upgrade)")
+	log.Printf("Update triggered (dockify-upgrade)")
 	return nil
 }
 
