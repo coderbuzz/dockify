@@ -76,20 +76,16 @@ function runUpdate() {
       btn.disabled = false;
       btn.textContent = 'Update Failed';
     } else {
-      log.textContent += 'Update started. Reloading in 10s...\n';
-      var c = 10;
+      log.textContent += '\n';
       var ival = setInterval(function(){
+        log.textContent += '.';
         fetch('api/settings/update/check?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.json()}).then(function(info){
           if (info.current !== '{{.Version}}') {
             clearInterval(ival);
-            log.textContent += 'Updated to v' + info.current + '. Reloading...\n';
-            location.reload(true);
-            return;
+            log.textContent += ' (detected, refresh)';
+            setTimeout(function(){ location.reload(true); }, 1000);
           }
         }).catch(function(){});
-        c--;
-        if (c <= 0) { clearInterval(ival); location.reload(true); }
-        log.textContent = log.textContent.replace(/(\d+)s\.\.\./, c + 's...');
       }, 1000);
     }
   });
