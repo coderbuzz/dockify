@@ -87,6 +87,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Clean up untagged Docker images
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PACKAGE=$(echo '${{ github.repository }}' | cut -d'/' -f2)
+          for id in $(gh api "/user/packages/container/${PACKAGE}/versions" \
+            --paginate -q '.[] | select(.metadata.container.tags == []) | .id'); do
+            echo "Deleting untagged version $id"
+            gh api -X DELETE "/user/packages/container/${PACKAGE}/versions/$id"
+          done
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
