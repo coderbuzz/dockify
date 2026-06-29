@@ -30,6 +30,15 @@ func (h *Handler) RollWebhookSecret(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"secret": secret})
 }
 
+func (h *Handler) EnableWebhookSecret(w http.ResponseWriter, r *http.Request) {
+	secret, err := h.service.GetWebhookSecret()
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"secret": secret})
+}
+
 func (h *Handler) GetWebhookSecret(w http.ResponseWriter, r *http.Request) {
 	secret, err := h.service.GetWebhookSecret()
 	if err != nil {
@@ -37,6 +46,14 @@ func (h *Handler) GetWebhookSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]string{"secret": secret})
+}
+
+func (h *Handler) DisableWebhookSecret(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.DisableWebhookSecret(); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"secret": ""})
 }
 
 func (h *Handler) CheckUpdate(w http.ResponseWriter, r *http.Request) {

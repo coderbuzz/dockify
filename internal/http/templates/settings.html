@@ -12,15 +12,17 @@
 
   <div class="card">
     <h3>Webhook Secret</h3>
+    {{if .WebhookSecret}}
     <p style="color:var(--text-muted);margin-top:0">
       Use this secret in GitHub Actions to authenticate webhook deploy notifications.
     </p>
-    <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap" id="wh-active">
       <input type="password" id="wh-secret" value="{{.WebhookSecret}}" readonly
              style="flex:1;font-family:monospace;font-size:0.85em;min-width:280px;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       <button class="btn btn-ghost" onclick="toggleSecret()" style="font-size:0.85em" id="toggle-btn">Show</button>
       <button class="btn btn-ghost" onclick="copySecret()" style="font-size:0.85em">Copy</button>
-      <button class="btn btn-ghost btn-red" onclick="rollSecret()" style="font-size:0.85em">Roll</button>
+      <button class="btn btn-ghost" onclick="rollSecret()" style="font-size:0.85em">Roll</button>
+      <button class="btn btn-ghost btn-red" onclick="disableSecret()" style="font-size:0.85em">Disable</button>
     </div>
     <div style="margin-top:1em;font-size:0.8em;color:var(--text-muted)">
       <strong>GitHub Actions workflow snippet:</strong>
@@ -30,12 +32,18 @@
   run: |
     PAYLOAD='{"ref":"refs/heads/'${GITHUB_REF#refs/heads/}'","after":"'${{"{{"}} github.sha {{"}}"}}'","repository":{"clone_url":"https://github.com/'${{"{{"}} github.repository {{"}}"}}'.git"}}'
     SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$DOCKIFY_WEBHOOK_SECRET" | sed 's/^.* //')
-    curl -s -X POST https://dockify.amg.id/api/webhook/github \
+     curl -s -X POST https://dockify.example.com/api/webhook/github \
       -H "Content-Type: application/json" \
       -H "X-GitHub-Event: push" \
       -H "X-Hub-Signature-256: sha256=$SIG" \
       -d "$PAYLOAD"</pre>
     </div>
+    {{else}}
+    <p style="color:var(--text-muted);margin-top:0">
+      Webhook secret is <strong>disabled</strong>. Webhooks are accepted without signature verification.
+    </p>
+    <button class="btn btn-primary" onclick="enableSecret()" style="font-size:0.85em" id="enable-btn">Enable</button>
+    {{end}}
   </div>
 
   <div class="card" style="margin-top:1em">
@@ -76,6 +84,16 @@ function rollSecret() {
       document.getElementById('wh-secret').value = d.secret;
       if (visible) document.getElementById('wh-secret').type = 'text';
     });
+}
+function disableSecret() {
+  if (!confirm('Disable webhook secret verification? Webhooks will be accepted without a signature.')) return;
+  fetch('api/settings/webhook-secret/disable', {method:'POST'})
+    .then(r => { if (r.ok) location.reload(); });
+}
+function enableSecret() {
+  fetch('api/settings/webhook-secret/enable', {method:'POST'})
+    .then(r => r.json())
+    .then(d => { if (d.secret) location.reload(); });
 }
 </script>
 {{template "scripts" .}}

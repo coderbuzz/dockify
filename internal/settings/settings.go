@@ -117,6 +117,11 @@ func (s *Service) RegenerateWebhookSecret() (string, error) {
 	return secret, nil
 }
 
+func (s *Service) DisableWebhookSecret() error {
+	_, err := s.db.Exec("DELETE FROM settings WHERE key = ?", webhookSecretKey)
+	return err
+}
+
 func generateSecret() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

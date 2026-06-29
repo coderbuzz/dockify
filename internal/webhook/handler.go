@@ -16,12 +16,12 @@ type WebhookService interface {
 }
 
 type Handler struct {
-	service       WebhookService
-	webhookSecret string
+	service         WebhookService
+	webhookSecretFn func() string
 }
 
-func NewHandler(service WebhookService, webhookSecret string) *Handler {
-	return &Handler{service: service, webhookSecret: webhookSecret}
+func NewHandler(service WebhookService, webhookSecretFn func() string) *Handler {
+	return &Handler{service: service, webhookSecretFn: webhookSecretFn}
 }
 
 func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
@@ -54,8 +54,9 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Repo.CloneURL
 	commitSHA := payload.After
 
+	secret := h.webhookSecretFn()
 	sig := r.Header.Get("X-Hub-Signature-256")
-	if h.webhookSecret != "" && !verifyHMACSHA256(sig, body, h.webhookSecret) {
+	if secret != "" && !verifyHMACSHA256(sig, body, secret) {
 		log.Printf("Webhook: invalid signature for %s@%s", repo, branch)
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
@@ -96,8 +97,9 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Project.GitHTTPURL
 	commitSHA := payload.After
 
+	secret := h.webhookSecretFn()
 	token := r.Header.Get("X-Gitlab-Token")
-	if h.webhookSecret != "" && token != h.webhookSecret {
+	if secret != "" && token != secret {
 		log.Printf("Webhook: invalid token for %s@%s", repo, branch)
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
