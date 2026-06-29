@@ -80,16 +80,37 @@
 
     <fieldset>
       <legend>Secrets (optional — use <code>${KEY}</code> in compose to reference)</legend>
-      {{if .Secrets}}
-      {{range .Secrets}}
-      <div class="grid" style="margin-bottom:0.4em">
-        <input type="text" name="secret_key" value="{{.Key}}" placeholder="KEY" autocomplete="off">
-        <input type="text" name="secret_val" value="{{.Value}}" placeholder="value" autocomplete="off">
+      <div id="secrets-list">
+        {{if .IsEdit}}
+        {{if .Secrets}}
+        {{range .Secrets}}
+        <div class="secret-row" data-key="{{.Key}}">
+          <code>{{.Key}}</code>
+          <span class="secret-val">••••••••</span>
+          <button type="button" class="btn btn-ghost" style="font-size:0.78em;padding:0.15em 0.5em" onclick="editSecret(this, '{{.Key}}')">Update</button>
+          <button type="button" class="btn btn-ghost btn-red" style="font-size:0.78em;padding:0.15em 0.5em" onclick="removeApiSecret(this, '{{.Key}}')">✕</button>
+        </div>
+        {{end}}
+        {{else}}
+        <p id="no-secrets-msg" style="color:var(--text-muted);font-size:0.85em">No secrets configured.</p>
+        {{end}}
+        {{else}}
+        <p id="no-secrets-msg" style="color:var(--text-muted);font-size:0.85em">No secrets added yet.</p>
+        {{end}}
       </div>
-      {{end}}
-      {{end}}
-      <div id="secret-rows"></div>
-      <button type="button" class="btn btn-ghost" onclick="addSecretRow()" style="margin-top:0.3em">+ Add Secret</button>
+      <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:flex-end">
+        <input type="text" id="secret-key" placeholder="KEY" autocomplete="off" style="width:25%;min-width:140px">
+        <input type="text" id="secret-value" placeholder="value" autocomplete="off" style="width:35%;min-width:180px">
+        <button type="button" class="btn btn-primary" onclick="addFormSecret()" style="white-space:nowrap">Add Secret</button>
+      </div>
+      <div id="secret-hidden-fields"></div>
+      <details style="margin-top:0.6em">
+        <summary style="cursor:pointer;font-size:0.82em;color:var(--text-muted)">Import from .env</summary>
+        <div style="margin-top:0.4em">
+          <textarea id="env-import" rows="4" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="font-size:0.82em"></textarea>
+          <button type="button" class="btn btn-ghost" onclick="importEnv()" style="margin-top:0.35em;font-size:0.8em">Import</button>
+        </div>
+      </details>
     </fieldset>
 
     <fieldset>
@@ -113,14 +134,247 @@
   </form>
 </div>
 <script>
-function addSecretRow() {
+{{if .IsEdit}}
+var appId = {{.App.ID}};
+function addFormSecret() {
+  var key = document.getElementById('secret-key').value.trim();
+  var val = document.getElementById('secret-value').value;
+  if (!key) { alert('Key is required'); return; }
+  fetch('api/apps/' + appId + '/secrets', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({key: key, value: val})
+  }).then(r => r.json()).then(d => {
+    if (d.error) { alert(d.error); return; }
+    addSecretRowToDOM(key);
+    document.getElementById('secret-key').value = '';
+    document.getElementById('secret-value').value = '';
+  });
+}
+function addSecretRowToDOM(key) {
+  var el = document.getElementById('no-secrets-msg');
+  if (el) el.remove();
   var div = document.createElement('div');
-  div.className = 'grid';
-  div.style.marginBottom = '0.4em';
-  div.innerHTML = '<input type="text" name="secret_key" placeholder="KEY" autocomplete="off">'
-    + '<input type="text" name="secret_val" placeholder="value" autocomplete="off">'
-    + '<button type="button" class="btn btn-ghost btn-red" style="padding:0.2em 0.5em;font-size:0.8em" onclick="this.parentElement.remove()">x</button>';
-  document.getElementById('secret-rows').appendChild(div);
+  div.className = 'secret-row';
+  div.setAttribute('data-key', key);
+  div.innerHTML = '<code>' + escapeHtml(key) + '</code>'
+    + '<span class="secret-val">••••••••</span>'
+    + '<button type="button" class="btn btn-ghost" style="font-size:0.78em;padding:0.15em 0.5em" onclick="editSecret(this, \'' + escapeAttr(key) + '\')">Update</button>'
+    + '<button type="button" class="btn btn-ghost btn-red" style="font-size:0.78em;padding:0.15em 0.5em" onclick="removeApiSecret(this, \'' + escapeAttr(key) + '\')">✕</button>';
+  document.getElementById('secrets-list').appendChild(div);
+}
+function editSecret(btn, key) {
+  var row = btn.parentElement;
+  var valSpan = row.querySelector('.secret-val');
+  var updateBtn = btn;
+  var existingInput = row.querySelector('input');
+  if (existingInput && updateBtn.textContent === 'Save') {
+    var newVal = existingInput.value;
+    updateBtn.textContent = 'Update';
+    var cancelBtn = row.querySelector('button[onclick*="cancelEdit"]');
+    if (cancelBtn) cancelBtn.remove();
+    existingInput.replaceWith(valSpan);
+    updateBtn.disabled = false;
+    if (newVal) {
+      updateBtn.disabled = true;
+      fetch('api/apps/' + appId + '/secrets', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key: key, value: newVal})
+      }).then(r => r.json()).then(d => {
+        updateBtn.disabled = false;
+      });
+    }
+    return;
+  }
+  valSpan.style.display = 'none';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'new value';
+  input.style.cssText = 'width:auto;min-width:150px;padding:0.35em 0.55em;font-size:0.85em';
+  valSpan.parentElement.insertBefore(input, btn);
+  updateBtn.textContent = 'Save';
+  var cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-ghost';
+  cancel.style.cssText = 'font-size:0.78em;padding:0.15em 0.5em';
+  cancel.textContent = 'Cancel';
+  cancel.onclick = function() { editSecret(btn, key); };
+  btn.parentElement.insertBefore(cancel, btn.nextSibling);
+  input.focus();
+}
+function removeApiSecret(btn, key) {
+  if (!confirm('Delete secret "' + key + '"?')) return;
+  fetch('api/apps/' + appId + '/secrets/' + encodeURIComponent(key), {method: 'DELETE'})
+    .then(r => r.json()).then(d => {
+      var row = btn.parentElement;
+      row.remove();
+    });
+}
+function importEnv() {
+  var text = document.getElementById('env-import').value.trim();
+  if (!text) { alert('Paste KEY=VALUE pairs first'); return; }
+  var lines = text.split(/[\r\n]+/).filter(function(l){ return l.trim() && l.indexOf('=') > 0; });
+  if (lines.length === 0) { alert('No valid KEY=VALUE lines found'); return; }
+  var keys = [];
+  lines.forEach(function(line) {
+    var idx = line.indexOf('=');
+    var key = line.substring(0, idx).trim();
+    var val = line.substring(idx + 1).trim();
+    if (!key || !val) return;
+    keys.push(key);
+    fetch('api/apps/' + appId + '/secrets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({key: key, value: val})
+    }).then(r => r.json()).then(d => {
+      if (!d.error) addSecretRowToDOM(key);
+    });
+  });
+  if (keys.length > 0) injectEnvToCompose(keys);
+  document.getElementById('env-import').value = '';
+}
+{{else}}
+var pendingSecrets = [];
+function addFormSecret() {
+  var key = document.getElementById('secret-key').value.trim();
+  var val = document.getElementById('secret-value').value;
+  if (!key) { alert('Key is required'); return; }
+  if (pendingSecrets.some(function(s){ return s.key === key; })) { alert('Key already added'); return; }
+  pendingSecrets.push({key: key, value: val});
+  renderPendingSecrets();
+  document.getElementById('secret-key').value = '';
+  document.getElementById('secret-value').value = '';
+}
+function renderPendingSecrets() {
+  var list = document.getElementById('secrets-list');
+  var msg = document.getElementById('no-secrets-msg');
+  if (msg) msg.style.display = pendingSecrets.length ? 'none' : '';
+  var existing = list.querySelectorAll('.secret-row');
+  existing.forEach(function(r){ r.remove(); });
+  pendingSecrets.forEach(function(s){
+    var div = document.createElement('div');
+    div.className = 'secret-row';
+    div.setAttribute('data-key', s.key);
+    div.innerHTML = '<code>' + escapeHtml(s.key) + '</code>'
+      + '<span class="secret-val">••••••••</span>'
+      + '<button type="button" class="btn btn-ghost btn-red" style="font-size:0.78em;padding:0.15em 0.5em" onclick="removeFormSecret(\'' + escapeAttr(s.key) + '\')">✕</button>';
+    list.appendChild(div);
+  });
+  syncHiddenFields();
+}
+function removeFormSecret(key) {
+  pendingSecrets = pendingSecrets.filter(function(s){ return s.key !== key; });
+  renderPendingSecrets();
+}
+function syncHiddenFields() {
+  var container = document.getElementById('secret-hidden-fields');
+  container.innerHTML = '';
+  pendingSecrets.forEach(function(s){
+    var k = document.createElement('input');
+    k.type = 'hidden';
+    k.name = 'secret_key';
+    k.value = s.key;
+    var v = document.createElement('input');
+    v.type = 'hidden';
+    v.name = 'secret_val';
+    v.value = s.value;
+    container.appendChild(k);
+    container.appendChild(v);
+  });
+}
+function importEnv() {
+  var text = document.getElementById('env-import').value.trim();
+  if (!text) { alert('Paste KEY=VALUE pairs first'); return; }
+  var lines = text.split(/[\r\n]+/).filter(function(l){ return l.trim() && l.indexOf('=') > 0; });
+  if (lines.length === 0) { alert('No valid KEY=VALUE lines found'); return; }
+  var keys = [];
+  lines.forEach(function(line) {
+    var idx = line.indexOf('=');
+    var key = line.substring(0, idx).trim();
+    var val = line.substring(idx + 1).trim();
+    if (!key || !val) return;
+    keys.push(key);
+    if (!pendingSecrets.some(function(s){ return s.key === key; })) {
+      pendingSecrets.push({key: key, value: val});
+    }
+  });
+  renderPendingSecrets();
+  var envEl = document.getElementsByName('env_vars')[0];
+  if (envEl) {
+    var existing = envEl.value ? envEl.value.split('\n').filter(function(l){return l.trim()}) : [];
+    var existingKeys = {};
+    existing.forEach(function(l){
+      var idx = l.indexOf('=');
+      if (idx > 0) existingKeys[l.substring(0, idx).trim()] = true;
+    });
+    keys.forEach(function(k){
+      if (!existingKeys[k]) existing.push(k + '=${' + k + '}');
+    });
+    envEl.value = existing.join('\n') + (existing.length ? '\n' : '');
+  }
+  var composeEl = document.getElementsByName('compose')[0];
+  if (composeEl && keys.length > 0) injectEnvToCompose(keys);
+  document.getElementById('env-import').value = '';
+}
+{{end}}
+function injectEnvToCompose(keys) {
+  var composeEl = document.getElementsByName('compose')[0];
+  if (!composeEl) return;
+  var text = composeEl.value;
+  var lines = text.split('\n');
+  var envIndex = -1, envIndent = '', listMode = false;
+  var existing = {};
+  for (var i = 0; i < lines.length; i++) {
+    var t = lines[i];
+    var m = t.match(/^(\s*)environment\s*:\s*$/);
+    if (m) {
+      envIndex = i;
+      envIndent = m[1];
+      listMode = t.trimEnd().endsWith('- ');
+      for (var j = i + 1; j < lines.length; j++) {
+        var tj = lines[j], tm;
+        if (listMode) tm = tj.match(/^\s*-\s*(\w+)=/);
+        else tm = tj.match(/^\s*(\w+)=/);
+        if (tm) existing[tm[1]] = true;
+        else if (tj.trim() !== '' && !tm) break;
+      }
+      break;
+    }
+  }
+  var newLines = [];
+  keys.forEach(function(k) {
+    if (!existing[k]) {
+      var indent = envIndent + '  ';
+      newLines.push(listMode ? indent + '- ' + k + '=${' + k + '}' : indent + k + '=${' + k + '}');
+    }
+  });
+  if (newLines.length === 0) return;
+  if (envIndex === -1) {
+    var insIdx = -1;
+    for (var i = lines.length - 1; i >= 0; i--) {
+      if (/^\s{2,4}\w/.test(lines[i]) && !/^\s*environment\s*:/.test(lines[i])) { insIdx = i; break; }
+    }
+    var section = ['  environment:'];
+    newLines.forEach(function(l){ section.push(l); });
+    if (insIdx >= 0) lines.splice(insIdx + 1, 0, ...section);
+    else lines.push(...section);
+  } else {
+    var after = envIndex;
+    for (var i = envIndex + 1; i < lines.length; i++) {
+      var t = lines[i];
+      if (t.trim() === '' || /^\s*(-\s*)?\w+=/.test(t)) after = i;
+      else break;
+    }
+    lines.splice(after + 1, 0, ...newLines);
+  }
+  composeEl.value = lines.join('\n');
+}
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(s) {
+  return s.replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 }
 function addFileRow() {
   var div = document.createElement('div');

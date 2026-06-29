@@ -43,9 +43,10 @@
     <div id="secrets-list">
       {{if .Secrets}}
       {{range .Secrets}}
-      <div style="display:flex;align-items:center;padding:0.3em 0;border-bottom:1px solid var(--border)">
-        <code style="flex:1;font-size:0.85em">{{.Key}}</code>
-        <span style="color:var(--text-muted);font-size:0.8em;margin:0 1em">••••••••</span>
+      <div class="secret-row" data-key="{{.Key}}">
+        <code>{{.Key}}</code>
+        <span class="secret-val" style="margin:0 0.5em">••••••••</span>
+        <button class="btn btn-ghost" style="font-size:0.75em;padding:0.1em 0.5em" onclick="editSecretDetail(this, '{{.Key}}')">Update</button>
         <button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeSecret('{{.Key}}')">✕</button>
       </div>
       {{end}}
@@ -58,6 +59,14 @@
       <input type="text" id="secret-value" placeholder="value" autocomplete="off" style="width:40%;padding:0.4em;margin-right:0.3em;border:1px solid var(--border);border-radius:3px">
       <button class="btn btn-primary" onclick="addSecret()" style="padding:0.4em 1em">Add</button>
     </div>
+    <details style="margin-top:0.6em">
+      <summary style="cursor:pointer;font-size:0.82em;color:var(--text-muted)">Import from .env</summary>
+      <div style="margin-top:0.4em">
+        <textarea id="env-import" rows="4" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="font-size:0.82em"></textarea>
+        <button type="button" class="btn btn-ghost" onclick="importEnvDetail()" style="margin-top:0.35em;font-size:0.8em">Import</button>
+        <small>Adds as secrets only. Use <a href="apps/{{.App.ID}}/edit">Edit</a> to auto-inject into compose.</small>
+      </div>
+    </details>
   </div>
 
   <div class="card" style="margin-top:1em">
@@ -163,15 +172,99 @@ function addSecret() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({key: key, value: val})
   }).then(r => r.json()).then(d => {
-    location.reload();
+    if (d.error) { alert(d.error); return; }
+    addSecretRowDetail(key);
+    document.getElementById('secret-key').value = '';
+    document.getElementById('secret-value').value = '';
   });
+}
+function addSecretRowDetail(key) {
+  var list = document.getElementById('secrets-list');
+  var empty = list.querySelector('p');
+  if (empty) empty.remove();
+  var div = document.createElement('div');
+  div.className = 'secret-row';
+  div.setAttribute('data-key', key);
+  div.innerHTML = '<code>' + escapeHtml(key) + '</code>'
+    + '<span class="secret-val" style="margin:0 0.5em">••••••••</span>'
+    + '<button class="btn btn-ghost" style="font-size:0.75em;padding:0.1em 0.5em" onclick="editSecretDetail(this, \'' + escapeAttr(key) + '\')">Update</button>'
+    + '<button class="btn btn-ghost btn-red" style="font-size:0.75em;padding:0.1em 0.5em" onclick="removeSecret(\'' + escapeAttr(key) + '\')">✕</button>';
+  list.appendChild(div);
+}
+function editSecretDetail(btn, key) {
+  var row = btn.parentElement;
+  var valSpan = row.querySelector('.secret-val');
+  if (btn.textContent === 'Save') {
+    var input = row.querySelector('input');
+    var newVal = input ? input.value : '';
+    btn.textContent = 'Update';
+    var cancelBtn = row.querySelector('button.cancel-edit');
+    if (cancelBtn) cancelBtn.remove();
+    if (input) input.replaceWith(valSpan);
+    if (newVal) updateSecretValue(key, newVal, btn);
+    return;
+  }
+  valSpan.style.display = 'none';
+  btn.textContent = 'Save';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'new value';
+  input.style.cssText = 'width:auto;min-width:120px;padding:0.35em 0.55em;font-size:0.85em;margin:0';
+  valSpan.parentElement.insertBefore(input, btn);
+  var cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-ghost cancel-edit';
+  cancel.style.cssText = 'font-size:0.75em;padding:0.1em 0.5em';
+  cancel.textContent = 'Cancel';
+  cancel.onclick = function() { editSecretDetail(btn, key); };
+  btn.parentElement.insertBefore(cancel, btn.nextSibling);
+  input.focus();
+}
+function updateSecretValue(key, val, btn) {
+  btn.disabled = true;
+  fetch('api/apps/{{.App.ID}}/secrets', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({key: key, value: val})
+  }).then(r => r.json()).then(d => { btn.disabled = false; });
 }
 function removeSecret(key) {
   if (!confirm('Delete secret "' + key + '"?')) return;
   fetch('api/apps/{{.App.ID}}/secrets/' + encodeURIComponent(key), {method: 'DELETE'})
     .then(r => r.json()).then(d => {
-      location.reload();
+      var row = document.querySelector('#secrets-list [data-key="' + CSS.escape(key) + '"]');
+      if (row) row.remove();
     });
+}
+function importEnvDetail() {
+  var text = document.getElementById('env-import').value.trim();
+  if (!text) { alert('Paste KEY=VALUE pairs first'); return; }
+  var lines = text.split(/[\r\n]+/).filter(function(l){ return l.trim() && l.indexOf('=') > 0; });
+  if (lines.length === 0) { alert('No valid KEY=VALUE lines found'); return; }
+  var count = 0;
+  lines.forEach(function(line) {
+    var idx = line.indexOf('=');
+    var key = line.substring(0, idx).trim();
+    var val = line.substring(idx + 1).trim();
+    if (!key || !val) return;
+    count++;
+    fetch('api/apps/{{.App.ID}}/secrets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({key: key, value: val})
+    }).then(r => r.json()).then(d => {
+      if (!d.error && !document.querySelector('#secrets-list [data-key="' + CSS.escape(key) + '"]')) {
+        addSecretRowDetail(key);
+      }
+    });
+  });
+  if (count > 0) document.getElementById('env-import').value = '';
+}
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(s) {
+  return s.replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 }
 function addFile() {
   var path = document.getElementById('file-path').value.trim();

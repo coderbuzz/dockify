@@ -503,7 +503,6 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
-	saveFormSecrets(r, h.service, id)
 	saveFormFiles(r, h.service, id)
 
 	go h.service.Redeploy(id)
