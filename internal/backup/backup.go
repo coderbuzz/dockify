@@ -92,7 +92,7 @@ func (s *Service) Export() (string, error) {
 
 	sb := strings.Builder{}
 	sb.WriteString("# Dockify Configuration Export\n")
-	sb.WriteString("# Secrets (SSH keys, auth passwords if present) are included as saved.\n")
+	sb.WriteString("# Auth passwords (if present) are included as saved. SSH keys are not exported.\n")
 	sb.WriteString("# Remove or edit entries before import as needed.\n")
 	sb.Write(out)
 	return sb.String(), nil

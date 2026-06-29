@@ -14,7 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir, webhookSecret string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -31,7 +31,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	appAPIHandler := app.NewHandler(appSvc)
 	appWebHandler := app.NewWebHandler(appSvc, serverListAdapter)
 
-	whHandler := webhook.NewHandler(appSvc, webhookSecret)
+	whHandler := webhook.NewHandler(appSvc, webhookSecretFn)
 
 	// Public routes (no auth required)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +174,8 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
 		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
+		r.Post("/api/settings/webhook-secret/disable", settingsHandler.DisableWebhookSecret)
+		r.Post("/api/settings/webhook-secret/enable", settingsHandler.EnableWebhookSecret)
 		r.Post("/api/settings/update/run", settingsHandler.RunUpdate)
 
 		r.Get("/about", func(w http.ResponseWriter, r *http.Request) {

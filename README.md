@@ -222,7 +222,7 @@ Dockify verifies incoming webhooks using HMAC-SHA256 (GitHub) or secret token (G
 
 ### Webhook Security
 
-Dockify auto-generates a global **webhook secret** (64-character hex) on first startup, stored in the database. You can view, copy, or regenerate (roll) it on the **Settings** page (`/settings`).
+Dockify auto-generates a global **webhook secret** (64-character hex) on first startup, stored in the database. You can view, copy, regenerate (roll), or disable it on the **Settings** page (`/settings`). When disabled, webhooks are accepted without signature verification.
 
 When the webhook secret is set, Dockify validates incoming webhooks:
 
@@ -238,7 +238,7 @@ If the signature or token does not match, the webhook is rejected with `401 Unau
 3. Paste it as the **Secret** in your GitHub/GitLab webhook settings
 4. For GitHub Actions, pass the secret via `${{ secrets.DOCKIFY_WEBHOOK_SECRET }}` (see examples below)
 
-> **Note:** When you **Roll** the secret, the old one stops working immediately. Update all CI secrets to match.
+> **Note:** When you **Roll** the secret, the old one stops working immediately. Update all CI secrets to match. Use **Disable** to turn off secret verification entirely.
 
 ### Trigger Deploy via GitHub Actions
 
@@ -249,7 +249,7 @@ Add repository secrets (**Settings → Secrets and variables → Actions**):
 - `DOCKIFY_URL` — your Dockify URL (e.g. `https://dockify.example.com`)
 - `DOCKIFY_WEBHOOK_SECRET` — the webhook secret from Dockify Settings (for Option B)
 
-**Option A: Without webhook secret** (simple, works when Dockify does not verify webhooks)
+**Option A: Without webhook secret** (simple; disable the webhook secret on the Settings page first, or use when no secret is configured)
 
 ```yaml
 name: Deploy via Dockify
