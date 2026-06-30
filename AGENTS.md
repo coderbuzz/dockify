@@ -149,21 +149,101 @@ Pushing a `v*` tag triggers `.github/workflows/build.yml` which automatically:
 
 No manual GitHub UI interaction needed. The install script auto-detects the latest release.
 
-## Key Commands
+## Development Workflow
 
+This project uses [Air](https://github.com/air-verse/air) for live-reload during development.
+
+### Flow
+1. **User** runs `air` in terminal (keeps it running)
+2. **opencode** edits code/saves files
+3. **Air** auto-detects changes → rebuilds Go binary → restarts server
+4. **User** refreshes browser (Cmd+Shift+R) at `http://localhost:8080` to review
+5. Repeat steps 2-4 until feature is complete
+6. Only then release: `./scripts/release.sh patch`
+
+### How Air works
+- Watches `.go` files in `cmd/` and `internal/` + `.html` files in `internal/http/templates/`
+- On successful build: kills old process, starts new one
+- On build error: **old server keeps running** (thanks to `stop_on_error = false`), error shown in terminal
+- Data stored in `./data/` (SQLite DB), credentials in `.env` (both gitignored)
+- Config: `.air.toml` at project root
+
+### Key development commands
 ```bash
 # Development
 go build ./...           # build all packages
 go vet ./...             # lint
 go mod tidy              # clean dependencies
 
-# Run locally
+# Run locally (auto-reload)
+air                      # http://localhost:8080
+
+# Run once (no auto-reload)
 DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
+
+# Verify templates parse correctly
+go test ./internal/http/... -run TestTemplates
 
 # Build and run with Docker
 docker build -t dockify .
 docker run -p 8080:8080 -v $(pwd)/data:/var/lib/dockify dockify
 ```
+
+## Git Workflow
+
+### Branch Strategy
+- `main` — stable, production-ready. Hanya diisi dari merge PR.
+- `feat/*` — fitur baru
+- `fix/*` — perbaikan bug
+
+### Daily Flow
+
+```
+main ───── feat/new-feature
+  │              │
+  ├─ buat branch ┘
+  │              ├─ kerja, commit (wip boleh), push
+  │              ├─ switch PC → pull, lanjut, push
+  │              │  (ulang sampai selesai)
+  │              │
+  │         selesai
+  │              ├─ push final
+  │              ├─ gh pr create --fill
+  │              ├─ user: "merge"
+  │              ├─ gh pr merge --merge --delete-branch
+  │              └─ git branch -d feat/x
+  │              │
+  ├─ merge ──────┘
+  │
+  ├─ ./scripts/release.sh patch
+  └─ push tag
+```
+
+### Step-by-step
+
+1. **opencode start task:** `git checkout main && git pull && git checkout -b feat/x`
+2. **opencode kerja:** edit → commit → push (bisa WIP)
+3. **Switch PC:** commit + push dulu di PC lama; `git pull` di PC baru, `git checkout feat/x`
+4. **Selesai:** push final → `gh pr create --fill`
+5. **User review:** user bilang "merge" kalau OK
+6. **opencode merge:** `gh pr merge --merge --delete-branch && git branch -d feat/x && git checkout main`
+7. **Release (dari main):** `./scripts/release.sh patch`
+
+### Commit Messages
+```
+feat: add dark mode toggle
+fix: handle empty server list
+refactor: extract deploy logic
+docs: update README
+wip: partial work (feature branch only, never on main)
+```
+
+### Rules
+- Tidak pernah commit/amend langsung di `main`
+- Tidak pernah force push
+- Tidak commit `.env`, token, atau secret
+- Branch remote auto-hapus setelah merge, branch local dihapus manual
+- Push dulu sebelum switch PC (biar bisa lanjut di perangkat lain)
 
 ## Environment Variables
 
