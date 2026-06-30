@@ -1,0 +1,41 @@
+#:schema https://json.schemastore.org/any.json
+
+root = "."
+tmp_dir = "tmp"
+
+env_files = [".env"]
+
+[build]
+entrypoint = "dockify"
+cmd = "go build -o ./tmp/dockify ./cmd/dockify"
+  delay = 1000
+  env = ["DOCKIFY_DATA_DIR=./data"]
+  exclude_dir = ["assets", "tmp", "vendor", "data", "scripts"]
+  exclude_regex = ["_test\\.go"]
+  exclude_unchanged = true
+  full_bin = "DOCKIFY_DATA_DIR=./data ./tmp/dockify serve"
+  include_dir = ["cmd", "internal"]
+  include_ext = ["go", "html"]
+  kill_delay = "500ms"
+  log = "build-errors.log"
+  send_interrupt = true
+  stop_on_error = false
+
+[color]
+app = ""
+build = "yellow"
+main = "green"
+runner = "cyan"
+watcher = "blue"
+
+[log]
+main_only = false
+time = false
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true
+
