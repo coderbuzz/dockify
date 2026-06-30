@@ -16,6 +16,7 @@ import (
 	httppkg "github.com/coderbuzz/dockify/internal/http"
 	"github.com/coderbuzz/dockify/internal/scheduler"
 	"github.com/coderbuzz/dockify/internal/server"
+	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/coderbuzz/dockify/internal/settings"
 )
 
@@ -60,6 +61,12 @@ func main() {
 
 	appRepo := app.NewRepository(database)
 	appSvc := app.NewService(appRepo, serverRepo, cfClient, sch)
+
+	if cfg.DevMock {
+		svc.SetConnFactory(ssh.MockFactory())
+		appSvc.SetConnFactory(ssh.MockFactory())
+		log.Println("DEV MOCK MODE: using mock SSH client")
+	}
 
 	settingsSvc := settings.NewService(database, version)
 	settingsHandler := settings.NewHandler(settingsSvc)

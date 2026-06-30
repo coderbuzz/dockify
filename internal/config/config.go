@@ -16,6 +16,8 @@ type Config struct {
 
 	CloudflareAPIToken string
 	CloudflareZoneID   string
+
+	DevMock bool
 }
 
 func Load() *Config {
@@ -28,6 +30,8 @@ func Load() *Config {
 		AdminPass:          os.Getenv("DOCKIFY_ADMIN_PASSWORD"),
 		CloudflareAPIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),
 		CloudflareZoneID:   os.Getenv("CLOUDFLARE_ZONE_ID"),
+
+		DevMock: os.Getenv("DOCKIFY_DEV_MOCK") == "true",
 	}
 
 	os.MkdirAll(cfg.DataDir, 0700)

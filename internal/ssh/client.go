@@ -78,3 +78,10 @@ func (c *Client) Close() error {
 	}
 	return nil
 }
+
+func RealFactory() Factory {
+	return func(host string, port int, user, keyPath string) (Connector, error) {
+		return Connect(host, port, user, keyPath)
+	}
+}
+

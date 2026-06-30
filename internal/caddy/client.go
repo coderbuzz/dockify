@@ -31,10 +31,10 @@ type upstream struct {
 }
 
 type Client struct {
-	ssh *ssh.Client
+	ssh ssh.Connector
 }
 
-func NewClient(sshClient *ssh.Client) *Client {
+func NewClient(sshClient ssh.Connector) *Client {
 	return &Client{ssh: sshClient}
 }
 
