@@ -17,12 +17,20 @@ const (
 )
 
 type Service struct {
-	repo   *Repository
-	monitor *Monitor
+	repo        *Repository
+	monitor     *Monitor
+	connFactory ssh.Factory
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{
+		repo:        repo,
+		connFactory: ssh.RealFactory(),
+	}
+}
+
+func (s *Service) SetConnFactory(f ssh.Factory) {
+	s.connFactory = f
 }
 
 func (s *Service) List() ([]Server, error) {
@@ -60,7 +68,7 @@ func (s *Service) TestConnection(id int64) error {
 		return fmt.Errorf("server not found")
 	}
 
-	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
 		return fmt.Errorf("SSH connect failed: %w", err)
@@ -89,7 +97,7 @@ func (s *Service) InitWorker(id int64) error {
 
 	s.repo.UpdateStatus(id, "initializing")
 
-	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusError)
 		return fmt.Errorf("SSH connect: %w", err)
@@ -143,7 +151,7 @@ func (s *Service) RefreshResources(id int64) error {
 		return err
 	}
 
-	client, err := ssh.Connect(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
 		return err
@@ -167,7 +175,7 @@ func (s *Service) StartMonitor() {
 	go s.monitor.Run()
 }
 
-func parseCPUCount(c *ssh.Client) (int, error) {
+func parseCPUCount(c ssh.Connector) (int, error) {
 	out, err := c.Exec("nproc")
 	if err != nil {
 		return 0, err
@@ -177,7 +185,7 @@ func parseCPUCount(c *ssh.Client) (int, error) {
 	return count, nil
 }
 
-func parseRAM(c *ssh.Client) (int, error) {
+func parseRAM(c ssh.Connector) (int, error) {
 	out, err := c.Exec("free -m | awk '/Mem:/ {print $2}'")
 	if err != nil {
 		return 0, err
@@ -187,7 +195,7 @@ func parseRAM(c *ssh.Client) (int, error) {
 	return mb, nil
 }
 
-func parseDisk(c *ssh.Client) (int, error) {
+func parseDisk(c ssh.Connector) (int, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/G/,\"\"); print $2}'")
 	if err != nil {
 		return 0, err
@@ -197,7 +205,7 @@ func parseDisk(c *ssh.Client) (int, error) {
 	return gb, nil
 }
 
-func parseCPUUsage(c *ssh.Client) (float64, error) {
+func parseCPUUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("awk '/^cpu / {printf \"%.1f\", ($2+$4)*100/($2+$4+$5)}' /proc/stat")
 	if err != nil {
 		return 0, err
@@ -207,7 +215,7 @@ func parseCPUUsage(c *ssh.Client) (float64, error) {
 	return usage, nil
 }
 
-func parseRAMUsage(c *ssh.Client) (float64, error) {
+func parseRAMUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("free -m | awk '/Mem:/ {printf \"%.1f\", $3/$2 * 100.0}'")
 	if err != nil {
 		return 0, err
@@ -217,7 +225,7 @@ func parseRAMUsage(c *ssh.Client) (float64, error) {
 	return usage, nil
 }
 
-func parseDiskUsage(c *ssh.Client) (float64, error) {
+func parseDiskUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/%/,\"\"); print $5}'")
 	if err != nil {
 		return 0, err

@@ -352,7 +352,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
 
-	if compose == "" && image != "" {
+	if image != "" && (compose == "" || !strings.Contains(compose, "services:")) {
 		compose = generateCompose(image, port, envVars, volumes)
 	}
 
@@ -461,7 +461,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
 
-	if compose == "" && image != "" {
+	if image != "" && (compose == "" || !strings.Contains(compose, "services:")) {
 		compose = generateCompose(image, port, envVars, volumes)
 	}
 
@@ -503,6 +503,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
+	saveFormSecrets(r, h.service, id)
 	saveFormFiles(r, h.service, id)
 
 	go h.service.Redeploy(id)
@@ -590,6 +591,7 @@ func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render 
 }
 
 func saveFormSecrets(r *http.Request, svc *Service, appID int64) {
+	svc.DeleteSecrets(appID)
 	keys := r.Form["secret_key"]
 	vals := r.Form["secret_val"]
 	for i, k := range keys {

@@ -26,10 +26,15 @@ type Service struct {
 	serverRepo       *server.Repository
 	cf               *cloudflare.Client
 	scheduler        *scheduler.Scheduler
+	connFactory      ssh.Factory
+}
+
+func (s *Service) SetConnFactory(f ssh.Factory) {
+	s.connFactory = f
 }
 
 func NewService(repo *Repository, serverRepo *server.Repository, cf *cloudflare.Client, sch *scheduler.Scheduler) *Service {
-	return &Service{repo: repo, serverRepo: serverRepo, cf: cf, scheduler: sch}
+	return &Service{repo: repo, serverRepo: serverRepo, cf: cf, scheduler: sch, connFactory: ssh.RealFactory()}
 }
 
 func (s *Service) List() ([]App, error) {
@@ -58,6 +63,10 @@ func (s *Service) SetSecret(appID int64, key, value string) error {
 
 func (s *Service) DeleteSecret(appID int64, key string) error {
 	return s.repo.DeleteSecret(appID, key)
+}
+
+func (s *Service) DeleteSecrets(appID int64) error {
+	return s.repo.DeleteSecrets(appID)
 }
 
 func (s *Service) ListFiles(appID int64) ([]AppFile, error) {
@@ -119,7 +128,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		return
 	}
 
-	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("SSH connect: %v", err), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
@@ -258,7 +267,7 @@ func (s *Service) FetchLogs(id int64, tail int) (string, error) {
 		return "", fmt.Errorf("server not found")
 	}
 
-	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		return "", fmt.Errorf("SSH connect: %w", err)
 	}
@@ -301,7 +310,7 @@ func (s *Service) Undeploy(id int64) error {
 		return nil
 	}
 
-	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		log.Printf("Undeploy %q: SSH connect failed, cleaning up DB: %v", app.Name, err)
 		s.repo.DeleteDNSRecords(app.ID)
@@ -357,7 +366,7 @@ func (s *Service) Stop(id int64) error {
 		return fmt.Errorf("server not found")
 	}
 
-	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		return fmt.Errorf("SSH connect: %w", err)
 	}
@@ -387,7 +396,7 @@ func (s *Service) Start(id int64) error {
 		return fmt.Errorf("server not found")
 	}
 
-	client, err := ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		return fmt.Errorf("SSH connect: %w", err)
 	}
@@ -464,7 +473,7 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 
 	var _ = time.Now
 
-func dockerComposeCmd(c *ssh.Client) string {
+func dockerComposeCmd(c ssh.Connector) string {
 	out, err := c.Exec("command -v docker-compose 2>/dev/null || echo docker compose")
 	if err != nil {
 		return "docker compose"
