@@ -95,6 +95,7 @@ func main() {
 
 	go func() {
 		log.Printf("Dockify v%s starting on %s", version, cfg.Addr())
+		log.Printf("Open: http://localhost:%s", cfg.Port)
 		log.Printf("Data dir: %s", cfg.DataDir)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("failed to serve: %v", err)
