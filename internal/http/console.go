@@ -94,24 +94,24 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// WebSocket → SSH stdin
 	go func() {
 		for {
-			_, msg, err := conn.ReadMessage()
+			messageType, msg, err := conn.ReadMessage()
 			if err != nil {
 				errCh <- err
 				return
 			}
-			var input ssh.Input
-			if json.Unmarshal(msg, &input) == nil {
-				if input.Resize != nil {
+
+			switch messageType {
+			case websocket.TextMessage:
+				// Keystrokes — raw text, no JSON parsing
+				inCh <- ssh.Input{Data: string(msg)}
+
+			case websocket.BinaryMessage:
+				// Resize events — JSON
+				var input ssh.Input
+				if json.Unmarshal(msg, &input) == nil && input.Resize != nil {
 					inCh <- input
-					continue
-				}
-				if len(input.Data) > 0 {
-					inCh <- input
-					continue
 				}
 			}
-
-			inCh <- ssh.Input{Data: string(msg)}
 		}
 	}()
 
