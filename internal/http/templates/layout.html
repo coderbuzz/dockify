@@ -409,6 +409,7 @@ function connectConsole() {
 	setTimeout(function() { fitAddon.fit(); }, 50);
 
 	ws = new WebSocket(proto + '//' + host + base + 'api/servers/' + serverId + '/console');
+	ws.binaryType = 'arraybuffer';
 
 	ws.onopen = function() {
 		document.getElementById('console-status').textContent = 'Connected';
@@ -421,9 +422,13 @@ function connectConsole() {
 	};
 
 	ws.onmessage = function(evt) {
-		term.write(evt.data);
+		var data = evt.data;
+		if (data instanceof ArrayBuffer) {
+			term.write(new Uint8Array(data));
+		} else {
+			term.write(data);
+		}
 	};
-
 	ws.onclose = function() {
 		document.getElementById('console-status').textContent = 'Disconnected';
 		document.getElementById('console-status').className = 'badge badge-offline';
