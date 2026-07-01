@@ -116,8 +116,11 @@ func (s *Service) InitWorker(id int64) error {
 	if err != nil {
 		log.Printf("Warning: failed to create dockify network: %v", err)
 	}
-	log.Printf("Deploying Caddy on %s...", server.Name)
-	caddyRun := `mkdir -p /opt/dockify/caddy && cat > /opt/dockify/caddy/Caddyfile << 'CADDYEOF'
+
+	caddyRunning, _ := client.Exec("docker ps -q --filter name=^/caddy$")
+	if strings.TrimSpace(caddyRunning) == "" {
+		log.Printf("Deploying Caddy on %s...", server.Name)
+		caddyRun := `mkdir -p /opt/dockify/caddy && cat > /opt/dockify/caddy/Caddyfile << 'CADDYEOF'
 :80, :443 {
 }
 CADDYEOF
@@ -132,10 +135,13 @@ docker run -d \
   -v /opt/dockify/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   --restart unless-stopped \
   caddy:latest`
-	_, err = client.Exec(caddyRun)
-	if err != nil {
-		s.repo.UpdateStatus(id, StatusError)
-		return fmt.Errorf("deploy caddy: %w", err)
+		_, err = client.Exec(caddyRun)
+		if err != nil {
+			s.repo.UpdateStatus(id, StatusError)
+			return fmt.Errorf("deploy caddy: %w", err)
+		}
+	} else {
+		log.Printf("Caddy already running on %s, skipping deploy", server.Name)
 	}
 
 	s.repo.UpdateStatus(id, StatusOnline)

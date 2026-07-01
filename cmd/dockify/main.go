@@ -77,7 +77,7 @@ func main() {
 	serverListAdapter := &serverLister{svc: svc}
 
 	webhookSecretFn := func() string { s, _ := settingsSvc.GetWebhookSecret(); return s }
-	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecretFn, settingsHandler, backupHandler, version)
+	router := httppkg.NewRouter(svc, appSvc, httppkg.Render, serverListAdapter, cfg.AdminUser, cfg.AdminPass, cfg.SSHKeyDir, webhookSecretFn, settingsHandler, backupHandler, version, cfg.DevMock)
 
 	if cfg.AdminPass == "" {
 		log.Println("WARNING: No admin password set (DOCKIFY_ADMIN_PASSWORD). Web UI has no authentication.")
