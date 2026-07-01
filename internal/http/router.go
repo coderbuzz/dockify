@@ -28,6 +28,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	apiHandler := server.NewHandler(svc, sshKeyDir)
 	webHandler := server.NewWebHandler(svc, sshKeyDir)
+	consoleHandler := NewConsoleHandler(svc, sshKeyDir)
 
 	appAPIHandler := app.NewHandler(appSvc)
 	appWebHandler := app.NewWebHandler(appSvc, serverListAdapter)
@@ -72,6 +73,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Delete("/{id}", apiHandler.Delete)
 			r.Post("/{id}/init", apiHandler.Init)
 			r.Post("/{id}/refresh", apiHandler.Refresh)
+			r.Get("/{id}/console", consoleHandler.ServeWS)
 		})
 
 		r.Route("/servers", func(r chi.Router) {

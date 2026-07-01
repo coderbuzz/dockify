@@ -4,6 +4,9 @@
 <base href="{{.BasePath}}">
 <title>{{.Title}} - Dockify</title>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
 <style>
 :root {
   --bg: #f5f5f5;
@@ -280,6 +283,27 @@ pre {
   .container { padding: 0.8em 1em; }
   .grid { grid-template-columns: 1fr; }
 }
+
+/* Console */
+.console-section { margin-top: 1em; }
+.console-section #console-toggle { margin-bottom: 0.5em; }
+.console-container {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+	background: #0d0d0d;
+}
+.console-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.4em 0.7em;
+	border-bottom: 1px solid var(--border);
+	background: var(--bg-elevated);
+}
+#terminal { padding: 0.3em; }
+html.dark .console-container { background: #0d0d0d; }
+html:not(.dark) .console-container { background: #1a1a1a; }
 </style>
 {{end}}
 
@@ -321,5 +345,125 @@ document.querySelectorAll('time[datetime]').forEach(function(el){
   var p=function(n){return String(n).padStart(2,'0');};
   el.textContent = d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
 });
+
+/* SSH Console */
+var term = null;
+var ws = null;
+
+function toggleConsole() {
+	var container = document.getElementById('console-container');
+	if (container.style.display === 'none') {
+		container.style.display = 'block';
+		document.getElementById('console-toggle').textContent = 'Close Console';
+		connectConsole();
+	} else {
+		container.style.display = 'none';
+		document.getElementById('console-toggle').textContent = 'Console';
+		disconnectConsole();
+	}
+}
+
+function connectConsole() {
+	var btn = document.getElementById('console-toggle');
+	var serverId = btn.getAttribute('data-server-id');
+	if (!serverId) return;
+	var base = document.querySelector('base').getAttribute('href') || '/';
+	var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+	var host = window.location.host;
+
+	term = new Terminal({
+		fontFamily: '"Berkeley Mono", "IBM Plex Mono", ui-monospace, monospace',
+		fontSize: 13,
+		lineHeight: 1.35,
+		cursorBlink: true,
+		cursorStyle: 'block',
+		theme: {
+			background: '#0d0d0d',
+			foreground: '#cfcecd',
+			cursor: '#cfcecd',
+			selectionBackground: '#3a3a3a',
+			black: '#0d0d0d',
+			red: '#b33a3a',
+			green: '#3d8b4a',
+			yellow: '#b8942e',
+			blue: '#4a7bbb',
+			magenta: '#b84a7b',
+			cyan: '#4ab8b8',
+			white: '#cfcecd',
+			brightBlack: '#555',
+			brightRed: '#b33a3a',
+			brightGreen: '#3d8b4a',
+			brightYellow: '#b8942e',
+			brightBlue: '#4a7bbb',
+			brightMagenta: '#b84a7b',
+			brightCyan: '#4ab8b8',
+			brightWhite: '#cfcecd'
+		}
+	});
+
+	var fitAddon = new FitAddon.FitAddon();
+	term.loadAddon(fitAddon);
+	term.open(document.getElementById('terminal'));
+
+	// Delay fit until terminal is visible and rendered
+	setTimeout(function() { fitAddon.fit(); }, 50);
+
+	ws = new WebSocket(proto + '//' + host + base + 'api/servers/' + serverId + '/console');
+
+	ws.onopen = function() {
+		document.getElementById('console-status').textContent = 'Connected';
+		document.getElementById('console-status').className = 'badge badge-online';
+		term.focus();
+		var dims = fitAddon.proposeDimensions();
+		if (dims) {
+			ws.send(JSON.stringify({resize: {width: dims.cols, height: dims.rows}}));
+		}
+	};
+
+	ws.onmessage = function(evt) {
+		term.write(evt.data);
+	};
+
+	ws.onclose = function() {
+		document.getElementById('console-status').textContent = 'Disconnected';
+		document.getElementById('console-status').className = 'badge badge-offline';
+		if (term) {
+			term.write('\r\n\x1b[31mSession ended.\x1b[0m\r\n');
+		}
+	};
+
+	term.onData(function(data) {
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.send(JSON.stringify({data: data}));
+		}
+	});
+
+	window._consoleResizeHandler = function() {
+		if (!fitAddon || !ws || ws.readyState !== WebSocket.OPEN) return;
+		fitAddon.fit();
+		var dims = fitAddon.proposeDimensions();
+		if (dims) {
+			ws.send(JSON.stringify({resize: {width: dims.cols, height: dims.rows}}));
+		}
+	};
+	window.addEventListener('resize', window._consoleResizeHandler);
+}
+
+function disconnectConsole() {
+	if (window._consoleResizeHandler) {
+		window.removeEventListener('resize', window._consoleResizeHandler);
+		window._consoleResizeHandler = null;
+	}
+	if (ws) {
+		ws.close();
+		ws = null;
+	}
+	if (term) {
+		term.dispose();
+		term = null;
+	}
+	document.getElementById('console-status').textContent = 'Disconnected';
+	document.getElementById('console-status').className = 'badge badge-offline';
+}
 </script>
 {{end}}

@@ -1,8 +1,10 @@
 package ssh
 
 import (
+	"context"
 	"os"
 	"strings"
+	"time"
 )
 
 type MockClient struct {
@@ -39,6 +41,72 @@ func (m *MockClient) WriteFile(path, content string, mode os.FileMode) error {
 
 func (m *MockClient) Close() error {
 	return nil
+}
+
+func (m *MockClient) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error) {
+	outCh := make(chan Output, 64)
+	inCh := make(chan Input, 64)
+
+	go func() {
+		defer close(outCh)
+
+		prompt := []byte("\r\n$ ")
+
+		// Initial prompt
+		outCh <- Output{Data: []byte("\r\nDockify Dev Mock — SSH console simulation\r\n")}
+		outCh <- Output{Data: prompt}
+
+		var buf []byte
+		ticker := time.NewTicker(30 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				outCh <- Output{Data: []byte("\r\nSession closed.\r\n")}
+				outCh <- Output{Closed: true}
+				return
+			case input, ok := <-inCh:
+				if !ok {
+					return
+				}
+				if input.Resize != nil {
+					continue
+				}
+				for _, b := range input.Data {
+					if b == '\r' {
+						outCh <- Output{Data: []byte("\r\n")}
+						cmd := string(buf)
+						buf = nil
+
+						// Simulate command response
+						if cmd == "exit" || cmd == "exit " {
+							outCh <- Output{Data: []byte("logout\r\n")}
+							outCh <- Output{Closed: true}
+							return
+						}
+
+						// Echo back the command
+						result := "Mock response for: " + cmd + "\r\n"
+						outCh <- Output{Data: []byte(result)}
+						outCh <- Output{Data: prompt}
+					} else if b == '\x7f' { // backspace
+						if len(buf) > 0 {
+							buf = buf[:len(buf)-1]
+							outCh <- Output{Data: []byte{'\b', ' ', '\b'}}
+						}
+					} else {
+						buf = append(buf, b)
+						outCh <- Output{Data: []byte{b}}
+					}
+				}
+			case <-ticker.C:
+				// Keep the goroutine alive for cleanup
+			}
+		}
+	}()
+
+	return outCh, inCh, nil
 }
 
 func MockFactory() Factory {

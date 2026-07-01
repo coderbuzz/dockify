@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -85,3 +86,75 @@ func RealFactory() Factory {
 	}
 }
 
+
+func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return nil, nil, fmt.Errorf("new session: %w", err)
+	}
+
+	if err := session.RequestPty("xterm-256color", rows, cols, gossh.TerminalModes{
+		gossh.ECHO:  1,
+		gossh.OCRNL: 1,
+	}); err != nil {
+		session.Close()
+		return nil, nil, fmt.Errorf("request pty: %w", err)
+	}
+
+	wIn, err := session.StdinPipe()
+	if err != nil {
+		session.Close()
+		return nil, nil, fmt.Errorf("stdin pipe: %w", err)
+	}
+
+	outCh := make(chan Output, 64)
+	inCh := make(chan Input, 64)
+
+	session.Stdout = channelWriter{outCh}
+	session.Stderr = channelWriter{outCh}
+
+	if err := session.Shell(); err != nil {
+		session.Close()
+		return nil, nil, fmt.Errorf("shell: %w", err)
+	}
+
+	// Forward input channel → SSH stdin
+	go func() {
+		defer wIn.Close()
+		for input := range inCh {
+			if input.Resize != nil {
+				session.WindowChange(input.Resize.Height, input.Resize.Width)
+				continue
+			}
+			if len(input.Data) > 0 {
+				wIn.Write(input.Data)
+			}
+		}
+	}()
+
+	// Wait for remote exit
+	go func() {
+		session.Wait()
+		session.Close()
+		outCh <- Output{Closed: true}
+	}()
+
+	// Context cancellation → kill session
+	go func() {
+		<-ctx.Done()
+		session.Close()
+	}()
+
+	return outCh, inCh, nil
+}
+
+type channelWriter struct {
+	ch chan<- Output
+}
+
+func (w channelWriter) Write(p []byte) (int, error) {
+	data := make([]byte, len(p))
+	copy(data, p)
+	w.ch <- Output{Data: data}
+	return len(p), nil
+}

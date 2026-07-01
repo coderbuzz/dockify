@@ -284,6 +284,8 @@ func (s *Service) Undeploy(id int64) error {
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
 
 	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	client.Exec("docker image prune -af 2>&1 || true")
+	client.Exec("docker builder prune -af 2>&1 || true")
 
 	if app.Domain != "" {
 		caddyClient := caddy.NewClient(client)
