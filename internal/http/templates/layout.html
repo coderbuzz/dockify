@@ -415,9 +415,10 @@ function connectConsole() {
 		document.getElementById('console-status').textContent = 'Connected';
 		document.getElementById('console-status').className = 'badge badge-online';
 		term.focus();
+		var enc = new TextEncoder();
 		var dims = fitAddon.proposeDimensions();
 		if (dims) {
-			ws.send(JSON.stringify({resize: {width: dims.cols, height: dims.rows}}));
+			ws.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
 		}
 	};
 
@@ -448,7 +449,7 @@ function connectConsole() {
 		fitAddon.fit();
 		var dims = fitAddon.proposeDimensions();
 		if (dims) {
-			ws.send(JSON.stringify({resize: {width: dims.cols, height: dims.rows}}));
+			ws.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
 		}
 	};
 	window.addEventListener('resize', window._consoleResizeHandler);

@@ -95,7 +95,6 @@ func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan
 
 	if err := session.RequestPty("xterm-256color", rows, cols, gossh.TerminalModes{
 		gossh.ECHO:          1,
-		gossh.OCRNL:         1,
 		gossh.TTY_OP_ISPEED: 14400,
 		gossh.TTY_OP_OSPEED: 14400,
 	}); err != nil {
