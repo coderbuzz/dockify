@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="3">{{end}}</head>
+<head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
@@ -15,7 +15,7 @@
     <p>{{if .App.Domain}}{{.App.Domain}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
   </hgroup>
 
-  <div class="grid">
+  <div class="grid grid-fill">
     <div class="card">
       <h3>Details</h3>
       <table>
@@ -31,7 +31,7 @@
     </div>
     <div class="card">
       <h3>Docker Compose</h3>
-      <pre style="max-height:200px">{{.App.Compose}}</pre>
+      <pre style="max-height:none">{{.App.Compose}}</pre>
     </div>
   </div>
 

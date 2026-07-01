@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>{{template "head" .}}</head>
+<head>{{template "head" .}}{{if eq .Server.Status "initializing"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">

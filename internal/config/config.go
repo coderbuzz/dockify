@@ -21,11 +21,12 @@ type Config struct {
 }
 
 func Load() *Config {
+	dataDir := getEnv("DOCKIFY_DATA_DIR", "/var/lib/dockify")
 	cfg := &Config{
 		Host:               getEnv("DOCKIFY_HOST", "0.0.0.0"),
 		Port:               getEnv("DOCKIFY_PORT", "8080"),
-		DataDir:            getEnv("DOCKIFY_DATA_DIR", "/var/lib/dockify"),
-		SSHKeyDir:          getEnv("DOCKIFY_SSH_KEY_DIR", "/var/lib/dockify/keys"),
+		DataDir:            dataDir,
+		SSHKeyDir:          getEnv("DOCKIFY_SSH_KEY_DIR", filepath.Join(dataDir, "keys")),
 		AdminUser:          getEnv("DOCKIFY_ADMIN_USER", "admin"),
 		AdminPass:          os.Getenv("DOCKIFY_ADMIN_PASSWORD"),
 		CloudflareAPIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),

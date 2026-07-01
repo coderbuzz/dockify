@@ -12,24 +12,79 @@
 
   <hgroup><h1>Export Configuration</h1></hgroup>
 
-  <div class="card">
-    <h3>Download Backup</h3>
-    <p style="color:var(--text-muted)">
-      Export all servers and apps configuration to a YAML file.
-      SSH keys are <strong>not</strong> exported — you must re-add them after import.
-    </p>
-    <a href="api/backup/export" class="btn btn-primary">Download YAML</a>
-  </div>
+  <form method="POST" action="/api/backup/export">
+    <div class="card">
+      <h3>Download Backup</h3>
+      <p style="color:var(--text-muted)">
+        Export all servers and apps configuration to a YAML file.
+        SSH keys are <strong>not</strong> exported — you must re-add them after import.
+      </p>
+
+      <label style="display:block;margin-bottom:0.5em">
+        <span style="font-size:0.85em;color:var(--text-muted)">Passphrase (save this — you'll need it to import)</span>
+        <div style="display:flex;gap:0.4em;margin-top:0.3em">
+          <input type="text" name="passphrase" id="passphrase" value="{{.Passphrase}}" readonly
+                 style="flex:1;font-family:ui-monospace,monospace;font-size:0.85em" required>
+          <button type="button" class="btn btn-ghost" onclick="regenerate()">Regenerate</button>
+          <button type="button" class="btn btn-ghost" onclick="copyPassphrase()">Copy</button>
+        </div>
+      </label>
+
+      <p style="color:var(--orange);font-size:0.85em">
+        ⚠ Secret values will be encrypted with this passphrase.
+        Store it safely — without it you cannot import this backup.
+      </p>
+
+      <button type="submit" class="btn btn-primary">Download YAML</button>
+    </div>
+  </form>
 
   <div class="card" style="margin-top:1em">
     <h3>What's exported</h3>
     <ul style="color:var(--text-muted);font-size:0.9em">
       <li>Server: name, host, port, user (no SSH key)</li>
-      <li>Apps: name, domain, port, compose, git repo/branch, auth credentials</li>
+      <li>Apps: name, domain, port, compose, git repo/branch, auth credentials, secrets, config files</li>
+      <li>Secrets are encrypted with your passphrase</li>
       <li>You can edit the YAML file to remove entries before importing</li>
     </ul>
   </div>
 </div>
+
+<script>
+function generatePassphrase() {
+  var chars = 'abcdef0123456789';
+  var result = '';
+  var array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  for (var i = 0; i < 32; i++) {
+    result += chars[array[i] % chars.length];
+  }
+  return result;
+}
+
+function regenerate() {
+  document.getElementById('passphrase').value = generatePassphrase();
+}
+
+function copyPassphrase() {
+  var input = document.getElementById('passphrase');
+  input.select();
+  input.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(input.value).then(function() {
+    var btn = event.target;
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 2000);
+  });
+}
+
+(function() {
+  if (!document.getElementById('passphrase').value) {
+    document.getElementById('passphrase').value = generatePassphrase();
+  }
+})();
+</script>
+
 {{template "scripts" .}}
 </body>
 </html>

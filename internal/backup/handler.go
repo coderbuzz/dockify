@@ -14,18 +14,26 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) ExportDownload(w http.ResponseWriter, r *http.Request) {
-	yamlStr, err := h.service.Export()
+	passphrase := r.FormValue("passphrase")
+
+	yamlStr, err := h.service.Export(passphrase)
 	if err != nil {
 		http.Error(w, "export: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-yaml; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=dockify-export.yaml")
+	if passphrase != "" {
+		w.Header().Set("Content-Disposition", "attachment; filename=dockify-export.yaml")
+	} else {
+		w.Header().Set("Content-Disposition", "attachment; filename=dockify-export.yaml")
+	}
 	w.Write([]byte(yamlStr))
 }
 
 func (h *Handler) ExportPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
-	render(w, r, http.StatusOK, "export.html", map[string]interface{}{"Title": "Export"})
+	render(w, r, http.StatusOK, "export.html", map[string]interface{}{
+		"Title": "Export",
+	})
 }
 
 func (h *Handler) ImportPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -40,6 +48,7 @@ func (h *Handler) ImportUpload(w http.ResponseWriter, r *http.Request, render fu
 	if mode != "replace" && mode != "merge" {
 		mode = "merge"
 	}
+	passphrase := r.FormValue("passphrase")
 
 	file, _, err := r.FormFile("file")
 	if err != nil {
@@ -60,7 +69,7 @@ func (h *Handler) ImportUpload(w http.ResponseWriter, r *http.Request, render fu
 		return
 	}
 
-	logOutput, err := h.service.Import(string(raw), mode)
+	logOutput, err := h.service.Import(string(raw), passphrase, mode)
 	if err != nil {
 		render(w, r, http.StatusOK, "import.html", map[string]interface{}{
 			"Title": "Import",
