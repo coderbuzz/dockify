@@ -41,6 +41,17 @@
           onsubmit="return confirm('Remove {{.Server.Name}}? This cannot be undone.')">
       <button type="submit" class="btn btn-ghost btn-red">Remove Server</button>
     </form>
+    <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()" style="margin-left:auto">Console</button>
+  </div>
+
+  <div class="console-section">
+    <div id="console-container" class="console-container" style="display:none">
+      <div class="console-toolbar">
+        <span class="badge badge-online" id="console-status">Connected</span>
+        <button class="btn btn-ghost btn-red" id="console-disconnect" onclick="toggleConsole()">Disconnect</button>
+      </div>
+      <div id="terminal"></div>
+    </div>
   </div>
 </div>
 {{template "scripts" .}}

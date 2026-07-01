@@ -1,9 +1,28 @@
 package ssh
 
-import "os"
+import (
+	"context"
+	"os"
+)
+
+type Output struct {
+	Data   []byte
+	Closed bool
+}
+
+type WindowSize struct {
+	Width  int
+	Height int
+}
+
+type Input struct {
+	Data   []byte
+	Resize *WindowSize
+}
 
 type Connector interface {
 	Exec(cmd string) (string, error)
+	Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error)
 	WriteFile(path, content string, mode os.FileMode) error
 	Close() error
 }
