@@ -17,7 +17,7 @@ func (r *Repository) List() ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, unique_service_name, created_at, updated_at
-		FROM apps ORDER BY created_at DESC
+		FROM apps ORDER BY name ASC
 	`)
 	if err != nil {
 		return nil, err

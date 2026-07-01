@@ -209,7 +209,14 @@ func (s *Service) Export(passphrase string) (string, error) {
 			return "", fmt.Errorf("list files for %q: %w", a.Name, err)
 		}
 		for _, f := range files {
-			ea.Files = append(ea.Files, ExportFile{Path: f.Path, Content: f.Content})
+			content := f.Content
+			if passphrase != "" {
+				content, err = encrypt(f.Content, passphrase)
+				if err != nil {
+					return "", fmt.Errorf("encrypt file %q for %q: %w", f.Path, a.Name, err)
+				}
+			}
+			ea.Files = append(ea.Files, ExportFile{Path: f.Path, Content: content})
 		}
 
 		data.Apps = append(data.Apps, ea)
@@ -224,7 +231,7 @@ func (s *Service) Export(passphrase string) (string, error) {
 	sb.WriteString("# Dockify Configuration Export\n")
 	sb.WriteString("# Auth passwords (if present) are included as saved. SSH keys are not exported.\n")
 	if passphrase != "" {
-		sb.WriteString("# Secret values are encrypted with the provided passphrase.\n")
+		sb.WriteString("# Secret values and config file contents are encrypted with the provided passphrase.\n")
 	}
 	sb.WriteString("# Remove or edit entries before import as needed.\n")
 	sb.Write(out)
@@ -250,6 +257,11 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		for _, sec := range ea.Secrets {
 			if err := validateDecrypt(sec.Value, passphrase); err != nil {
 				return "", fmt.Errorf("%q secret %q: %w", ea.Name, sec.Key, err)
+			}
+		}
+		for _, f := range ea.Files {
+			if err := validateDecrypt(f.Content, passphrase); err != nil {
+				return "", fmt.Errorf("%q file %q: %w", ea.Name, f.Path, err)
 			}
 		}
 	}
@@ -352,7 +364,14 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		}
 
 		for _, f := range ea.Files {
-			if err := s.appSvc.SetFile(ap.ID, f.Path, f.Content); err != nil {
+			content := f.Content
+			if passphrase != "" {
+				content, err = decrypt(f.Content, passphrase)
+				if err != nil {
+					return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
+				}
+			}
+			if err := s.appSvc.SetFile(ap.ID, f.Path, content); err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("set file %q for %q: %w", f.Path, ea.Name, err)
 			}
 		}

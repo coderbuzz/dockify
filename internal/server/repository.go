@@ -19,7 +19,7 @@ func (r *Repository) List() ([]Server, error) {
 		SELECT id, name, host, port, user, ssh_key, status,
 		       cpu_cores, ram_mb, disk_gb, cpu_usage, ram_usage, disk_usage,
 		       resources_updated_at, created_at, updated_at
-		FROM servers ORDER BY created_at DESC
+		FROM servers ORDER BY name ASC
 	`)
 	if err != nil {
 		return nil, err
