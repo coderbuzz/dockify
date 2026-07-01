@@ -403,6 +403,8 @@ func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, rend
 		return
 	}
 
+	go h.service.TestConnection(id)
+
 	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 

@@ -14,7 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock bool) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -22,6 +22,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	r.Use(chimw.RealIP)
 	r.Use(PrefixMiddleware)
 	r.Use(CORSMiddleware)
+	r.Use(DevMockMiddleware(devMock))
 
 	authEnabled := cfgPass != ""
 
@@ -239,4 +240,15 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func DevMockMiddleware(devMock bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if devMock {
+				r = SetDevMock(r, true)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

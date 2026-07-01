@@ -32,9 +32,11 @@
   <div class="btn-group">
     <a href="servers/{{.Server.ID}}/edit" class="btn btn-ghost">Edit</a>
     <button class="btn btn-ghost" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh Resources</button>
+    {{if and (ne .Server.Status "online") (ne .Server.Status "initializing")}}
     <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
       <button type="submit" class="btn btn-primary">Initialize Worker</button>
     </form>
+    {{end}}
     <form method="POST" action="servers/{{.Server.ID}}/delete" style="display:inline"
           onsubmit="return confirm('Remove {{.Server.Name}}? This cannot be undone.')">
       <button type="submit" class="btn btn-ghost btn-red">Remove Server</button>

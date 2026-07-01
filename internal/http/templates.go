@@ -68,6 +68,7 @@ var tmpl = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "te
 type contextKey string
 
 const basePathKey contextKey = "basePath"
+const devMockKey contextKey = "devMock"
 
 func SetBasePath(r *http.Request, path string) *http.Request {
 	ctx := context.WithValue(r.Context(), basePathKey, path)
@@ -79,6 +80,16 @@ func GetBasePath(r *http.Request) string {
 		return v
 	}
 	return "/"
+}
+
+func SetDevMock(r *http.Request, val bool) *http.Request {
+	ctx := context.WithValue(r.Context(), devMockKey, val)
+	return r.WithContext(ctx)
+}
+
+func GetDevMock(r *http.Request) bool {
+	v, _ := r.Context().Value(devMockKey).(bool)
+	return v
 }
 
 type RenderFunc func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})
@@ -94,6 +105,7 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 	m, ok := data.(map[string]interface{})
 	if ok {
 		m["BasePath"] = basePath
+		m["DevMock"] = GetDevMock(r)
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
