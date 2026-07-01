@@ -16,7 +16,7 @@ type WindowSize struct {
 }
 
 type Input struct {
-	Data   []byte
+	Data   string
 	Resize *WindowSize
 }
 
