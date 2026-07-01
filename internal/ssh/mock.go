@@ -73,7 +73,7 @@ func (m *MockClient) Shell(ctx context.Context, rows, cols int) (<-chan Output, 
 				if input.Resize != nil {
 					continue
 				}
-				for _, b := range input.Data {
+				for _, b := range []byte(input.Data) {
 					if b == '\r' {
 						outCh <- Output{Data: []byte("\r\n")}
 						cmd := string(buf)

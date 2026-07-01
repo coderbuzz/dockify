@@ -111,7 +111,7 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			inCh <- ssh.Input{Data: msg}
+			inCh <- ssh.Input{Data: string(msg)}
 		}
 	}()
 

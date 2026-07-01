@@ -129,7 +129,7 @@ func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan
 				continue
 			}
 			if len(input.Data) > 0 {
-				wIn.Write(input.Data)
+				wIn.Write([]byte(input.Data))
 			}
 		}
 	}()
