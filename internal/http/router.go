@@ -188,7 +188,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		r.Get("/export", func(w http.ResponseWriter, r *http.Request) {
 			backupHandler.ExportPage(w, r, render)
 		})
-		r.Get("/api/backup/export", backupHandler.ExportDownload)
+		r.Post("/api/backup/export", backupHandler.ExportDownload)
 		r.Get("/import", func(w http.ResponseWriter, r *http.Request) {
 			backupHandler.ImportPage(w, r, render)
 		})

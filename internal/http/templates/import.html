@@ -19,11 +19,16 @@
   <div class="card" style="color:var(--green);margin-bottom:1em">{{.Message}}</div>
   {{end}}
 
-  <form method="POST" action="api/backup/import" enctype="multipart/form-data">
+  <form method="POST" action="/api/backup/import" enctype="multipart/form-data">
     <div class="card">
       <h3>Upload Export File</h3>
       <label style="display:block;margin-bottom:1em">
         <input type="file" name="file" accept=".yaml,.yml" style="display:block;margin-top:0.3em">
+      </label>
+
+      <label style="display:block;margin-bottom:1em">
+        <span style="font-size:0.85em;color:var(--text-muted)">Passphrase (if encrypted)</span>
+        <input type="text" name="passphrase" placeholder="Enter passphrase from export" style="display:block;margin-top:0.3em;font-family:ui-monospace,monospace">
       </label>
 
       <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1em;margin:0 0 1em">
