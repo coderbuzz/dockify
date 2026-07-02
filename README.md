@@ -13,7 +13,10 @@ Self-hosted Docker app deployment platform. Deploy Docker Compose stacks to your
 - **Cloudflare DNS** — auto-create DNS records on deploy
 - **Git webhook** — push to main, auto deploy
 - **VM pool** — add VMs, deploy to least-loaded VM
-- **Web UI** — manage everything from the browser
+- **SSH console** — interactive terminal via browser (WebSocket + xterm.js)
+- **Dashboard** — live resource monitoring and deployment status at a glance
+- **Encrypted backups** — export/import config with AES-GCM passphrase encryption
+- **Web UI** — manage everything from the browser, dark/light mode
 
 ## Architecture
 
@@ -104,6 +107,7 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
 | `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. If not set, the web UI has **no authentication** |
+| `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID |
 | `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind a reverse proxy (e.g. `/proxy/9898`) |
@@ -170,8 +174,8 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
    - **Host:** `<worker-ip>`
    - **User:** `root`
    - **SSH Private Key:** Paste the content of `~/.ssh/dockify` (the private key file, `cat ~/.ssh/dockify`)
-3. Click **Add Server** → redirects to server detail
-4. Click **Initialize Worker**
+3. Click **Add Server** → redirects to server detail. Dockify auto-tests the connection and starts initialization in the background.
+4. Click **Initialize Worker** (if not already auto-initialized)
 
 **What "Initialize Worker" does automatically:**
 1. SSH connect + verify
@@ -181,10 +185,12 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 5. Collect CPU, RAM, Disk info
 6. Status → **online**. Ready to deploy apps.
 
+> Initialization is idempotent — re-running it on an already-initialized server skips existing components.
+
 ### Step 4: Deploy Your First App
 
 1. Go to **Apps** → **Deploy App**
-2. Choose **Simple Mode** (just an image name) or **Advanced Mode** (full `docker-compose.yml`)
+2. Choose **Simple Mode** (just an image name + env vars + volumes) or **Advanced Mode** (full `docker-compose.yml`)
 3. Set domain, port, and select a server (or **Auto-select** for least-loaded)
 4. Optional: fill **Basic Auth** username/password to protect the app behind HTTP basic auth
 5. Click **Deploy App**
@@ -194,19 +200,118 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 2. SSH → `docker compose up -d`
 3. Inject Caddy route via Admin API (domain → container:port)
 4. If basic auth is set, Caddy requires username/password before proxying
-5. Create Cloudflare DNS A record (if configured)
+5. Create Cloudflare DNS A record (if configured, skips duplicates)
 6. Record deployment + save compose snapshot for rollback
 7. Status → **running**
 
+## Dashboard
+
+The home page (`/`) provides a live overview of your infrastructure:
+
+- **Stats cards** — total servers, online servers, total apps, running apps
+- **Server summary** — all servers with live CPU/RAM usage and status badges
+- **App summary** — all apps with status badges and domain links
+- Empty state call-to-action buttons when no servers or apps exist yet
+
+## Server Management
+
+The **Servers** page lists all worker VMs with connection status and live resource usage. Click any server for its detail page.
+
+### Add, Edit, Delete
+
+Servers can be added via the web form (name, host, port, user, SSH private key) and edited after creation — update host, port, user, or SSH key without deleting and re-adding.
+
+### Resource Monitoring
+
+Dockify collects CPU, RAM, and disk usage from all online servers every 60 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
+
+- **CPU** — core count via `nproc`, usage % via `/proc/stat`
+- **RAM** — total and usage via `free -m`, with human-readable "used / free" info
+- **Disk** — total and usage via `df -BG`
+
+The scheduler uses these metrics to auto-select the least-loaded server (score = CPU% × 0.5 + RAM% × 0.5).
+
+### SSH Console
+
+Each server detail page includes an **interactive SSH terminal** powered by xterm.js and WebSocket. Open a full terminal session directly in the browser — no SSH client needed.
+
+- WebSocket connection: `GET /api/servers/:id/console`
+- Full xterm.js with FitAddon for responsive terminal sizing
+- Window resize events propagate to the remote PTY
+- Raw keystroke passthrough for a native terminal feel
+
+### Worker Init
+
+The **Initialize Worker** action installs Docker, creates the `dockify` network, and deploys Caddy. It is idempotent — safe to run multiple times.
+
+## App Management
+
+The **Apps** page lists all deployed apps. Click any app for its detail page with full management controls.
+
+### Deploy Modes
+
+- **Simple Mode** — provide an image name, port, environment variables, and volumes. Dockify auto-generates the docker-compose file.
+- **Advanced Mode** — paste a full `docker-compose.yml` with complete control over the stack.
+
+The compose mode (`simple` / `advanced`) is tracked per app and used to render the correct edit form.
+
+### Edit App
+
+Re-configure an existing app via the edit page. Dockify pre-fills the form with current settings (parsed from simple fields or the raw compose), saves changes, and automatically redeploys the app.
+
+### Server Auto-Select
+
+When creating or editing an app, set the server field to **Auto-select** (or `server_id=0` via API). Dockify picks the least-loaded online worker VM based on CPU and RAM usage.
+
+### Stop / Start
+
+Pause and resume an app without undeploying or losing configuration. Stopping runs `docker compose stop` and removes the Caddy route. Starting re-creates the route and DNS record.
+
+### Rollback
+
+Roll back to the last successful deployment. Dockify restores the compose snapshot saved at deploy time and redeploys the app.
+
+### Deployment History
+
+Each app keeps a history of deployments with status (running/failed), log output, commit SHA (for Git-triggered deploys), and timestamps. Viewable on the app detail page.
+
+### Logs
+
+Stream container logs via SSH (`docker compose logs`). Lazy-load buttons on the app detail page let you tail the last 50, 200, or 500 lines with HTMX partial updates.
+
+### Auto-Refresh
+
+While an app is deploying or a server is initializing, the detail page auto-refreshes every 2 seconds until the operation completes.
+
+## Secrets & Config Files
+
+### Environment Variables (Secrets)
+
+Each app can have key-value secrets managed through a **GitHub-style editor** in the web UI — inline add, edit, delete with show/hide toggles. On deploy, secrets are written as a `.env` file to `/opt/dockify/apps/<name>/.env` on the worker VM.
+
+**`.env` import:** Paste `KEY=VALUE` lines into the import textarea to bulk-add secrets. Dockify parses the format and also auto-injects `${KEY}` environment variable references into the docker-compose file, so secrets are available to containers without manual compose editing.
+
+### Config Files
+
+Each app can have arbitrary config files. Files are written to `/opt/dockify/apps/<name>/<path>` on the worker VM. Upload files directly from the browser (FileReader API) or paste content. Manage them inline on the app detail page.
+
+### HTTP Basic Auth
+
+Set `auth_user` and `auth_pass` on an app to require HTTP basic auth before accessing it. Caddy enforces this at the proxy level with bcrypt — the app itself does not need to handle authentication.
+
+### Unique Service Name (Simple Mode)
+
+In simple mode, Dockify renames the first service in the generated compose to a sanitized version of the app name (replacing `.`, `_`, spaces with `-`). This prevents service name conflicts when multiple apps use the same image.
+
 ## Git Webhook CI/CD
 
-Dockify can auto-deploy on every push via GitHub or GitLab webhooks. When an app is created with a `Git Repo URL` and `Branch`, Dockify matches incoming webhooks by repo + branch and triggers a redeploy.
+Dockify can auto-deploy on every push via GitHub or GitLab webhooks. When an app is created with a `Git Repo URL` and `Branch`, Dockify matches incoming webhooks by repo + branch and triggers a redeploy. A single webhook can trigger redeploys for multiple matching apps.
 
-A global **webhook secret** is auto-generated on first startup. See the [Webhook Security](#webhook-security) section below for details on how it works and how to configure it.
+A global **webhook secret** is auto-generated on first startup. See the [Webhook Security](#webhook-security) section below.
 
 ### Setup
 
-1. In your **app repo** (the one you want to auto-deploy), go to **Settings → Webhooks → Add webhook**
+1. In your **app repo**, go to **Settings → Webhooks → Add webhook**
 2. Fill in:
    ```
    Payload URL: https://dockify.example.com/api/webhook/github
@@ -218,7 +323,7 @@ A global **webhook secret** is auto-generated on first startup. See the [Webhook
    - **Git Repo URL:** `https://github.com/user/repo.git`
    - **Branch:** `main`
 
-Dockify verifies incoming webhooks using HMAC-SHA256 (GitHub) or secret token (GitLab). If the secret doesn't match, the webhook is rejected with 401. Non-push events are ignored gracefully (returns 200 with `"ignored"`).
+Dockify verifies incoming webhooks using HMAC-SHA256 (GitHub) or secret token (GitLab). Non-push events are ignored gracefully (returns 200 with `"ignored"`).
 
 ### Webhook Security
 
@@ -241,8 +346,6 @@ If the signature or token does not match, the webhook is rejected with `401 Unau
 > **Note:** When you **Roll** the secret, the old one stops working immediately. Update all CI secrets to match. Use **Disable** to turn off secret verification entirely.
 
 ### Trigger Deploy via GitHub Actions
-
-You can trigger deploys from GitHub Actions with or without webhook secret verification.
 
 Add repository secrets (**Settings → Secrets and variables → Actions**):
 
@@ -330,101 +433,55 @@ jobs:
             -d "$PAYLOAD"
 ```
 
-Dockify matches the `clone_url` and `ref` against registered apps, then redeploys the matching app with the commit SHA recorded in deployment history.
-
 ### How It Works
 
 1. GitHub sends a push event to `POST /api/webhook/github`
-2. Dockify parses `ref` → branch (`refs/heads/main` → `main`), `after` → commit SHA, `clone_url` → repo URL
-3. Finds the matching app by `git_repo` + `git_branch`
-4. Triggers `deployWithCommit(app.ID, commitSHA)` — same deploy flow as UI
+2. Dockify parses `ref` → branch, `after` → commit SHA, `clone_url` → repo URL
+3. Finds **all** matching apps by `git_repo` + `git_branch`
+4. Triggers `deployWithCommit(app.ID, commitSHA)` for each match — same deploy flow as UI
 5. Records the deployment with commit SHA in history
 
-## App Configuration
+## Cloudflare DNS
 
-### Environment Variables (Secrets)
+When `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` are configured, Dockify automatically manages DNS records on deploy:
 
-Each app can have key-value secrets stored in Dockify. On deploy, they are written as a `.env` file to `/opt/dockify/apps/<name>/.env` on the worker VM.
+- Creates an A record pointing to the worker VM's IP on app deploy (120s TTL)
+- Skips creation if a matching record already exists (deduplication)
+- Upserts records if the worker IP changes on re-deploy
+- DNS records are tracked in the database for cleanup
 
-Manage via the app detail page in the Web UI, or the API:
-
-```
-GET    /api/apps/:id/secrets        List secrets
-POST   /api/apps/:id/secrets        Set a secret (body: `{"key":"...","value":"..."}`)
-DELETE /api/apps/:id/secrets/:key   Delete a secret
-```
-
-### Config Files
-
-Each app can have arbitrary config files. On deploy, they are written to `/opt/dockify/apps/<name>/<path>` on the worker VM.
-
-```
-GET    /api/apps/:id/files          List files
-POST   /api/apps/:id/files          Set a file (body: `{"path":"...","content":"..."}`)
-DELETE /api/apps/:id/files/:path    Delete a file
-```
-
-### Stop / Start
-
-Pause and resume an app without undeploying or losing configuration:
-
-```
-POST   /api/apps/:id/stop           Runs `docker compose stop`
-POST   /api/apps/:id/start          Runs `docker compose start`
-```
-
-### Unique Service Name
-
-When enabled, Dockify renames the first service in the docker-compose file to a sanitized version of the app name (replacing `.`, `_`, spaces with `-`). This prevents service name conflicts when multiple apps use the same compose template.
-
-### HTTP Basic Auth
-
-Set `auth_user` and `auth_pass` on an app to require HTTP basic auth before accessing it. Caddy enforces this at the proxy level — the app itself does not need to handle authentication.
-
-## Server Features
-
-### Resource Monitoring
-
-Dockify collects CPU, RAM, and disk usage from all online servers every 60 seconds. Resource data is visible on server detail pages and used by the scheduler to pick the least-loaded server for new deployments.
-
-```
-POST   /api/servers/:id/refresh     Manually refresh a server's resource metrics
-```
-
-### Server Edit
-
-Update a server's host, port, user, or SSH key after creation:
-
-```
-PATCH  /api/servers/:id             Partial update of server fields
-```
+No DNS automation occurs if the env vars are not set.
 
 ## Backup & Restore
 
-Export your configuration (servers + apps) as YAML and import it into another instance.
+Export your configuration (servers + apps + secrets + config files) as YAML and import it into another instance.
 
-### Export
+### Encrypted Export
 
-```
-GET    /api/backup/export           Download YAML config file
-```
+Backups can be protected with a passphrase using **AES-GCM encryption** (PBKDF2 key derivation, 600,000 iterations):
 
-The export includes all servers (name, host, port, user) and apps (name, domain, port, compose, git repo, auth settings). **SSH keys are not exported** — you must re-enter them after import.
+- Secrets are encrypted before export with prefix `enc:`
+- Auth passwords and config file contents are encrypted
+- The export page includes a client-side passphrase generator (32-character hex, via `crypto.getRandomValues`)
+- Without a passphrase, secrets are exported as plaintext (still safe for offline backups)
+
+SSH keys are **never** exported — you must re-enter them after import.
 
 ### Import
 
-Upload a previously exported YAML file via the Import page (`/import`) or API:
-
-```
-POST   /api/backup/import           Upload YAML file (multipart: `file` + `mode`)
-```
+Upload a previously exported YAML file via the Import page (`/import`):
 
 - **merge** (default): skip entries that already exist by name
 - **replace**: delete all existing servers and apps before import
+- Encrypted values are validated by attempting decryption before the actual import
 
-## Settings & Updates
+### Unified Backup Page
 
-The **Settings** page (`/settings`) provides:
+Both **Export** and **Import** are accessible from dedicated pages (`/export`, `/import`) and also linked from the Settings page for convenience.
+
+## Settings
+
+The **Settings** page (`/settings`) provides centralized management:
 
 | Feature | Description |
 |---|---|
@@ -432,7 +489,33 @@ The **Settings** page (`/settings`) provides:
 | **Update Check** | Checks GitHub Releases for a newer version |
 | **Run Update** | Triggers a self-update via `systemd-run` — downloads and runs the latest `update.sh` |
 
-Manual update via command line:
+The **About** page (`/about`) shows the current version, project description, and a **Sponsor** link. An update progress bar with live polling keeps you informed during self-updates.
+
+## UI Features
+
+Dockify's web UI is built with Go `html/template` + HTMX and fully custom CSS (no framework):
+
+- **Dark/Light mode** — toggle via nav button, persisted in `localStorage` (`dockify-theme`)
+- **HTMX partial updates** — resource cards, log viewer, and status badges update without full page reloads
+- **Responsive** — adapts to mobile screen sizes (single breakpoint at 600px)
+- **Status badges** — color-coded for all server and app states
+- **Confirm dialogs** — destructive actions (undeploy, delete, rollback) require confirmation
+- **Relative timestamps** — deployment and resource times rendered in browser timezone
+
+## Dev Mode
+
+For local development without real worker VMs, set `DOCKIFY_DEV_MOCK=true`:
+
+- Enables a **mock SSH client** with realistic CPU/RAM/Disk responses
+- **Mock SSH console** — simulated interactive terminal that echoes commands
+- A yellow **"Dev Mock Mode"** banner appears above the nav bar
+- Works with [Air](https://github.com/air-verse/air) for live-reload:
+
+```bash
+air   # starts at http://localhost:8080, auto-rebuilds on save
+```
+
+Data is stored in `./data/` (SQLite DB, gitignored). See `AGENTS.md` for full development workflow details.
 
 ## Updating Dockify
 
@@ -464,20 +547,19 @@ sudo systemctl start dockify
 dockify/
 ├── cmd/dockify/main.go
 ├── internal/
-│   ├── ssh/           # SSH client, remote exec, worker init
+│   ├── ssh/           # SSH client, remote exec, worker init, mock client
 │   ├── server/        # Server CRUD, resource monitoring
-│   ├── app/           # App CRUD, deployment
+│   ├── app/           # App CRUD, deployment, rollback
 │   ├── caddy/         # Caddy Admin API client
 │   ├── cloudflare/    # Cloudflare DNS API
-│   ├── webhook/       # Git webhook handler
-│   ├── scheduler/     # Idle server selection
+│   ├── webhook/       # Git webhook handler (GitHub + GitLab)
+│   ├── scheduler/     # Idle server auto-selection
 │   ├── settings/      # Global settings, update checker
-│   ├── backup/        # Export/import YAML config
+│   ├── backup/        # Export/import YAML with encrypted secrets
 │   ├── db/            # SQLite layer
-│   └── http/          # HTTP server, handlers, templates
-├── web/static/        # CSS, JS (embedded)
-├── scripts/           # Worker init scripts
-└── docs/              # Documentation
+│   └── http/          # HTTP server, handlers, templates (HTMX + custom CSS)
+├── scripts/           # Install, worker setup, update, release scripts
+└── Dockerfile         # Multi-stage Docker build
 ```
 
 ## License
