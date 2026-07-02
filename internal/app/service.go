@@ -148,7 +148,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		envPath := fmt.Sprintf("%s/.env", remoteDir)
 		var envLines []string
 		for _, sec := range secrets {
-			envLines = append(envLines, sec.Key+"="+sec.Value)
+			envLines = append(envLines, sec.Key+"="+strings.ReplaceAll(sec.Value, "$", "$$"))
 		}
 		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
 			log.Printf("Warning: write .env: %v", err)
