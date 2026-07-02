@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/coderbuzz/dockify/internal/app"
@@ -164,14 +166,19 @@ func (s *Service) Export(passphrase string) (string, error) {
 			Port: svr.Port,
 			User: svr.User,
 		}
-		if svr.SSHKey != "" {
+		if svr.SSHKey != "" && svr.SSHKey != "pending" {
+			raw, err := os.ReadFile(svr.SSHKey)
+			if err != nil {
+				return "", fmt.Errorf("read ssh_key file for %q: %w", svr.Name, err)
+			}
+			keyContent := string(raw)
 			if passphrase != "" {
-				es.SSHKey, err = encrypt(svr.SSHKey, passphrase)
+				es.SSHKey, err = encrypt(keyContent, passphrase)
 				if err != nil {
 					return "", fmt.Errorf("encrypt ssh_key for %q: %w", svr.Name, err)
 				}
 			} else {
-				es.SSHKey = svr.SSHKey
+				es.SSHKey = keyContent
 			}
 		}
 		data.Servers = append(data.Servers, es)
@@ -305,15 +312,12 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			serverIDs[es.Name] = existing.ID
 			continue
 		}
-		sshKey := es.SSHKey
+		sshKeyContent := es.SSHKey
 		if passphrase != "" && es.SSHKey != "" {
-			sshKey, err = decrypt(es.SSHKey, passphrase)
+			sshKeyContent, err = decrypt(es.SSHKey, passphrase)
 			if err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
 			}
-		}
-		if sshKey == "" {
-			sshKey = "pending"
 		}
 
 		svr := &server.Server{
@@ -321,7 +325,7 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			Host:   es.Host,
 			Port:   es.Port,
 			User:   es.User,
-			SSHKey: sshKey,
+			SSHKey: "pending",
 			Status: "pending",
 		}
 		if svr.Port == 0 {
@@ -333,6 +337,18 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		if err := s.serverSvc.Create(svr); err != nil {
 			return strings.Join(logLines, "\n"), fmt.Errorf("create server %q: %w", es.Name, err)
 		}
+
+		if sshKeyContent != "" && sshKeyContent != "pending" {
+			path := filepath.Join(s.keyDir, fmt.Sprintf("%d.pem", svr.ID))
+			if err := os.WriteFile(path, []byte(sshKeyContent), 0600); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("save ssh_key file for %q: %w", es.Name, err)
+			}
+			svr.SSHKey = path
+			if err := s.serverSvc.Update(svr); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("update ssh_key path for %q: %w", es.Name, err)
+			}
+		}
+
 		serverIDs[es.Name] = svr.ID
 		logLines = append(logLines, fmt.Sprintf("Created server %q (%s)", es.Name, es.Host))
 	}
