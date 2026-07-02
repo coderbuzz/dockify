@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -34,13 +35,17 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func generateCompose(image string, port int, envVars string, volumes string) string {
+func generateCompose(image string, port int, envVars string, volumes string, appName string) string {
+	svcName := "app"
+	if appName != "" {
+		svcName = sanitizeAppName(appName)
+	}
 	compose := fmt.Sprintf(`services:
-  app:
+  %s:
     image: %s
     restart: unless-stopped
     networks:
-      - dockify`, image)
+      - dockify`, svcName, image)
 
 	if envVars != "" {
 		compose += "\n    environment:"
@@ -177,4 +182,84 @@ func splitEnvVars(envVars string) []string {
 		}
 	}
 	return result
+}
+
+type simpleFields struct {
+	Image   string
+	Port    int
+	EnvVars string
+	Volumes string
+}
+
+func parseSimpleFields(compose string) simpleFields {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
+		return simpleFields{}
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return simpleFields{}
+	}
+
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return simpleFields{}
+	}
+
+	// Find services node
+	var servicesNode *yaml.Node
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value == "services" {
+			servicesNode = root.Content[i+1]
+			break
+		}
+	}
+	if servicesNode == nil || servicesNode.Kind != yaml.MappingNode || len(servicesNode.Content) < 2 {
+		return simpleFields{}
+	}
+
+	// Take the first service
+	svc := servicesNode.Content[1]
+	if svc.Kind != yaml.MappingNode {
+		return simpleFields{}
+	}
+
+	var sf simpleFields
+	for i := 0; i+1 < len(svc.Content); i += 2 {
+		key := svc.Content[i].Value
+		val := svc.Content[i+1]
+
+		switch key {
+		case "image":
+			sf.Image = val.Value
+		case "expose":
+			if val.Kind == yaml.SequenceNode && len(val.Content) > 0 {
+				portStr := strings.Trim(val.Content[0].Value, "\"")
+				if p, err := strconv.Atoi(portStr); err == nil {
+					sf.Port = p
+				}
+			}
+		case "environment":
+			if val.Kind == yaml.SequenceNode {
+				var lines []string
+				for _, item := range val.Content {
+					if item.Value != "" {
+						lines = append(lines, item.Value)
+					}
+				}
+				sf.EnvVars = strings.Join(lines, "\n")
+			}
+		case "volumes":
+			if val.Kind == yaml.SequenceNode {
+				var lines []string
+				for _, item := range val.Content {
+					if item.Value != "" {
+						lines = append(lines, item.Value)
+					}
+				}
+				sf.Volumes = strings.Join(lines, "\n")
+			}
+		}
+	}
+
+	return sf
 }

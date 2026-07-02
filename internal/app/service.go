@@ -138,7 +138,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	composeCmd := dockerComposeCmd(client)
 
-	remoteDir := fmt.Sprintf("/opt/dockify/apps/%s", app.Name)
+	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
@@ -165,10 +165,10 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	composeContent := ensureDockifyNetwork(app.Compose)
 
-	if app.UniqueServiceName {
+	if app.ComposeMode == "simple" {
 		newName := sanitizeAppName(app.Name)
 		composeContent = renameFirstService(composeContent, newName)
-		log.Printf("Renamed first service to %q for unique service name", newName)
+		log.Printf("Renamed first service to %q (compose_mode=simple)", newName)
 	}
 
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
@@ -181,7 +181,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --force-recreate 2>&1", composeCmd, composePath)); err != nil {
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --force-recreate --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
@@ -242,7 +242,7 @@ func (s *Service) FetchLogs(id int64, tail int) (string, error) {
 	}
 	defer client.Close()
 
-	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
+	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	dc := dockerComposeCmd(client)
 	out, err := client.Exec(fmt.Sprintf("%s -f %s logs --tail=%d 2>&1", dc, composePath, tail))
 	if err != nil {
@@ -278,7 +278,7 @@ func (s *Service) Undeploy(id int64) error {
 
 	dc := dockerComposeCmd(client)
 
-	remoteDir := fmt.Sprintf("/opt/dockify/apps/%s", app.Name)
+	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
@@ -382,7 +382,7 @@ func (s *Service) Stop(id int64) error {
 	defer client.Close()
 
 	dc := dockerComposeCmd(client)
-	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
+	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
 
 	if app.Domain != "" {
@@ -419,7 +419,7 @@ func (s *Service) Start(id int64) error {
 	defer client.Close()
 
 	dc := dockerComposeCmd(client)
-	composePath := fmt.Sprintf("/opt/dockify/apps/%s/docker-compose.yml", app.Name)
+	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Starting %q on %s...", app.Name, svr.Name)
 
 	if out, err := client.Exec(fmt.Sprintf("%s -f %s start 2>&1", dc, composePath)); err != nil {

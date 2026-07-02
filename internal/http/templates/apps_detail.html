@@ -21,10 +21,9 @@
       <table>
         <tr><td><strong>Domain</strong></td><td>{{.App.Domain}}</td></tr>
         <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
-        <tr><td><strong>Server</strong></td><td>#{{.App.ServerID}}</td></tr>
+        <tr><td><strong>Server</strong></td><td>{{.ServerName}}</td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
         {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
-        <tr><td><strong>Unique</strong></td><td>{{if .App.UniqueServiceName}}yes{{else}}no{{end}}</td></tr>
         {{if .App.GitRepo}}<tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
         <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>{{end}}
       </table>

@@ -14,7 +14,7 @@ type App struct {
 	AuthUser          string    `json:"auth_user"`
 	AuthPass          string    `json:"auth_pass"`
 	Status            string    `json:"status"`
-	UniqueServiceName bool      `json:"unique_service_name"`
+	ComposeMode       string    `json:"compose_mode"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

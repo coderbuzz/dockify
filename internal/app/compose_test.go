@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerateSimple(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "")
+	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -25,8 +25,28 @@ func TestGenerateSimple(t *testing.T) {
 	}
 }
 
+func TestGenerateSimpleWithAppName(t *testing.T) {
+	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "", "my-app")
+	if c == "" {
+		t.Fatal("empty compose")
+	}
+
+	names, err := parseServiceNames(c)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(names) != 1 || names[0] != "my-app" {
+		t.Fatalf("expected service [my-app], got %v", names)
+	}
+
+	sn := getServiceName(c)
+	if sn != "my-app" {
+		t.Fatalf("expected my-app, got %s", sn)
+	}
+}
+
 func TestGenerateWithVolumes(t *testing.T) {
-	c := generateCompose("postgres:16", 5432, "POSTGRES_PASSWORD=secret", "./db:/var/lib/postgresql/data")
+	c := generateCompose("postgres:16", 5432, "POSTGRES_PASSWORD=secret", "./db:/var/lib/postgresql/data", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -129,5 +149,57 @@ func TestRenameFirstServiceNoServices(t *testing.T) {
 	result := renameFirstService(compose, "whatever")
 	if result != compose {
 		t.Fatal("compose without services should be returned unchanged")
+	}
+}
+
+func TestParseSimpleFields(t *testing.T) {
+	compose := `services:
+  my-app:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks:
+      - dockify
+    environment:
+      - FOO=bar
+      - BAZ=qux
+    expose:
+      - "80"
+    volumes:
+      - ./data:/data
+networks:
+  dockify:
+    external: true`
+
+	sf := parseSimpleFields(compose)
+	if sf.Image != "nginx:alpine" {
+		t.Fatalf("expected nginx:alpine, got %q", sf.Image)
+	}
+	if sf.Port != 80 {
+		t.Fatalf("expected 80, got %d", sf.Port)
+	}
+	if sf.EnvVars != "FOO=bar\nBAZ=qux" {
+		t.Fatalf("expected FOO=bar\\nBAZ=qux, got %q", sf.EnvVars)
+	}
+	if sf.Volumes != "./data:/data" {
+		t.Fatalf("expected ./data:/data, got %q", sf.Volumes)
+	}
+}
+
+func TestParseSimpleFieldsEmpty(t *testing.T) {
+	sf := parseSimpleFields("")
+	if sf.Image != "" || sf.Port != 0 || sf.EnvVars != "" || sf.Volumes != "" {
+		t.Fatal("expected empty fields for empty compose")
+	}
+}
+
+func TestParseSimpleFieldsMultipleServices(t *testing.T) {
+	compose := `services:
+  web:
+    image: nginx
+  db:
+    image: postgres`
+	sf := parseSimpleFields(compose)
+	if sf.Image != "nginx" {
+		t.Fatalf("expected nginx, got %q", sf.Image)
 	}
 }
