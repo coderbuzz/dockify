@@ -25,10 +25,11 @@ type ExportData struct {
 }
 
 type ExportServer struct {
-	Name string `yaml:"name"`
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
-	User string `yaml:"user"`
+	Name   string `yaml:"name"`
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+	User   string `yaml:"user"`
+	SSHKey string `yaml:"ssh_key,omitempty"`
 }
 
 type ExportSecret struct {
@@ -157,12 +158,23 @@ func (s *Service) Export(passphrase string) (string, error) {
 	serverNameMap := map[int64]string{}
 	for _, svr := range servers {
 		serverNameMap[svr.ID] = svr.Name
-		data.Servers = append(data.Servers, ExportServer{
+		es := ExportServer{
 			Name: svr.Name,
 			Host: svr.Host,
 			Port: svr.Port,
 			User: svr.User,
-		})
+		}
+		if svr.SSHKey != "" {
+			if passphrase != "" {
+				es.SSHKey, err = encrypt(svr.SSHKey, passphrase)
+				if err != nil {
+					return "", fmt.Errorf("encrypt ssh_key for %q: %w", svr.Name, err)
+				}
+			} else {
+				es.SSHKey = svr.SSHKey
+			}
+		}
+		data.Servers = append(data.Servers, es)
 	}
 
 	for _, a := range apps {
@@ -229,9 +241,8 @@ func (s *Service) Export(passphrase string) (string, error) {
 
 	sb := strings.Builder{}
 	sb.WriteString("# Dockify Configuration Export\n")
-	sb.WriteString("# Auth passwords (if present) are included as saved. SSH keys are not exported.\n")
 	if passphrase != "" {
-		sb.WriteString("# Secret values and config file contents are encrypted with the provided passphrase.\n")
+		sb.WriteString("# All sensitive values (secrets, auth passwords, config files, SSH keys) are encrypted.\n")
 	}
 	sb.WriteString("# Remove or edit entries before import as needed.\n")
 	sb.Write(out)
@@ -250,6 +261,11 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 
 	var logLines []string
 
+	for _, es := range data.Servers {
+		if err := validateDecrypt(es.SSHKey, passphrase); err != nil {
+			return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
+		}
+	}
 	for _, ea := range data.Apps {
 		if err := validateDecrypt(ea.AuthPass, passphrase); err != nil {
 			return "", fmt.Errorf("%q: %w", ea.Name, err)
@@ -289,12 +305,23 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			serverIDs[es.Name] = existing.ID
 			continue
 		}
+		sshKey := es.SSHKey
+		if passphrase != "" && es.SSHKey != "" {
+			sshKey, err = decrypt(es.SSHKey, passphrase)
+			if err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
+			}
+		}
+		if sshKey == "" {
+			sshKey = "pending"
+		}
+
 		svr := &server.Server{
 			Name:   es.Name,
 			Host:   es.Host,
 			Port:   es.Port,
 			User:   es.User,
-			SSHKey: "pending",
+			SSHKey: sshKey,
 			Status: "pending",
 		}
 		if svr.Port == 0 {

@@ -350,20 +350,20 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 
 ### Export
 
-1. Query all servers (name, host, port, user — **no SSH keys**)
+1. Query all servers (name, host, port, user, SSH key)
 2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, server name mapping)
 3. Query all app secrets and config files
-4. If passphrase provided: encrypt secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
+4. If passphrase provided: encrypt SSH keys, secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
 5. Generate YAML document
 6. Download as `dockify-config.yaml`
 
 ### Import
 
 1. Parse YAML file
-2. If passphrase provided: attempt decryption of all `enc:` values to validate passphrase
+2. If passphrase provided: attempt decryption of all `enc:` values to validate passphrase (including SSH keys)
 3. In **merge** mode (default): skip entries that already exist by same name
 4. In **replace** mode: delete all existing servers and apps, then import
-5. Create servers (user must re-enter SSH keys after import)
+5. Create servers with SSH key from export (fallback to `"pending"` if key is empty — user must enter key manually)
 6. Create apps (status = created, ready for deploy)
 7. Import secrets and config files
 8. Redirect to servers page

@@ -17,7 +17,7 @@
       <h3>Download Backup</h3>
       <p style="color:var(--text-muted)">
         Export all servers and apps configuration to a YAML file.
-        SSH keys are <strong>not</strong> exported — you must re-add them after import.
+        SSH keys are included and encrypted with your passphrase.
       </p>
 
       <label style="display:block;margin-bottom:0.5em">
@@ -31,8 +31,8 @@
       </label>
 
       <p style="color:var(--orange);font-size:0.85em">
-        ⚠ Secret values will be encrypted with this passphrase.
-        Store it safely — without it you cannot import this backup.
+        ⚠ All sensitive values (secrets, auth passwords, SSH keys, config files) will be encrypted.
+        Store the passphrase safely — without it you cannot import this backup.
       </p>
 
       <button type="submit" class="btn btn-primary">Download YAML</button>
@@ -42,7 +42,7 @@
   <div class="card" style="margin-top:1em">
     <h3>What's exported</h3>
     <ul style="color:var(--text-muted);font-size:0.9em">
-      <li>Server: name, host, port, user (no SSH key)</li>
+      <li>Server: name, host, port, user, SSH key (encrypted with your passphrase)</li>
       <li>Apps: name, domain, port, compose, git repo/branch, auth credentials, secrets, config files</li>
       <li>Secrets are encrypted with your passphrase</li>
       <li>You can edit the YAML file to remove entries before importing</li>

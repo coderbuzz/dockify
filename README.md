@@ -460,12 +460,12 @@ Export your configuration (servers + apps + secrets + config files) as YAML and 
 
 Backups can be protected with a passphrase using **AES-GCM encryption** (PBKDF2 key derivation, 600,000 iterations):
 
-- Secrets are encrypted before export with prefix `enc:`
-- Auth passwords and config file contents are encrypted
+- Secrets, SSH keys, auth passwords, and config file contents are encrypted before export
+- Encrypted values use the prefix `enc:` with base64 salt + nonce + ciphertext
 - The export page includes a client-side passphrase generator (32-character hex, via `crypto.getRandomValues`)
-- Without a passphrase, secrets are exported as plaintext (still safe for offline backups)
+- Without a passphrase, sensitive data is exported as plaintext (still useful for offline/internal backups)
 
-SSH keys are **never** exported — you must re-enter them after import.
+When importing on a new instance, all servers and their SSH keys are restored automatically — no need to re-enter keys one by one, as long as the target VMs are reachable or use the same key pair.
 
 ### Import
 
