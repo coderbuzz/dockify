@@ -332,15 +332,31 @@ func (s *Service) setupRouteAndDNS(app *App, svr *server.Server, client ssh.Conn
 			log.Printf("Warning: Cloudflare DNS lookup failed for %q: %v", app.Name, err)
 			return
 		}
-		exists := false
+		var existing *cloudflare.DNSRecord
 		for _, r := range records {
 			if r.Name == app.Domain && r.Type == "A" {
-				exists = true
-				log.Printf("DNS A record already exists for %s, skipping (IP: %s, proxied: %v)", app.Domain, r.Content, r.Proxied)
+				existing = &r
 				break
 			}
 		}
-		if !exists {
+
+		if existing != nil {
+			if existing.Content != svr.Host {
+				log.Printf("DNS A record IP mismatch for %s: current=%s, expected=%s, updating...", app.Domain, existing.Content, svr.Host)
+				record, err := s.cf.UpdateRecord(existing.ID, app.Domain, svr.Host, existing.Proxied)
+				if err != nil {
+					log.Printf("Warning: Cloudflare DNS update failed for %q: %v", app.Name, err)
+					if logs != nil {
+						*logs = append(*logs, fmt.Sprintf("dns: %v", err))
+					}
+				} else {
+					log.Printf("DNS A record updated: %s -> %s", record.Name, record.Content)
+					s.repo.SaveDNSRecord(app.ID, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
+				}
+			} else {
+				log.Printf("DNS A record already exists for %s, IP matches (IP: %s, proxied: %v)", app.Domain, existing.Content, existing.Proxied)
+			}
+		} else {
 			record, err := s.cf.CreateRecord(app.Domain, svr.Host, false)
 			if err != nil {
 				log.Printf("Warning: Cloudflare DNS failed for %q: %v", app.Name, err)
