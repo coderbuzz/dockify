@@ -46,5 +46,9 @@ func Open(path string) (*sql.DB, error) {
 	// Migrasi: tambah kolom unique_service_name (v0.3.0)
 	db.Exec("ALTER TABLE apps ADD COLUMN unique_service_name INTEGER DEFAULT 0")
 
+	// Migrasi: tambah kolom compose_mode, gantikan unique_service_name (v0.5.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN compose_mode TEXT DEFAULT 'advanced'")
+	db.Exec("UPDATE apps SET compose_mode = 'simple' WHERE unique_service_name = 1")
+
 	return db, nil
 }

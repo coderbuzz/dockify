@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,19 +29,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name              string `json:"name"`
-		ServerID          int64  `json:"server_id"`
-		Domain            string `json:"domain"`
-		Port              int    `json:"port"`
-		Compose           string `json:"compose"`
-		Image             string `json:"image"`
-		EnvVars           string `json:"env_vars"`
-		Volumes           string `json:"volumes"`
-		GitRepo           string `json:"git_repo"`
-		GitBranch         string `json:"git_branch"`
-		AuthUser          string `json:"auth_user"`
-		AuthPass          string `json:"auth_pass"`
-		UniqueServiceName bool   `json:"unique_service_name"`
+		Name     string `json:"name"`
+		ServerID int64  `json:"server_id"`
+		Domain   string `json:"domain"`
+		Port     int    `json:"port"`
+		Compose  string `json:"compose"`
+		Image    string `json:"image"`
+		EnvVars  string `json:"env_vars"`
+		Volumes  string `json:"volumes"`
+		GitRepo  string `json:"git_repo"`
+		GitBranch string `json:"git_branch"`
+		AuthUser string `json:"auth_user"`
+		AuthPass string `json:"auth_pass"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -55,7 +55,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	compose := input.Compose
 	if compose == "" && input.Image != "" {
-		compose = generateCompose(input.Image, input.Port, input.EnvVars, input.Volumes)
+		compose = generateCompose(input.Image, input.Port, input.EnvVars, input.Volumes, input.Name)
 	}
 	if compose == "" {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "provide either compose or image"})
@@ -71,17 +71,21 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		input.ServerID = id
 	}
 
+	composeMode := "advanced"
+	if input.Image != "" && (input.Compose == "" || !strings.Contains(input.Compose, "services:")) {
+		composeMode = "simple"
+	}
 	app := &App{
-		Name:              input.Name,
-		ServerID:          input.ServerID,
-		Domain:            input.Domain,
-		Port:              input.Port,
-		Compose:           compose,
-		GitRepo:           input.GitRepo,
-		GitBranch:         input.GitBranch,
-		AuthUser:          input.AuthUser,
-		AuthPass:          input.AuthPass,
-		UniqueServiceName: input.UniqueServiceName,
+		Name:        input.Name,
+		ServerID:    input.ServerID,
+		Domain:      input.Domain,
+		Port:        input.Port,
+		Compose:     compose,
+		GitRepo:     input.GitRepo,
+		GitBranch:   input.GitBranch,
+		AuthUser:    input.AuthUser,
+		AuthPass:    input.AuthPass,
+		ComposeMode: composeMode,
 	}
 
 	if err := h.service.Create(app); err != nil {
@@ -347,13 +351,16 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		gitBranch = "main"
 	}
 
+	mode := r.FormValue("mode")
 	compose := strings.TrimSpace(r.FormValue("compose"))
 	image := strings.TrimSpace(r.FormValue("image"))
 	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
 
-	if image != "" && (compose == "" || !strings.Contains(compose, "services:")) {
-		compose = generateCompose(image, port, envVars, volumes)
+	composeMode := "advanced"
+	if mode == "simple" && image != "" {
+		compose = generateCompose(image, port, envVars, volumes, strings.TrimSpace(r.FormValue("name")))
+		composeMode = "simple"
 	}
 
 	app := &App{
@@ -366,7 +373,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		GitBranch:         gitBranch,
 		AuthUser:          strings.TrimSpace(r.FormValue("auth_user")),
 		AuthPass:          strings.TrimSpace(r.FormValue("auth_pass")),
-		UniqueServiceName: r.FormValue("unique_service_name") == "1",
+		ComposeMode:       composeMode,
 	}
 
 	if app.Name == "" || app.Compose == "" {
@@ -421,13 +428,28 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 	servers, _ := h.serverRepo.List()
 	secrets, _ := h.service.ListSecrets(id)
 	files, _ := h.service.ListFiles(id)
+
+	// Parse simple fields from compose for pre-filling the edit form
+	sf := parseSimpleFields(app.Compose)
+	image := sf.Image
+	envVars := sf.EnvVars
+	volumes := sf.Volumes
+	if sf.Port > 0 {
+		app.Port = sf.Port
+	}
+	// If compose generated with app name as service, image is reliable.
+	// Otherwise fall back to showing compose textarea (advanced mode in template)
+
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
-		"Title":   "Edit " + app.Name,
-		"Servers": servers,
-		"App":     app,
-		"Secrets": secrets,
-		"Files":   files,
-		"IsEdit":  true,
+		"Title":    "Edit " + app.Name,
+		"Servers":  servers,
+		"App":      app,
+		"Secrets":  secrets,
+		"Files":    files,
+		"IsEdit":   true,
+		"Image":    image,
+		"EnvVars":  envVars,
+		"Volumes":  volumes,
 	})
 }
 
@@ -456,13 +478,21 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 	port, _ := strconv.Atoi(r.FormValue("port"))
 
-	compose := strings.TrimSpace(r.FormValue("compose"))
-	image := strings.TrimSpace(r.FormValue("image"))
 	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
 
-	if image != "" && (compose == "" || !strings.Contains(compose, "services:")) {
-		compose = generateCompose(image, port, envVars, volumes)
+	mode := r.FormValue("mode")
+	compose := strings.TrimSpace(r.FormValue("compose"))
+	image := strings.TrimSpace(r.FormValue("image"))
+
+	if mode == "simple" && image != "" {
+		compose = generateCompose(image, port, envVars, volumes, app.Name)
+		app.ComposeMode = "simple"
+	} else {
+		if compose == "" {
+			compose = app.Compose
+		}
+		app.ComposeMode = "advanced"
 	}
 
 	app.Name = strings.TrimSpace(r.FormValue("name"))
@@ -474,7 +504,6 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.GitBranch = strings.TrimSpace(r.FormValue("git_branch"))
 	app.AuthUser = strings.TrimSpace(r.FormValue("auth_user"))
 	app.AuthPass = strings.TrimSpace(r.FormValue("auth_pass"))
-	app.UniqueServiceName = r.FormValue("unique_service_name") == "1"
 
 	if app.GitBranch == "" {
 		app.GitBranch = "main"
@@ -532,9 +561,21 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 	secrets, _ := h.service.ListSecrets(id)
 	files, _ := h.service.ListFiles(id)
 
+	// Resolve server name for display
+	serverName := fmt.Sprintf("#%d", app.ServerID)
+	if servers, err := h.serverRepo.List(); err == nil {
+		for _, svr := range servers {
+			if svr.ID == app.ServerID {
+				serverName = svr.Name
+				break
+			}
+		}
+	}
+
 	render(w, r, http.StatusOK, "apps_detail.html", map[string]interface{}{
 		"Title":       app.Name,
 		"App":         app,
+		"ServerName":  serverName,
 		"Deployments": deps,
 		"Secrets":     secrets,
 		"Files":       files,

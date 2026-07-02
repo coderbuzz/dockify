@@ -51,7 +51,7 @@ type ExportApp struct {
 	GitBranch          string         `yaml:"git_branch,omitempty"`
 	AuthUser           string         `yaml:"auth_user,omitempty"`
 	AuthPass           string         `yaml:"auth_pass,omitempty"`
-	UniqueServiceName  bool           `yaml:"unique_service_name,omitempty"`
+	ComposeMode string `yaml:"compose_mode,omitempty"`
 	Secrets            []ExportSecret `yaml:"secrets,omitempty"`
 	Files              []ExportFile   `yaml:"files,omitempty"`
 }
@@ -175,7 +175,7 @@ func (s *Service) Export(passphrase string) (string, error) {
 			GitRepo:           a.GitRepo,
 			GitBranch:         a.GitBranch,
 			AuthUser:          a.AuthUser,
-			UniqueServiceName: a.UniqueServiceName,
+			ComposeMode: a.ComposeMode,
 		}
 
 		if a.AuthPass != "" {
@@ -341,7 +341,7 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			GitBranch:         ea.GitBranch,
 			AuthUser:          ea.AuthUser,
 			AuthPass:          authPass,
-			UniqueServiceName: ea.UniqueServiceName,
+			ComposeMode: ea.ComposeMode,
 		}
 		if ap.GitBranch == "" {
 			ap.GitBranch = "main"

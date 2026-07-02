@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS apps (
     auth_user           TEXT DEFAULT '',
     auth_pass           TEXT DEFAULT '',
     status              TEXT DEFAULT 'created',
-    unique_service_name INTEGER DEFAULT 0,
+    compose_mode       TEXT DEFAULT 'advanced',
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
 );
