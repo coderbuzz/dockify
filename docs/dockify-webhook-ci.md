@@ -14,7 +14,7 @@ Push ke main → CI build Docker image → push ke registry → notify Dockify v
 ```
 
 Satu webhook bisa trigger redeploy **semua instance** app yang menggunakan repo dan branch yang sama. Dockify melakukan:
-1. SSH ke worker → `docker compose pull && docker compose up -d --force-recreate`
+1. SSH ke worker → `docker compose pull && docker compose up -d --remove-orphans`
 2. Inject ulang Caddy route (domain → container:port)
 3. Record deployment history (success/failed)
 

@@ -188,12 +188,16 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 		return
 	}
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --force-recreate --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
+	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
 		return
+	}
+
+	if _, err := client.Exec("docker image prune -f 2>&1"); err != nil {
+		log.Printf("Warning: image prune failed: %v (non-fatal)", err)
 	}
 
 	if app.Domain != "" {
