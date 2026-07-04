@@ -181,6 +181,13 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
 
+	if pullOut, pullErr := client.Exec(fmt.Sprintf("%s -f %s pull 2>&1", composeCmd, composePath)); pullErr != nil {
+		logs = append(logs, fmt.Sprintf("compose pull failed: %v\n%s", pullErr, pullOut))
+		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
+		s.repo.UpdateStatus(id, StatusFailed)
+		return
+	}
+
 	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --force-recreate --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
