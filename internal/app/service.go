@@ -380,7 +380,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 				log.Printf("DNS A record already exists for %s, IP matches (IP: %s, proxied: %v)", route.Domain, existing.Content, existing.Proxied)
 			}
 		} else {
-			record, err := s.cf.CreateRecord(route.Domain, svr.Host, false)
+			record, err := s.cf.CreateRecord(route.Domain, svr.Host, true)
 			if err != nil {
 				log.Printf("Warning: Cloudflare DNS failed for %s: %v", route.Domain, err)
 				if logs != nil {
