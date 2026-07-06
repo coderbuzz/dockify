@@ -35,6 +35,69 @@ func (m *MockClient) Exec(cmd string) (string, error) {
 	return "", nil
 }
 
+func (m *MockClient) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error) {
+	outCh := make(chan Output, 64)
+	inCh := make(chan Input, 64)
+
+	go func() {
+		defer close(outCh)
+
+		prompt := []byte("\r\ncontainer:$ ")
+
+		outCh <- Output{Data: []byte("\r\nDockify Dev Mock — Container console simulation\r\n")}
+		outCh <- Output{Data: []byte("Running: " + cmd + "\r\n")}
+		outCh <- Output{Data: prompt}
+
+		var buf []byte
+		ticker := time.NewTicker(30 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				outCh <- Output{Data: []byte("\r\nSession closed.\r\n")}
+				outCh <- Output{Closed: true}
+				return
+			case input, ok := <-inCh:
+				if !ok {
+					return
+				}
+				if input.Resize != nil {
+					continue
+				}
+				for _, b := range []byte(input.Data) {
+					if b == '\r' {
+						outCh <- Output{Data: []byte("\r\n")}
+						cmdStr := string(buf)
+						buf = nil
+
+						if cmdStr == "exit" || cmdStr == "exit " {
+							outCh <- Output{Data: []byte("logout\r\n")}
+							outCh <- Output{Closed: true}
+							return
+						}
+
+						result := "Mock container response for: " + cmdStr + "\r\n"
+						outCh <- Output{Data: []byte(result)}
+						outCh <- Output{Data: prompt}
+					} else if b == '\x7f' {
+						if len(buf) > 0 {
+							buf = buf[:len(buf)-1]
+							outCh <- Output{Data: []byte{'\b', ' ', '\b'}}
+						}
+					} else {
+						buf = append(buf, b)
+						outCh <- Output{Data: []byte{b}}
+					}
+				}
+			case <-ticker.C:
+			}
+		}
+	}()
+
+	return outCh, inCh, nil
+}
+
 func (m *MockClient) WriteFile(path, content string, mode os.FileMode) error {
 	return nil
 }

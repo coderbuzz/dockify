@@ -117,6 +117,13 @@ func sanitizeAppName(name string) string {
 	return r.Replace(name)
 }
 
+func (a *App) ContainerServiceName() string {
+	if a.ComposeMode == "simple" {
+		return sanitizeAppName(a.Name)
+	}
+	return getServiceName(a.Compose)
+}
+
 func renameFirstService(compose string, newName string) string {
 	if !strings.Contains(compose, "services:") {
 		return compose
