@@ -1,27 +1,36 @@
 {{define "apps_list"}}
 {{if .Apps}}
-<table style="font-size:0.85em">
-  <thead>
-    <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th><th>Git</th><th></th></tr>
-  </thead>
-  <tbody>
-    {{range .Apps}}
-    <tr>
-      <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
-      <td style="white-space:nowrap">{{.Domain}}</td>
-      <td>{{.Port}}</td>
-      <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
-      <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
-      <td style="width:1%;white-space:nowrap">
-        <form method="POST" action="apps/{{.ID}}/undeploy" style="display:inline"
-              onsubmit="return confirm('Undeploy {{.Name}}? This will stop and remove the app.')">
-          <button type="submit" class="btn btn-ghost btn-red">Undeploy</button>
-        </form>
-      </td>
-    </tr>
-    {{end}}
-  </tbody>
-</table>
+{{range .ServerGroups}}
+<div class="app-group" style="margin-bottom:1.5rem">
+  <h3 style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+    {{if .ServerID}}<a href="servers/{{.ServerID}}" style="text-decoration:none">{{.ServerName}}</a>{{else}}{{.ServerName}}{{end}}
+    <span class="badge badge-{{.Status}}" style="font-size:0.7rem">{{.Status}}</span>
+    <small style="color:var(--muted);font-weight:400">— {{len .Apps}} app(s)</small>
+  </h3>
+  <table style="font-size:0.85em">
+    <thead>
+      <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th><th>Git</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Apps}}
+      <tr>
+        <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
+        <td style="white-space:nowrap">{{.Domain}}</td>
+        <td>{{.Port}}</td>
+        <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+        <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
+        <td style="width:1%;white-space:nowrap">
+          <form method="POST" action="apps/{{.ID}}/undeploy" style="display:inline"
+                onsubmit="return confirm('Undeploy {{.Name}}? This will stop and remove the app.')">
+            <button type="submit" class="btn btn-ghost btn-red">Undeploy</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
 {{else}}
 <div class="empty-state">
   <p>No apps deployed yet.</p>

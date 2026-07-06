@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -293,6 +294,58 @@ func (h *Handler) Logs(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(logs))
 }
 
+type ServerGroup struct {
+	ServerID   int64
+	ServerName string
+	Status     string
+	Apps       []App
+}
+
+func GroupAppsByServer(apps []App, servers []ServerInfo) []ServerGroup {
+	serverMap := make(map[int64]ServerInfo)
+	for _, s := range servers {
+		serverMap[s.ID] = s
+	}
+
+	groupMap := make(map[int64]*ServerGroup)
+	var unassigned []App
+
+	for _, app := range apps {
+		svrInfo, found := serverMap[app.ServerID]
+		if !found {
+			unassigned = append(unassigned, app)
+			continue
+		}
+		g, ok := groupMap[app.ServerID]
+		if !ok {
+			groupMap[app.ServerID] = &ServerGroup{
+				ServerID:   svrInfo.ID,
+				ServerName: svrInfo.Name,
+				Status:     svrInfo.Status,
+			}
+			g = groupMap[app.ServerID]
+		}
+		g.Apps = append(g.Apps, app)
+	}
+
+	groups := make([]ServerGroup, 0, len(groupMap))
+	for _, g := range groupMap {
+		groups = append(groups, *g)
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].ServerName < groups[j].ServerName
+	})
+
+	if len(unassigned) > 0 {
+		groups = append(groups, ServerGroup{
+			ServerName: "Unassigned",
+			Apps:       unassigned,
+		})
+	}
+
+	return groups
+}
+
 type WebHandler struct {
 	service    *Service
 	serverRepo ServerRepo
@@ -318,9 +371,13 @@ func (h *WebHandler) AppListPage(w http.ResponseWriter, r *http.Request, render 
 		apps = nil
 	}
 
+	servers, _ := h.serverRepo.List()
+	groups := GroupAppsByServer(apps, servers)
+
 	render(w, r, http.StatusOK, "apps.html", map[string]interface{}{
-		"Title": "Apps",
-		"Apps":  apps,
+		"Title":        "Apps",
+		"Apps":         apps,
+		"ServerGroups": groups,
 	})
 }
 
