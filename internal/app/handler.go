@@ -30,18 +30,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name     string `json:"name"`
-		ServerID int64  `json:"server_id"`
-		Domain   string `json:"domain"`
-		Port     int    `json:"port"`
-		Compose  string `json:"compose"`
-		Image    string `json:"image"`
-		EnvVars  string `json:"env_vars"`
-		Volumes  string `json:"volumes"`
-		GitRepo  string `json:"git_repo"`
-		GitBranch string `json:"git_branch"`
-		AuthUser string `json:"auth_user"`
-		AuthPass string `json:"auth_pass"`
+		Name     string   `json:"name"`
+		ServerID int64    `json:"server_id"`
+		Domain   string   `json:"domain"`
+		Domains  []string `json:"domains"`
+		Port     int      `json:"port"`
+		Compose  string   `json:"compose"`
+		Image    string   `json:"image"`
+		EnvVars  string   `json:"env_vars"`
+		Volumes  string   `json:"volumes"`
+		GitRepo  string   `json:"git_repo"`
+		GitBranch string  `json:"git_branch"`
+		AuthUser string   `json:"auth_user"`
+		AuthPass string   `json:"auth_pass"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -92,6 +93,27 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.Create(app); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+
+	allDomains := []string{app.Domain}
+	for _, d := range input.Domains {
+		d = strings.TrimSpace(d)
+		if d != "" && d != app.Domain {
+			allDomains = append(allDomains, d)
+		}
+	}
+	seen := map[string]bool{}
+	for _, d := range allDomains {
+		if d == "" || seen[d] {
+			continue
+		}
+		seen[d] = true
+		h.service.SaveRoute(&Route{
+			AppID:    app.ID,
+			ServerID: app.ServerID,
+			Domain:   d,
+			Target:   "",
+		})
 	}
 
 	go h.service.Deploy(app.ID)
@@ -420,10 +442,22 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		composeMode = "simple"
 	}
 
+	domains := parseDomains(r)
+	if len(domains) == 0 {
+		domains = []string{strings.TrimSpace(r.FormValue("domain"))}
+	}
+	primaryDomain := ""
+	for _, d := range domains {
+		if d != "" {
+			primaryDomain = d
+			break
+		}
+	}
+
 	app := &App{
 		Name:              strings.TrimSpace(r.FormValue("name")),
 		ServerID:          serverID,
-		Domain:            strings.TrimSpace(r.FormValue("domain")),
+		Domain:            primaryDomain,
 		Port:              port,
 		Compose:           compose,
 		GitRepo:           strings.TrimSpace(r.FormValue("git_repo")),
@@ -470,6 +504,18 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	saveFormSecrets(r, h.service, app.ID)
 	saveFormFiles(r, h.service, app.ID)
 
+	for _, d := range domains {
+		if d == "" {
+			continue
+		}
+		h.service.SaveRoute(&Route{
+			AppID:    app.ID,
+			ServerID: app.ServerID,
+			Domain:   d,
+			Target:   "",
+		})
+	}
+
 	go h.service.Deploy(app.ID)
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
@@ -494,8 +540,17 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 	if sf.Port > 0 {
 		app.Port = sf.Port
 	}
-	// If compose generated with app name as service, image is reliable.
-	// Otherwise fall back to showing compose textarea (advanced mode in template)
+
+	routes, _ := h.service.GetRoutes(id)
+	domainList := make([]string, 0, len(routes)+1)
+	if app.Domain != "" {
+		domainList = append(domainList, app.Domain)
+	}
+	for _, r := range routes {
+		if r.Domain != app.Domain {
+			domainList = append(domainList, r.Domain)
+		}
+	}
 
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
 		"Title":    "Edit " + app.Name,
@@ -507,6 +562,7 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 		"Image":    image,
 		"EnvVars":  envVars,
 		"Volumes":  volumes,
+		"Domains":  domainList,
 	})
 }
 
@@ -552,9 +608,18 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		app.ComposeMode = "advanced"
 	}
 
+	domains := parseDomains(r)
+	primaryDomain := ""
+	for _, d := range domains {
+		if d != "" {
+			primaryDomain = d
+			break
+		}
+	}
+
 	app.Name = strings.TrimSpace(r.FormValue("name"))
 	app.ServerID = serverID
-	app.Domain = strings.TrimSpace(r.FormValue("domain"))
+	app.Domain = primaryDomain
 	app.Port = port
 	app.Compose = compose
 	app.GitRepo = strings.TrimSpace(r.FormValue("git_repo"))
@@ -591,6 +656,44 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 
 	saveFormSecrets(r, h.service, id)
 	saveFormFiles(r, h.service, id)
+
+	oldRoutes, _ := h.service.GetRoutes(id)
+	oldDomains := make(map[string]Route)
+	for _, r := range oldRoutes {
+		oldDomains[r.Domain] = r
+	}
+	if app.Domain != "" {
+		if _, exists := oldDomains[app.Domain]; !exists {
+			if app.Domain != "" {
+				h.service.SaveRoute(&Route{
+					AppID:    app.ID,
+					ServerID: app.ServerID,
+					Domain:   app.Domain,
+					Target:   "",
+				})
+			}
+		}
+	}
+	seen := map[string]bool{}
+	for _, d := range domains {
+		if d == "" || seen[d] {
+			continue
+		}
+		seen[d] = true
+		if _, exists := oldDomains[d]; !exists {
+			h.service.SaveRoute(&Route{
+				AppID:    app.ID,
+				ServerID: app.ServerID,
+				Domain:   d,
+				Target:   "",
+			})
+		}
+	}
+	for _, r := range oldRoutes {
+		if !seen[r.Domain] {
+			h.service.DeleteRouteByDomain(app.ID, r.Domain)
+		}
+	}
 
 	go h.service.Redeploy(id)
 
@@ -629,13 +732,28 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		}
 	}
 
+	routes, _ := h.service.GetRoutes(id)
+	domains := []string{}
+	if app.Domain != "" {
+		domains = append(domains, app.Domain)
+	}
+	for _, r := range routes {
+		if r.Domain != app.Domain {
+			domains = append(domains, r.Domain)
+		}
+	}
+
 	render(w, r, http.StatusOK, "apps_detail.html", map[string]interface{}{
-		"Title":       app.Name,
-		"App":         app,
-		"ServerName":  serverName,
-		"Deployments": deps,
-		"Secrets":     secrets,
-		"Files":       files,
+		"Title":            app.Name,
+		"App":              app,
+		"ServerName":       serverName,
+		"Deployments":      deps,
+		"Secrets":          secrets,
+		"Files":            files,
+		"Routes":           routes,
+		"Domains":          domains,
+		"DomainCount":      len(domains),
+		"ExtraDomainCount": len(domains) - 1,
 	})
 }
 
@@ -703,6 +821,20 @@ func saveFormSecrets(r *http.Request, svc *Service, appID int64) {
 		}
 		svc.SetSecret(appID, k, v)
 	}
+}
+
+func parseDomains(r *http.Request) []string {
+	domains := r.Form["domain"]
+	seen := map[string]bool{}
+	var result []string
+	for _, d := range domains {
+		d = strings.TrimSpace(d)
+		if d != "" && !seen[d] {
+			seen[d] = true
+			result = append(result, d)
+		}
+	}
+	return result
 }
 
 func saveFormFiles(r *http.Request, svc *Service, appID int64) {

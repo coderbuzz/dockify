@@ -12,14 +12,14 @@
 
   <hgroup>
     <h1>{{.App.Name}} <span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></h1>
-    <p>{{if .App.Domain}}{{.App.Domain}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
+    <p>{{if .Domains}}{{index .Domains 0}}{{if .ExtraDomainCount}} <span class="badge" style="font-size:0.65rem;vertical-align:middle">+{{.ExtraDomainCount}} more</span>{{end}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
   </hgroup>
 
   <div class="grid grid-fill">
     <div class="card">
       <h3>Details</h3>
       <table>
-        <tr><td><strong>Domain</strong></td><td>{{.App.Domain}}</td></tr>
+        <tr><td><strong>Domain{{if gt (len .Domains) 1}}s{{end}}</strong></td><td>{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</td></tr>
         <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
         <tr><td><strong>Server</strong></td><td>{{.ServerName}}</td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
