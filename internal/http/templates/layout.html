@@ -218,7 +218,8 @@ small { font-size: 0.82em; color: var(--text-dim); display: block; margin-top: 0
 .breadcrumb a:hover { color: var(--link); }
 
 /* Button group */
-.btn-group { display: flex; gap: 0.5em; flex-wrap: wrap; margin: 1em 0; }
+.btn-group { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5em; margin: 1em 0; }
+.btn-group-left, .btn-group-right { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; }
 
 /* Code blocks */
 pre, code { font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 0.85em; }

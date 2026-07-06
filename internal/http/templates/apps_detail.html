@@ -74,35 +74,47 @@
     </div>
 
   <div class="btn-group">
-    {{if eq .App.Status "running"}}
-    <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
-      <button type="submit" class="btn">Stop</button>
-    </form>
-    {{end}}
-    {{if eq .App.Status "stopped"}}
-    <form method="POST" action="apps/{{.App.ID}}/start" style="display:inline">
-      <button type="submit" class="btn btn-primary">Start</button>
-    </form>
-    {{end}}
-    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
-    <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
-      <button type="submit" class="btn">Redeploy</button>
-    </form>
-    <form method="POST" action="apps/{{.App.ID}}/rollback" style="display:inline"
-          onsubmit="return confirm('Rollback to the last successful deployment?')">
-      <button type="submit" class="btn btn-ghost">Rollback</button>
-    </form>
-    {{if eq .App.Status "running"}}
-    <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
-          onsubmit="return confirm('Undeploy {{.App.Name}}? This will stop and remove the app.')">
-      <button type="submit" class="btn btn-ghost btn-red">Undeploy</button>
-    </form>
-    {{else}}
-    <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
-          onsubmit="return confirm('Remove {{.App.Name}}? This cannot be undone.')">
-      <button type="submit" class="btn btn-ghost btn-red">Remove</button>
-    </form>
-    {{end}}
+    <div class="btn-group-left">
+      {{if eq .App.Status "running"}}
+      <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
+        <button type="submit" class="btn">Stop</button>
+      </form>
+      {{end}}
+      {{if eq .App.Status "stopped"}}
+      <form method="POST" action="apps/{{.App.ID}}/start" style="display:inline">
+        <button type="submit" class="btn btn-primary">Start</button>
+      </form>
+      {{end}}
+      {{if eq .App.Status "running"}}
+      <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
+      {{else}}
+      <a href="apps/{{.App.ID}}/edit" class="btn">Edit</a>
+      {{end}}
+      <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
+        <button type="submit" class="btn">Redeploy</button>
+      </form>
+      <form method="POST" action="apps/{{.App.ID}}/rollback" style="display:inline"
+            onsubmit="return confirm('Rollback to the last successful deployment?')">
+        <button type="submit" class="btn btn-ghost">Rollback</button>
+      </form>
+      <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
+    </div>
+    <div class="btn-group-right">
+      <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
+            onsubmit="return confirm('Undeploy {{.App.Name}}? This will stop and remove the app.')">
+        <button type="submit" class="btn btn-red">Undeploy</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="console-section">
+    <div id="app-console-container" class="console-container" style="display:none">
+      <div class="console-toolbar">
+        <span class="badge badge-online" id="app-console-status">Connected</span>
+        <button class="btn btn-ghost btn-red" id="app-console-disconnect" onclick="toggleAppConsole()">Disconnect</button>
+      </div>
+      <div id="app-terminal"></div>
+    </div>
   </div>
 
   {{if .Deployments}}
@@ -141,6 +153,129 @@
   {{end}}
 </div>
 
+<script>
+var appTerm = null;
+var appWs = null;
+
+function toggleAppConsole() {
+	var container = document.getElementById('app-console-container');
+	if (container.style.display === 'none') {
+		container.style.display = 'block';
+		connectAppConsole();
+	} else {
+		container.style.display = 'none';
+		disconnectAppConsole();
+	}
+}
+
+function connectAppConsole() {
+	var btn = document.getElementById('app-console-toggle');
+	var appId = btn.getAttribute('data-app-id');
+	if (!appId) return;
+	var base = document.querySelector('base').getAttribute('href') || '/';
+	var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+	var host = window.location.host;
+
+	appTerm = new Terminal({
+		fontFamily: '"Berkeley Mono", "IBM Plex Mono", ui-monospace, monospace',
+		fontSize: 13,
+		lineHeight: 1.35,
+		cursorBlink: true,
+		cursorStyle: 'block',
+		theme: {
+			background: '#0d0d0d',
+			foreground: '#cfcecd',
+			cursor: '#cfcecd',
+			selectionBackground: '#3a3a3a',
+			black: '#0d0d0d',
+			red: '#b33a3a',
+			green: '#3d8b4a',
+			yellow: '#b8942e',
+			blue: '#4a7bbb',
+			magenta: '#b84a7b',
+			cyan: '#4ab8b8',
+			white: '#cfcecd',
+			brightBlack: '#555',
+			brightRed: '#b33a3a',
+			brightGreen: '#3d8b4a',
+			brightYellow: '#b8942e',
+			brightBlue: '#4a7bbb',
+			brightMagenta: '#b84a7b',
+			brightCyan: '#4ab8b8',
+			brightWhite: '#cfcecd'
+		}
+	});
+
+	var fitAddon = new FitAddon.FitAddon();
+	appTerm.loadAddon(fitAddon);
+	appTerm.open(document.getElementById('app-terminal'));
+
+	setTimeout(function() { fitAddon.fit(); }, 50);
+
+	appWs = new WebSocket(proto + '//' + host + base + 'api/apps/' + appId + '/console');
+	appWs.binaryType = 'arraybuffer';
+
+	appWs.onopen = function() {
+		document.getElementById('app-console-status').textContent = 'Connected';
+		document.getElementById('app-console-status').className = 'badge badge-online';
+		appTerm.focus();
+		var enc = new TextEncoder();
+		var dims = fitAddon.proposeDimensions();
+		if (dims) {
+			appWs.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
+		}
+	};
+
+	appWs.onmessage = function(evt) {
+		var data = evt.data;
+		if (data instanceof ArrayBuffer) {
+			appTerm.write(new Uint8Array(data));
+		} else {
+			appTerm.write(data);
+		}
+	};
+	appWs.onclose = function() {
+		document.getElementById('app-console-status').textContent = 'Disconnected';
+		document.getElementById('app-console-status').className = 'badge badge-offline';
+		if (appTerm) {
+			appTerm.write('\r\n\x1b[31mSession ended.\x1b[0m\r\n');
+		}
+	};
+
+	appTerm.onData(function(data) {
+		if (appWs && appWs.readyState === WebSocket.OPEN) {
+			appWs.send(data);
+		}
+	});
+
+	window._appConsoleResizeHandler = function() {
+		if (!fitAddon || !appWs || appWs.readyState !== WebSocket.OPEN) return;
+		fitAddon.fit();
+		var dims = fitAddon.proposeDimensions();
+		if (dims) {
+			appWs.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
+		}
+	};
+	window.addEventListener('resize', window._appConsoleResizeHandler);
+}
+
+function disconnectAppConsole() {
+	if (window._appConsoleResizeHandler) {
+		window.removeEventListener('resize', window._appConsoleResizeHandler);
+		window._appConsoleResizeHandler = null;
+	}
+	if (appWs) {
+		appWs.close();
+		appWs = null;
+	}
+	if (appTerm) {
+		appTerm.dispose();
+		appTerm = null;
+	}
+	document.getElementById('app-console-status').textContent = 'Disconnected';
+	document.getElementById('app-console-status').className = 'badge badge-offline';
+}
+</script>
 {{template "scripts" .}}
 </body>
 </html>

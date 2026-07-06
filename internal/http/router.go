@@ -28,7 +28,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	apiHandler := server.NewHandler(svc, sshKeyDir)
 	webHandler := server.NewWebHandler(svc, sshKeyDir)
-	consoleHandler := NewConsoleHandler(svc, sshKeyDir)
+	consoleHandler := NewConsoleHandler(svc, appSvc, sshKeyDir)
 
 	appAPIHandler := app.NewHandler(appSvc)
 	appWebHandler := app.NewWebHandler(appSvc, serverListAdapter)
@@ -129,6 +129,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Get("/{id}/files", appAPIHandler.ListFiles)
 			r.Post("/{id}/files", appAPIHandler.SetFile)
 			r.Delete("/{id}/files/{path}", appAPIHandler.DeleteFile)
+			r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)

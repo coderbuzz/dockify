@@ -136,7 +136,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 	}
 	defer client.Close()
 
-	composeCmd := dockerComposeCmd(client)
+	composeCmd := DockerComposeCmd(client)
 
 	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
@@ -254,7 +254,7 @@ func (s *Service) FetchLogs(id int64, tail int) (string, error) {
 	defer client.Close()
 
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
-	dc := dockerComposeCmd(client)
+	dc := DockerComposeCmd(client)
 	out, err := client.Exec(fmt.Sprintf("%s -f %s logs --tail=%d 2>&1", dc, composePath, tail))
 	if err != nil {
 		return "", err
@@ -287,7 +287,7 @@ func (s *Service) Undeploy(id int64) error {
 	}
 	defer client.Close()
 
-	dc := dockerComposeCmd(client)
+	dc := DockerComposeCmd(client)
 
 	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
@@ -408,7 +408,7 @@ func (s *Service) Stop(id int64) error {
 	}
 	defer client.Close()
 
-	dc := dockerComposeCmd(client)
+	dc := DockerComposeCmd(client)
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
 
@@ -445,7 +445,7 @@ func (s *Service) Start(id int64) error {
 	}
 	defer client.Close()
 
-	dc := dockerComposeCmd(client)
+	dc := DockerComposeCmd(client)
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Starting %q on %s...", app.Name, svr.Name)
 
@@ -525,7 +525,7 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 
 	var _ = time.Now
 
-func dockerComposeCmd(c ssh.Connector) string {
+func DockerComposeCmd(c ssh.Connector) string {
 	out, err := c.Exec("command -v docker-compose 2>/dev/null || echo docker compose")
 	if err != nil {
 		return "docker compose"
