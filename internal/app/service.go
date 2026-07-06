@@ -96,6 +96,18 @@ func (s *Service) Delete(id int64) error {
 	return s.repo.Delete(id)
 }
 
+func (s *Service) SaveRoute(route *Route) error {
+	return s.repo.SaveRoute(route)
+}
+
+func (s *Service) GetRoutes(appID int64) ([]Route, error) {
+	return s.repo.GetRoutes(appID)
+}
+
+func (s *Service) DeleteRouteByDomain(appID int64, domain string) error {
+	return s.repo.DeleteRouteByDomain(appID, domain)
+}
+
 func (s *Service) Deploy(id int64) {
 	s.deployWithCommit(id, "")
 }
@@ -201,7 +213,10 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 	}
 
 	if app.Domain != "" {
-		s.setupRouteAndDNS(app, svr, client, composeContent, &logs)
+		routes, _ := s.repo.GetRoutes(app.ID)
+		for _, r := range routes {
+			s.setupRouteAndDNSForDomain(r, app, svr, client, composeContent, &logs)
+		}
 	} else {
 		log.Printf("App %q deployed as internal service (no domain, no Caddy route)", app.Name)
 	}
@@ -298,11 +313,11 @@ func (s *Service) Undeploy(id int64) error {
 	client.Exec("docker image prune -af 2>&1 || true")
 	client.Exec("docker builder prune -af 2>&1 || true")
 
-	if app.Domain != "" {
+	routes, _ := s.repo.GetRoutes(app.ID)
+	for _, r := range routes {
 		caddyClient := caddy.NewClient(client)
-		caddyClient.RemoveRoute(app.Domain)
+		caddyClient.RemoveRoute(r.Domain)
 	}
-
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDeployments(app.ID)
 
@@ -313,39 +328,36 @@ func (s *Service) Undeploy(id int64) error {
 	return nil
 }
 
-func (s *Service) setupRouteAndDNS(app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {
+func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {
 	target := fmt.Sprintf("%s:%d", getServiceName(composeContent), app.Port)
 	caddyClient := caddy.NewClient(client)
+
 	var caddyErr error
 	if app.AuthUser != "" && app.AuthPass != "" {
-		caddyErr = caddyClient.AddRouteWithAuth(app.Domain, target, app.AuthUser, app.AuthPass)
-		log.Printf("Caddy route (with auth) added: %s -> %s", app.Domain, target)
+		caddyErr = caddyClient.AddRouteWithAuth(route.Domain, target, app.AuthUser, app.AuthPass)
+		log.Printf("Caddy route (with auth) added: %s -> %s", route.Domain, target)
 	} else {
-		caddyErr = caddyClient.AddRoute(app.Domain, target)
-		log.Printf("Caddy route added: %s -> %s", app.Domain, target)
+		caddyErr = caddyClient.AddRoute(route.Domain, target)
+		log.Printf("Caddy route added: %s -> %s", route.Domain, target)
 	}
 	if caddyErr != nil {
-		log.Printf("Warning: caddy route injection failed for %q: %v", app.Name, caddyErr)
+		log.Printf("Warning: caddy route injection failed for %s: %v", route.Domain, caddyErr)
 		if logs != nil {
-			*logs = append(*logs, fmt.Sprintf("caddy: %v", caddyErr))
+			*logs = append(*logs, fmt.Sprintf("caddy/%s: %v", route.Domain, caddyErr))
 		}
 	}
-	s.repo.SaveRoute(&Route{
-		AppID:    app.ID,
-		ServerID: svr.ID,
-		Domain:   app.Domain,
-		Target:   target,
-	})
+
+	s.repo.UpdateRouteTarget(route.ID, target)
 
 	if s.cf != nil && s.cf.Enabled() {
-		records, err := s.cf.ListRecords(app.Domain)
+		records, err := s.cf.ListRecords(route.Domain)
 		if err != nil {
-			log.Printf("Warning: Cloudflare DNS lookup failed for %q: %v", app.Name, err)
+			log.Printf("Warning: Cloudflare DNS lookup failed for %s: %v", route.Domain, err)
 			return
 		}
 		var existing *cloudflare.DNSRecord
 		for _, r := range records {
-			if r.Name == app.Domain && r.Type == "A" {
+			if r.Name == route.Domain && r.Type == "A" {
 				existing = &r
 				break
 			}
@@ -353,26 +365,26 @@ func (s *Service) setupRouteAndDNS(app *App, svr *server.Server, client ssh.Conn
 
 		if existing != nil {
 			if existing.Content != svr.Host {
-				log.Printf("DNS A record IP mismatch for %s: current=%s, expected=%s, updating...", app.Domain, existing.Content, svr.Host)
-				record, err := s.cf.UpdateRecord(existing.ID, app.Domain, svr.Host, existing.Proxied)
+				log.Printf("DNS A record IP mismatch for %s: current=%s, expected=%s, updating...", route.Domain, existing.Content, svr.Host)
+				record, err := s.cf.UpdateRecord(existing.ID, route.Domain, svr.Host, existing.Proxied)
 				if err != nil {
-					log.Printf("Warning: Cloudflare DNS update failed for %q: %v", app.Name, err)
+					log.Printf("Warning: Cloudflare DNS update failed for %s: %v", route.Domain, err)
 					if logs != nil {
-						*logs = append(*logs, fmt.Sprintf("dns: %v", err))
+						*logs = append(*logs, fmt.Sprintf("dns/%s: %v", route.Domain, err))
 					}
 				} else {
 					log.Printf("DNS A record updated: %s -> %s", record.Name, record.Content)
-					s.repo.SaveDNSRecord(app.ID, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
+					_ = record
 				}
 			} else {
-				log.Printf("DNS A record already exists for %s, IP matches (IP: %s, proxied: %v)", app.Domain, existing.Content, existing.Proxied)
+				log.Printf("DNS A record already exists for %s, IP matches (IP: %s, proxied: %v)", route.Domain, existing.Content, existing.Proxied)
 			}
 		} else {
-			record, err := s.cf.CreateRecord(app.Domain, svr.Host, false)
+			record, err := s.cf.CreateRecord(route.Domain, svr.Host, false)
 			if err != nil {
-				log.Printf("Warning: Cloudflare DNS failed for %q: %v", app.Name, err)
+				log.Printf("Warning: Cloudflare DNS failed for %s: %v", route.Domain, err)
 				if logs != nil {
-					*logs = append(*logs, fmt.Sprintf("dns: %v", err))
+					*logs = append(*logs, fmt.Sprintf("dns/%s: %v", route.Domain, err))
 				}
 			} else {
 				log.Printf("DNS A record created: %s -> %s", record.Name, record.Content)
@@ -413,9 +425,12 @@ func (s *Service) Stop(id int64) error {
 	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
 
 	if app.Domain != "" {
-		caddyClient := caddy.NewClient(client)
-		if err := caddyClient.RemoveRoute(app.Domain); err != nil {
-			log.Printf("Warning: failed to remove Caddy route for %q: %v", app.Name, err)
+		routes, _ := s.repo.GetRoutes(app.ID)
+		for _, r := range routes {
+			caddyClient := caddy.NewClient(client)
+			if err := caddyClient.RemoveRoute(r.Domain); err != nil {
+				log.Printf("Warning: failed to remove Caddy route for %s: %v", r.Domain, err)
+			}
 		}
 	}
 
@@ -455,10 +470,13 @@ func (s *Service) Start(id int64) error {
 
 	if app.Domain != "" {
 		composeRemote, err := client.Exec(fmt.Sprintf("cat %s", composePath))
-		if err == nil {
-			s.setupRouteAndDNS(app, svr, client, composeRemote, nil)
-		} else {
+		if err != nil {
 			log.Printf("Warning: could not read remote compose for %q: %v", app.Name, err)
+		} else {
+			routes, _ := s.repo.GetRoutes(app.ID)
+			for _, r := range routes {
+				s.setupRouteAndDNSForDomain(r, app, svr, client, composeRemote, nil)
+			}
 		}
 	}
 

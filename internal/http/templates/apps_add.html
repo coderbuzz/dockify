@@ -18,7 +18,25 @@
       <h3>Basic</h3>
       <div class="grid">
         <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
-        <label>Domain<input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}"><small>Leave empty for internal services</small></label>
+        <label>Domains
+          <div id="domains-list">
+            <div id="domains-list">
+              {{if .Domains}}
+              {{range $i, $d := .Domains}}
+              <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
+                <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" style="margin-bottom:0;flex:1">
+                {{if $i}}<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>{{end}}
+              </div>
+              {{end}}
+              {{else}}
+              <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
+                <input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}" style="margin-bottom:0;flex:1">
+              </div>
+              {{end}}
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost" onclick="addDomainRow()" style="margin-top:0.2em;font-size:0.85em">+ Add Domain</button>
+          <small>First domain is primary. Leave empty for internal services.</small>
       </div>
       <div class="grid">
         <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
@@ -302,6 +320,20 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) {
   return s.replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+function addDomainRow() {
+  var list = document.getElementById('domains-list');
+  var div = document.createElement('div');
+  div.className = 'domain-row';
+  div.style.cssText = 'display:flex;gap:0.4em;margin-bottom:0.35em';
+  div.innerHTML = '<input type="text" name="domain" placeholder="app.example.com" style="margin-bottom:0;flex:1">'
+    + '<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>';
+  list.appendChild(div);
+}
+function removeDomainRow(btn) {
+  var list = document.getElementById('domains-list');
+  if (list.querySelectorAll('.domain-row').length <= 1) return;
+  btn.parentElement.remove();
 }
 function addFileRow() {
   var div = document.createElement('div');

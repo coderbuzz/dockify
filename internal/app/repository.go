@@ -291,6 +291,16 @@ func (r *Repository) SaveRoute(route *Route) error {
 	return nil
 }
 
+func (r *Repository) UpdateRouteTarget(routeID int64, target string) error {
+	_, err := r.db.Exec("UPDATE routes SET target = ? WHERE id = ?", target, routeID)
+	return err
+}
+
+func (r *Repository) DeleteRouteByDomain(appID int64, domain string) error {
+	_, err := r.db.Exec("DELETE FROM routes WHERE app_id = ? AND domain = ?", appID, domain)
+	return err
+}
+
 func (r *Repository) RemoveRoute(routeID int64) error {
 	_, err := r.db.Exec("UPDATE routes SET status='removed' WHERE id=?", routeID)
 	return err
