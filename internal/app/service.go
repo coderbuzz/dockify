@@ -424,16 +424,6 @@ func (s *Service) Stop(id int64) error {
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
 
-	if app.Domain != "" {
-		routes, _ := s.repo.GetRoutes(app.ID)
-		for _, r := range routes {
-			caddyClient := caddy.NewClient(client)
-			if err := caddyClient.RemoveRoute(r.Domain); err != nil {
-				log.Printf("Warning: failed to remove Caddy route for %s: %v", r.Domain, err)
-			}
-		}
-	}
-
 	if out, err := client.Exec(fmt.Sprintf("%s -f %s stop 2>&1", dc, composePath)); err != nil {
 		return fmt.Errorf("compose stop: %w\n%s", err, out)
 	}
@@ -466,18 +456,6 @@ func (s *Service) Start(id int64) error {
 
 	if out, err := client.Exec(fmt.Sprintf("%s -f %s start 2>&1", dc, composePath)); err != nil {
 		return fmt.Errorf("compose start: %w\n%s", err, out)
-	}
-
-	if app.Domain != "" {
-		composeRemote, err := client.Exec(fmt.Sprintf("cat %s", composePath))
-		if err != nil {
-			log.Printf("Warning: could not read remote compose for %q: %v", app.Name, err)
-		} else {
-			routes, _ := s.repo.GetRoutes(app.ID)
-			for _, r := range routes {
-				s.setupRouteAndDNSForDomain(r, app, svr, client, composeRemote, nil)
-			}
-		}
 	}
 
 	s.repo.UpdateStatus(id, StatusRunning)
