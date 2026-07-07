@@ -124,7 +124,7 @@ func (s *Service) DeployByGit(repo, branch, commitSHA string) {
 	}
 }
 
-func (s *Service) deployWithCommit(id int64, commitSHA string) {
+func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ...string) {
 	s.repo.UpdateStatus(id, StatusDeploying)
 
 	app, err := s.repo.Get(id)
@@ -210,6 +210,16 @@ func (s *Service) deployWithCommit(id int64, commitSHA string) {
 
 	if _, err := client.Exec("docker image prune -f 2>&1"); err != nil {
 		log.Printf("Warning: image prune failed: %v (non-fatal)", err)
+	}
+
+	for _, domain := range removedDomains {
+		caddyClient := caddy.NewClient(client)
+		if err := caddyClient.RemoveRoute(domain); err != nil {
+			log.Printf("Warning: remove Caddy route %s: %v", domain, err)
+			logs = append(logs, fmt.Sprintf("caddy/cleanup:%s: %v", domain, err))
+		} else {
+			log.Printf("Caddy route removed: %s", domain)
+		}
 	}
 
 	if app.Domain != "" {
@@ -394,13 +404,13 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 	}
 }
 
-func (s *Service) Redeploy(id int64) {
+func (s *Service) Redeploy(id int64, removedDomains ...string) {
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return
 	}
 	log.Printf("Redeploying %q...", app.Name)
-	s.deployWithCommit(id, "")
+	s.deployWithCommit(id, "", removedDomains...)
 }
 
 func (s *Service) Stop(id int64) error {
