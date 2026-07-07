@@ -689,13 +689,19 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 			})
 		}
 	}
+	var removedDomains []string
+	for _, r := range oldRoutes {
+		if !seen[r.Domain] {
+			removedDomains = append(removedDomains, r.Domain)
+		}
+	}
 	for _, r := range oldRoutes {
 		if !seen[r.Domain] {
 			h.service.DeleteRouteByDomain(app.ID, r.Domain)
 		}
 	}
 
-	go h.service.Redeploy(id)
+	go h.service.Redeploy(id, removedDomains...)
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
