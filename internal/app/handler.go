@@ -597,9 +597,10 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	mode := r.FormValue("mode")
 	compose := strings.TrimSpace(r.FormValue("compose"))
 	image := strings.TrimSpace(r.FormValue("image"))
+	newName := strings.TrimSpace(r.FormValue("name"))
 
 	if mode == "simple" && image != "" {
-		compose = generateCompose(image, port, envVars, volumes, app.Name)
+		compose = generateCompose(image, port, envVars, volumes, newName)
 		app.ComposeMode = "simple"
 	} else {
 		if compose == "" {
@@ -617,7 +618,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	app.Name = strings.TrimSpace(r.FormValue("name"))
+	app.Name = newName
 	app.ServerID = serverID
 	app.Domain = primaryDomain
 	app.Port = port
