@@ -183,6 +183,8 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		log.Printf("Renamed first service to %q (compose_mode=simple)", newName)
 	}
 
+	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", composeCmd, composePath))
+
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
