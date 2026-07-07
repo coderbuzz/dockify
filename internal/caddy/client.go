@@ -3,7 +3,9 @@ package caddy
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/coderbuzz/dockify/internal/ssh"
 	"golang.org/x/crypto/bcrypt"
@@ -141,6 +143,41 @@ func (c *Client) RemoveRoute(domain string) error {
 		return fmt.Errorf("caddy returned HTTP %s", code)
 	}
 	return nil
+}
+
+// CheckCertificate checks whether Caddy has obtained a valid TLS certificate
+// for the given domain by performing a TLS handshake via localhost.
+func (c *Client) CheckCertificate(domain string) (bool, error) {
+	cmd := fmt.Sprintf(
+		`docker exec caddy curl -sI -o /dev/null -w '%%{http_code}' --connect-timeout 5 --resolve %s:443:127.0.0.1 https://%s/ 2>&1`,
+		domain, domain,
+	)
+	out, err := c.ssh.Exec(cmd)
+	if err != nil {
+		return false, nil
+	}
+	code := strings.TrimSpace(out)
+	if code == "" || code == "000" {
+		return false, nil
+	}
+	n, err := strconv.Atoi(code)
+	if err != nil || n == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+// WaitForCertificate polls CheckCertificate until the cert is ready or timeout.
+func (c *Client) WaitForCertificate(domain string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		ready, err := c.CheckCertificate(domain)
+		if err == nil && ready {
+			return true
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return false
 }
 
 func sanitizeID(s string) string {
