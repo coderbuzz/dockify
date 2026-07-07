@@ -349,6 +349,15 @@ func (r *Repository) SaveDNSRecord(appID, serverID int64, zoneID, recordID, name
 	return err
 }
 
+func (r *Repository) UpdateDNSRecordProxied(recordID string, proxied bool) error {
+	proxiedInt := 0
+	if proxied {
+		proxiedInt = 1
+	}
+	_, err := r.db.Exec(`UPDATE dns_records SET proxied = ? WHERE record_id = ?`, proxiedInt, recordID)
+	return err
+}
+
 func (r *Repository) GetDNSRecords(appID int64) ([]DNSRecordInfo, error) {
 	rows, err := r.db.Query(`
 		SELECT id, app_id, server_id, zone_id, record_id, name, type, content, proxied, created_at
