@@ -10,8 +10,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
+
+type cachedResult struct {
+	info      *UpdateInfo
+	err       error
+	timestamp time.Time
+}
 
 const webhookSecretKey = "webhook_secret"
 
@@ -24,6 +31,9 @@ type UpdateInfo struct {
 type Service struct {
 	db      *sql.DB
 	version string
+
+	cacheMu sync.Mutex
+	cache   *cachedResult
 }
 
 func NewService(db *sql.DB, version string) *Service {
@@ -38,28 +48,60 @@ func (s *Service) CheckUpdate() (*UpdateInfo, error) {
 		current = "0.0.0"
 	}
 
+	s.cacheMu.Lock()
+	if s.cache != nil && time.Since(s.cache.timestamp) < 5*time.Minute {
+		info, err := s.cache.info, s.cache.err
+		s.cacheMu.Unlock()
+		return info, err
+	}
+	s.cacheMu.Unlock()
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get("https://api.github.com/repos/coderbuzz/dockify/releases/latest")
 	if err != nil {
-		return &UpdateInfo{Current: current, Latest: "", HasUpdate: false}, fmt.Errorf("fetch latest: %w", err)
+		info := &UpdateInfo{Current: current, Latest: "", HasUpdate: false}
+		err = fmt.Errorf("fetch latest: %w", err)
+		s.cacheMu.Lock()
+		s.cache = &cachedResult{info: info, err: err, timestamp: time.Now()}
+		s.cacheMu.Unlock()
+		return info, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		info := &UpdateInfo{Current: current, Latest: "", HasUpdate: false}
+		err = fmt.Errorf("GitHub API rate limit exceeded (HTTP %d)", resp.StatusCode)
+		s.cacheMu.Lock()
+		s.cache = &cachedResult{info: info, err: err, timestamp: time.Now()}
+		s.cacheMu.Unlock()
+		return info, err
+	}
 
 	var result struct {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &UpdateInfo{Current: current, Latest: "", HasUpdate: false}, fmt.Errorf("decode: %w", err)
+		info := &UpdateInfo{Current: current, Latest: "", HasUpdate: false}
+		err = fmt.Errorf("decode: %w", err)
+		s.cacheMu.Lock()
+		s.cache = &cachedResult{info: info, err: err, timestamp: time.Now()}
+		s.cacheMu.Unlock()
+		return info, err
 	}
 
 	latest := result.TagName
 	hasUpdate := latest != "" && latest != "v"+current && latest != current
-
-	return &UpdateInfo{
+	info := &UpdateInfo{
 		Current:   current,
 		Latest:    latest,
 		HasUpdate: hasUpdate,
-	}, nil
+	}
+
+	s.cacheMu.Lock()
+	s.cache = &cachedResult{info: info, err: nil, timestamp: time.Now()}
+	s.cacheMu.Unlock()
+
+	return info, nil
 }
 
 func (s *Service) RunUpdate() error {
