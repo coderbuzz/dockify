@@ -172,6 +172,7 @@ func (s *Service) RefreshResources(id int64) error {
 	diskUsage, _ := parseDiskUsage(client)
 
 	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage, diskUsage)
+	s.repo.UpdateStatus(id, StatusOnline)
 
 	return nil
 }

@@ -39,7 +39,7 @@
         <button type="submit" class="btn btn-primary">Initialize Worker</button>
       </form>
       {{end}}
-      <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh Resources</button>
+      <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh</button>
       <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
     </div>
     <div class="btn-group-right">
