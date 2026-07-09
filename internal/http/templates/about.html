@@ -70,22 +70,45 @@ function runUpdate() {
   var log = document.getElementById('update-log');
   log.style.display = 'block';
   log.textContent = 'Starting update...\n';
+  var versionOnPage = '{{.Version}}';
   fetch('api/settings/update/run', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
     if (d.error) {
       log.textContent += 'Error: ' + d.error + '\n';
       btn.disabled = false;
       btn.textContent = 'Update Failed';
     } else {
-      var ival = setInterval(function(){
+      var attempts = 0;
+      var maxAttempts = 30;
+      var delay = 1000;
+      function poll() {
+        if (attempts >= maxAttempts) {
+          log.textContent += '\nUpdate monitoring timed out. The server may need a manual restart.';
+          btn.disabled = false;
+          btn.textContent = 'Check Status';
+          return;
+        }
+        attempts++;
         log.textContent += '.';
         fetch('api/settings/update/check?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.json()}).then(function(info){
-          if (info.current !== '{{.Version}}') {
-            clearInterval(ival);
-            log.textContent += ' (detected, refresh)';
+          if (info.error) {
+            log.textContent += '\nCheck error: ' + info.error;
+            if (info.error.indexOf('rate limit') !== -1) {
+              log.textContent += ' (stopping monitor)';
+              return;
+            }
+          } else if (info.current !== versionOnPage) {
+            log.textContent += '\nUpdate detected, refresh';
             setTimeout(function(){ location.reload(true); }, 1000);
+            return;
           }
-        }).catch(function(){});
-      }, 1000);
+          setTimeout(poll, delay);
+          delay = Math.min(delay * 2, 30000);
+        }).catch(function(){
+          setTimeout(poll, delay);
+          delay = Math.min(delay * 2, 30000);
+        });
+      }
+      poll();
     }
   });
 }
