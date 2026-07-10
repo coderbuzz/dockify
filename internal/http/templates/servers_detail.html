@@ -31,14 +31,10 @@
 
   <div class="btn-group">
     <div class="btn-group-left">
-      {{if or (eq .Server.Status "online") (eq .Server.Status "initializing")}}
       <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>
-      {{else}}
-      <a href="servers/{{.Server.ID}}/edit" class="btn">Edit</a>
       <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
-        <button type="submit" class="btn btn-primary">Initialize Worker</button>
+        <button type="submit" class="btn">Init Worker</button>
       </form>
-      {{end}}
       <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh</button>
       <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
     </div>
