@@ -145,6 +145,15 @@ func (c *Client) RemoveRoute(domain string) error {
 	return nil
 }
 
+func (c *Client) SaveConfig() error {
+	cmd := `docker exec caddy sh -c 'curl -s http://localhost:2019/config/ -o /data/config.json'`
+	_, err := c.ssh.Exec(cmd)
+	if err != nil {
+		return fmt.Errorf("caddy save config: %w", err)
+	}
+	return nil
+}
+
 // CheckCertificate checks whether Caddy has obtained a valid TLS certificate
 // for the given domain by performing a TLS handshake via localhost.
 func (c *Client) CheckCertificate(domain string) (bool, error) {
