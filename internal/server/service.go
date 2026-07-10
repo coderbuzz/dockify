@@ -141,7 +141,26 @@ docker run -d \
 			return fmt.Errorf("deploy caddy: %w", err)
 		}
 	} else {
-		log.Printf("Caddy already running on %s, skipping deploy", server.Name)
+		log.Printf("Caddy already running on %s, checking config...", server.Name)
+		migrateCmd := `if [ ! -f /opt/dockify/caddy/config.json ]; then
+  mkdir -p /opt/dockify/caddy
+  docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
+  docker rm -f caddy 2>/dev/null
+  docker run -d \
+    --name caddy \
+    --network dockify \
+    -p 80:80 \
+    -p 443:443 \
+    -p 127.0.0.1:2019:2019 \
+    -v caddy_data:/data \
+    -v /opt/dockify/caddy/config.json:/data/config.json \
+    --restart unless-stopped \
+    caddy:latest caddy run --config /data/config.json
+fi`
+		_, err = client.Exec(migrateCmd)
+		if err != nil {
+			log.Printf("Warning: caddy config migration failed for %s: %v", server.Name, err)
+		}
 	}
 
 	s.repo.UpdateStatus(id, StatusOnline)
