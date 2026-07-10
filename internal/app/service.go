@@ -330,6 +330,9 @@ func (s *Service) Undeploy(id int64) error {
 		caddyClient := caddy.NewClient(client)
 		caddyClient.RemoveRoute(r.Domain)
 	}
+	if len(routes) > 0 {
+		caddy.NewClient(client).SaveConfig()
+	}
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDeployments(app.ID)
 
@@ -356,6 +359,10 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 		log.Printf("Warning: caddy route injection failed for %s: %v", route.Domain, caddyErr)
 		if logs != nil {
 			*logs = append(*logs, fmt.Sprintf("caddy/%s: %v", route.Domain, caddyErr))
+		}
+	} else {
+		if err := caddyClient.SaveConfig(); err != nil {
+			log.Printf("Warning: failed to save caddy config: %v", err)
 		}
 	}
 

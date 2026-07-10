@@ -120,10 +120,10 @@ func (s *Service) InitWorker(id int64) error {
 	caddyRunning, _ := client.Exec("docker ps -q --filter name=^/caddy$")
 	if strings.TrimSpace(caddyRunning) == "" {
 		log.Printf("Deploying Caddy on %s...", server.Name)
-		caddyRun := `mkdir -p /opt/dockify/caddy && cat > /opt/dockify/caddy/Caddyfile << 'CADDYEOF'
-:80, :443 {
-}
-CADDYEOF
+		caddyRun := `mkdir -p /opt/dockify/caddy
+if [ ! -f /opt/dockify/caddy/config.json ]; then
+  echo '{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"]}}}}}' > /opt/dockify/caddy/config.json
+fi
 docker rm -f caddy 2>/dev/null
 docker run -d \
   --name caddy \
@@ -132,9 +132,9 @@ docker run -d \
   -p 443:443 \
   -p 127.0.0.1:2019:2019 \
   -v caddy_data:/data \
-  -v /opt/dockify/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v /opt/dockify/caddy/config.json:/data/config.json \
   --restart unless-stopped \
-  caddy:latest`
+  caddy:latest caddy run --config /data/config.json`
 		_, err = client.Exec(caddyRun)
 		if err != nil {
 			s.repo.UpdateStatus(id, StatusError)
