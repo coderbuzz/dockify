@@ -36,17 +36,17 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
-	// Migrasi: hapus kolom webhook_secret dari apps (global settings sekarang)
+	// Migration: drop webhook_secret column from apps (global settings now)
 	db.Exec("ALTER TABLE apps DROP COLUMN webhook_secret")
 
-	// Migrasi: tambah kolom disk_usage (v0.4.0)
+	// Migration: add disk_usage column (v0.4.0)
 	db.Exec("ALTER TABLE servers ADD COLUMN disk_usage REAL")
 	db.Exec("ALTER TABLE servers ADD COLUMN resources_updated_at DATETIME")
 
-	// Migrasi: tambah kolom unique_service_name (v0.3.0)
+	// Migration: add unique_service_name column (v0.3.0)
 	db.Exec("ALTER TABLE apps ADD COLUMN unique_service_name INTEGER DEFAULT 0")
 
-	// Migrasi: tambah kolom compose_mode, gantikan unique_service_name (v0.5.0)
+	// Migration: add compose_mode column, replaces unique_service_name (v0.5.0)
 	db.Exec("ALTER TABLE apps ADD COLUMN compose_mode TEXT DEFAULT 'advanced'")
 	db.Exec("UPDATE apps SET compose_mode = 'simple' WHERE unique_service_name = 1")
 

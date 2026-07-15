@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -573,6 +574,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
 		return
 	}
+	oldServerID := app.ServerID
 	if err := r.ParseForm(); err != nil {
 		servers, _ := h.serverRepo.List()
 		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
@@ -655,6 +657,28 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
+	var flashMsg string
+	if oldServerID != 0 && oldServerID != serverID {
+		oldServerName := fmt.Sprintf("#%d", oldServerID)
+		newServerName := fmt.Sprintf("#%d", serverID)
+		if servers, err := h.serverRepo.List(); err == nil {
+			for _, s := range servers {
+				if s.ID == oldServerID {
+					oldServerName = s.Name
+				}
+				if s.ID == serverID {
+					newServerName = s.Name
+				}
+			}
+		}
+		h.service.DeleteRoutes(app.ID)
+		go h.service.CleanupFromServer(id, oldServerID)
+		flashMsg = url.QueryEscape(fmt.Sprintf(
+			"App moved from %s to %s. Containers stopped on %s, but app folder remains — check and delete manually if no longer needed.",
+			oldServerName, newServerName, oldServerName,
+		))
+	}
+
 	saveFormSecrets(r, h.service, id)
 	saveFormFiles(r, h.service, id)
 
@@ -704,7 +728,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 
 	go h.service.Redeploy(id, removedDomains...)
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	redirectURL := "/apps/" + strconv.FormatInt(id, 10)
+	if flashMsg != "" {
+		redirectURL += "?flash=" + flashMsg
+	}
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -759,6 +787,7 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		"Files":            files,
 		"Routes":           routes,
 		"Domains":          domains,
+		"Flash":            r.URL.Query().Get("flash"),
 		"DomainCount":      len(domains),
 		"ExtraDomainCount": len(domains) - 1,
 	})

@@ -96,6 +96,10 @@ func (s *Service) Delete(id int64) error {
 	return s.repo.Delete(id)
 }
 
+func (s *Service) DeleteRoutes(appID int64) error {
+	return s.repo.DeleteRoutes(appID)
+}
+
 func (s *Service) SaveRoute(route *Route) error {
 	return s.repo.SaveRoute(route)
 }
@@ -341,6 +345,49 @@ func (s *Service) Undeploy(id int64) error {
 	s.repo.Delete(id)
 	log.Printf("App %q undeployed", app.Name)
 	return nil
+}
+
+// CleanupFromServer stops containers and removes Caddy routes from a server
+// without deleting the app folder or DB rows. Used when moving an app to
+// a different server.
+func (s *Service) CleanupFromServer(appID, serverID int64) {
+	app, err := s.repo.Get(appID)
+	if err != nil || app == nil {
+		log.Printf("CleanupFromServer: app %d not found", appID)
+		return
+	}
+
+	svr, err := s.serverRepo.Get(serverID)
+	if err != nil || svr == nil {
+		log.Printf("CleanupFromServer %q: server %d not found, skipping", app.Name, serverID)
+		return
+	}
+
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	if err != nil {
+		log.Printf("CleanupFromServer %q: SSH connect to %s failed, skipping: %v", app.Name, svr.Name, err)
+		return
+	}
+	defer client.Close()
+
+	dc := DockerComposeCmd(client)
+	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
+	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
+
+	log.Printf("Cleaning up %q from %s (containers stopped, folder kept)...", app.Name, svr.Name)
+
+	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+
+	routes, _ := s.repo.GetRoutes(app.ID)
+	for _, r := range routes {
+		caddyClient := caddy.NewClient(client)
+		caddyClient.RemoveRoute(r.Domain)
+	}
+	if len(routes) > 0 {
+		caddy.NewClient(client).SaveConfig()
+	}
+
+	log.Printf("App %q cleaned up from %s (folder preserved at %s)", app.Name, svr.Name, remoteDir)
 }
 
 func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {
