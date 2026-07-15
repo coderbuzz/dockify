@@ -4,6 +4,7 @@
 <body>
 {{template "nav" .}}
 <div class="container">
+  {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
   <div class="breadcrumb">
     <a href="apps">Apps</a>
     <span>/</span>
