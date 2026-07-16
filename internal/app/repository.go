@@ -421,6 +421,23 @@ func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
 	return secrets, rows.Err()
 }
 
+func (r *Repository) ListAllSecrets() ([]AppSecret, error) {
+	rows, err := r.db.Query(`SELECT id, app_id, key, value FROM app_secrets ORDER BY app_id, key`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var secrets []AppSecret
+	for rows.Next() {
+		var s AppSecret
+		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value); err != nil {
+			return nil, err
+		}
+		secrets = append(secrets, s)
+	}
+	return secrets, rows.Err()
+}
+
 func (r *Repository) SetSecret(appID int64, key, value string) error {
 	_, err := r.db.Exec(`INSERT INTO app_secrets (app_id, key, value) VALUES (?, ?, ?) ON CONFLICT(app_id, key) DO UPDATE SET value = ?`, appID, key, value, value)
 	return err
@@ -445,6 +462,23 @@ type AppFile struct {
 
 func (r *Repository) ListFiles(appID int64) ([]AppFile, error) {
 	rows, err := r.db.Query(`SELECT id, app_id, path, content FROM app_files WHERE app_id = ? ORDER BY path`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var files []AppFile
+	for rows.Next() {
+		var f AppFile
+		if err := rows.Scan(&f.ID, &f.AppID, &f.Path, &f.Content); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+func (r *Repository) ListAllFiles() ([]AppFile, error) {
+	rows, err := r.db.Query(`SELECT id, app_id, path, content FROM app_files ORDER BY app_id, path`)
 	if err != nil {
 		return nil, err
 	}

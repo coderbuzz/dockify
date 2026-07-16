@@ -57,6 +57,10 @@ func (s *Service) ListSecrets(appID int64) ([]AppSecret, error) {
 	return s.repo.ListSecrets(appID)
 }
 
+func (s *Service) ListAllSecrets() ([]AppSecret, error) {
+	return s.repo.ListAllSecrets()
+}
+
 func (s *Service) SetSecret(appID int64, key, value string) error {
 	return s.repo.SetSecret(appID, key, value)
 }
@@ -71,6 +75,10 @@ func (s *Service) DeleteSecrets(appID int64) error {
 
 func (s *Service) ListFiles(appID int64) ([]AppFile, error) {
 	return s.repo.ListFiles(appID)
+}
+
+func (s *Service) ListAllFiles() ([]AppFile, error) {
+	return s.repo.ListAllFiles()
 }
 
 func (s *Service) SetFile(appID int64, path, content string) error {
