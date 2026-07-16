@@ -790,6 +790,7 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		"Flash":            r.URL.Query().Get("flash"),
 		"DomainCount":      len(domains),
 		"ExtraDomainCount": len(domains) - 1,
+		"ServiceName":      app.ContainerServiceName(),
 	})
 }
 
