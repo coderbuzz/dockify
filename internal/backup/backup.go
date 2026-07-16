@@ -21,9 +21,10 @@ import (
 const Version = 1
 
 type ExportData struct {
-	Version int            `yaml:"version"`
-	Servers []ExportServer `yaml:"servers"`
-	Apps    []ExportApp    `yaml:"apps"`
+	Version    int            `yaml:"version"`
+	MasterSalt string         `yaml:"master_salt,omitempty"`
+	Servers    []ExportServer `yaml:"servers"`
+	Apps       []ExportApp    `yaml:"apps"`
 }
 
 type ExportServer struct {
@@ -98,6 +99,16 @@ func encrypt(plaintext, passphrase string) (string, error) {
 	return "enc:" + base64.StdEncoding.EncodeToString(raw), nil
 }
 
+func encryptValue(aead cipher.AEAD, plaintext string) (string, error) {
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := aead.Seal(nil, nonce, []byte(plaintext), nil)
+	raw := append(nonce, ciphertext...)
+	return "enc:" + base64.StdEncoding.EncodeToString(raw), nil
+}
+
 func decrypt(encoded, passphrase string) (string, error) {
 	if !strings.HasPrefix(encoded, "enc:") {
 		return encoded, nil
@@ -130,6 +141,26 @@ func decrypt(encoded, passphrase string) (string, error) {
 	return string(plaintext), nil
 }
 
+func decryptWithAEAD(aead cipher.AEAD, encoded string) (string, error) {
+	if !strings.HasPrefix(encoded, "enc:") {
+		return encoded, nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(encoded[4:])
+	if err != nil {
+		return "", fmt.Errorf("decode: %w", err)
+	}
+	nonceSize := aead.NonceSize()
+	if len(raw) < nonceSize {
+		return "", fmt.Errorf("invalid encrypted data")
+	}
+	nonce, ciphertext := raw[:nonceSize], raw[nonceSize:]
+	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", fmt.Errorf("message authentication failed: %w", err)
+	}
+	return string(plaintext), nil
+}
+
 func validateDecrypt(value, passphrase string) error {
 	if !strings.HasPrefix(value, "enc:") {
 		return nil
@@ -144,6 +175,53 @@ func validateDecrypt(value, passphrase string) error {
 	return nil
 }
 
+func validateDecryptWithAEAD(aead cipher.AEAD, value string) error {
+	if !strings.HasPrefix(value, "enc:") {
+		return nil
+	}
+	_, err := decryptWithAEAD(aead, value)
+	if err != nil {
+		return fmt.Errorf("wrong passphrase or corrupted data")
+	}
+	return nil
+}
+
+func deriveAEAD(passphrase string) ([]byte, cipher.AEAD, error) {
+	salt := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, nil, err
+	}
+	key, err := pbkdf2.Key(sha256.New, passphrase, salt, 600000, 32)
+	if err != nil {
+		return nil, nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, nil, err
+	}
+	return salt, aead, nil
+}
+
+func deriveAEADFromSalt(passphrase string, salt []byte) (cipher.AEAD, error) {
+	key, err := pbkdf2.Key(sha256.New, passphrase, salt, 600000, 32)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return aead, nil
+}
+
 func (s *Service) Export(passphrase string) (string, error) {
 	servers, err := s.serverSvc.List()
 	if err != nil {
@@ -156,6 +234,22 @@ func (s *Service) Export(passphrase string) (string, error) {
 	}
 
 	data := ExportData{Version: Version}
+
+	var enc func(string) (string, error)
+	if passphrase != "" {
+		salt, aead, err := deriveAEAD(passphrase)
+		if err != nil {
+			return "", fmt.Errorf("derive encryption key: %w", err)
+		}
+		data.MasterSalt = base64.StdEncoding.EncodeToString(salt)
+		enc = func(plaintext string) (string, error) {
+			return encryptValue(aead, plaintext)
+		}
+	} else {
+		enc = func(plaintext string) (string, error) {
+			return plaintext, nil
+		}
+	}
 
 	serverNameMap := map[int64]string{}
 	for _, svr := range servers {
@@ -172,71 +266,62 @@ func (s *Service) Export(passphrase string) (string, error) {
 				return "", fmt.Errorf("read ssh_key file for %q: %w", svr.Name, err)
 			}
 			keyContent := string(raw)
-			if passphrase != "" {
-				es.SSHKey, err = encrypt(keyContent, passphrase)
-				if err != nil {
-					return "", fmt.Errorf("encrypt ssh_key for %q: %w", svr.Name, err)
-				}
-			} else {
-				es.SSHKey = keyContent
+			es.SSHKey, err = enc(keyContent)
+			if err != nil {
+				return "", fmt.Errorf("encrypt ssh_key for %q: %w", svr.Name, err)
 			}
 		}
 		data.Servers = append(data.Servers, es)
 	}
 
+	allSecrets, err := s.appSvc.ListAllSecrets()
+	if err != nil {
+		return "", fmt.Errorf("list all secrets: %w", err)
+	}
+	secretsByApp := map[int64][]ExportSecret{}
+	for _, sec := range allSecrets {
+		val, err := enc(sec.Value)
+		if err != nil {
+			return "", fmt.Errorf("encrypt secret %q: %w", sec.Key, err)
+		}
+		secretsByApp[sec.AppID] = append(secretsByApp[sec.AppID], ExportSecret{Key: sec.Key, Value: val})
+	}
+
+	allFiles, err := s.appSvc.ListAllFiles()
+	if err != nil {
+		return "", fmt.Errorf("list all files: %w", err)
+	}
+	filesByApp := map[int64][]ExportFile{}
+	for _, f := range allFiles {
+		content, err := enc(f.Content)
+		if err != nil {
+			return "", fmt.Errorf("encrypt file %q: %w", f.Path, err)
+		}
+		filesByApp[f.AppID] = append(filesByApp[f.AppID], ExportFile{Path: f.Path, Content: content})
+	}
+
 	for _, a := range apps {
 		ea := ExportApp{
-			Name:              a.Name,
-			ServerName:        serverNameMap[a.ServerID],
-			Domain:            a.Domain,
-			Port:              a.Port,
-			Compose:           a.Compose,
-			GitRepo:           a.GitRepo,
-			GitBranch:         a.GitBranch,
-			AuthUser:          a.AuthUser,
+			Name:        a.Name,
+			ServerName:  serverNameMap[a.ServerID],
+			Domain:      a.Domain,
+			Port:        a.Port,
+			Compose:     a.Compose,
+			GitRepo:     a.GitRepo,
+			GitBranch:   a.GitBranch,
+			AuthUser:    a.AuthUser,
 			ComposeMode: a.ComposeMode,
 		}
 
 		if a.AuthPass != "" {
-			if passphrase != "" {
-				ea.AuthPass, err = encrypt(a.AuthPass, passphrase)
-				if err != nil {
-					return "", fmt.Errorf("encrypt auth_pass for %q: %w", a.Name, err)
-				}
-			} else {
-				ea.AuthPass = a.AuthPass
+			ea.AuthPass, err = enc(a.AuthPass)
+			if err != nil {
+				return "", fmt.Errorf("encrypt auth_pass for %q: %w", a.Name, err)
 			}
 		}
 
-		secrets, err := s.appSvc.ListSecrets(a.ID)
-		if err != nil {
-			return "", fmt.Errorf("list secrets for %q: %w", a.Name, err)
-		}
-		for _, sec := range secrets {
-			val := sec.Value
-			if passphrase != "" {
-				val, err = encrypt(sec.Value, passphrase)
-				if err != nil {
-					return "", fmt.Errorf("encrypt secret %q for %q: %w", sec.Key, a.Name, err)
-				}
-			}
-			ea.Secrets = append(ea.Secrets, ExportSecret{Key: sec.Key, Value: val})
-		}
-
-		files, err := s.appSvc.ListFiles(a.ID)
-		if err != nil {
-			return "", fmt.Errorf("list files for %q: %w", a.Name, err)
-		}
-		for _, f := range files {
-			content := f.Content
-			if passphrase != "" {
-				content, err = encrypt(f.Content, passphrase)
-				if err != nil {
-					return "", fmt.Errorf("encrypt file %q for %q: %w", f.Path, a.Name, err)
-				}
-			}
-			ea.Files = append(ea.Files, ExportFile{Path: f.Path, Content: content})
-		}
+		ea.Secrets = secretsByApp[a.ID]
+		ea.Files = filesByApp[a.ID]
 
 		data.Apps = append(data.Apps, ea)
 	}
@@ -268,23 +353,74 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 
 	var logLines []string
 
+	var impAEAD cipher.AEAD
+	if passphrase != "" && data.MasterSalt != "" {
+		salt, err := base64.StdEncoding.DecodeString(data.MasterSalt)
+		if err != nil {
+			return "", fmt.Errorf("decode master salt: %w", err)
+		}
+		impAEAD, err = deriveAEADFromSalt(passphrase, salt)
+		if err != nil {
+			return "", fmt.Errorf("derive encryption key: %w", err)
+		}
+	}
+
+	var dec func(string) (string, error)
+	if impAEAD != nil {
+		dec = func(value string) (string, error) {
+			return decryptWithAEAD(impAEAD, value)
+		}
+	} else if passphrase != "" {
+		dec = func(value string) (string, error) {
+			return decrypt(value, passphrase)
+		}
+	} else {
+		dec = func(value string) (string, error) {
+			return value, nil
+		}
+	}
+
 	for _, es := range data.Servers {
-		if err := validateDecrypt(es.SSHKey, passphrase); err != nil {
-			return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
+		if impAEAD != nil {
+			if err := validateDecryptWithAEAD(impAEAD, es.SSHKey); err != nil {
+				return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
+			}
+		} else {
+			if err := validateDecrypt(es.SSHKey, passphrase); err != nil {
+				return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
+			}
 		}
 	}
 	for _, ea := range data.Apps {
-		if err := validateDecrypt(ea.AuthPass, passphrase); err != nil {
-			return "", fmt.Errorf("%q: %w", ea.Name, err)
+		if impAEAD != nil {
+			if err := validateDecryptWithAEAD(impAEAD, ea.AuthPass); err != nil {
+				return "", fmt.Errorf("%q: %w", ea.Name, err)
+			}
+		} else {
+			if err := validateDecrypt(ea.AuthPass, passphrase); err != nil {
+				return "", fmt.Errorf("%q: %w", ea.Name, err)
+			}
 		}
 		for _, sec := range ea.Secrets {
-			if err := validateDecrypt(sec.Value, passphrase); err != nil {
-				return "", fmt.Errorf("%q secret %q: %w", ea.Name, sec.Key, err)
+			if impAEAD != nil {
+				if err := validateDecryptWithAEAD(impAEAD, sec.Value); err != nil {
+					return "", fmt.Errorf("%q secret %q: %w", ea.Name, sec.Key, err)
+				}
+			} else {
+				if err := validateDecrypt(sec.Value, passphrase); err != nil {
+					return "", fmt.Errorf("%q secret %q: %w", ea.Name, sec.Key, err)
+				}
 			}
 		}
 		for _, f := range ea.Files {
-			if err := validateDecrypt(f.Content, passphrase); err != nil {
-				return "", fmt.Errorf("%q file %q: %w", ea.Name, f.Path, err)
+			if impAEAD != nil {
+				if err := validateDecryptWithAEAD(impAEAD, f.Content); err != nil {
+					return "", fmt.Errorf("%q file %q: %w", ea.Name, f.Path, err)
+				}
+			} else {
+				if err := validateDecrypt(f.Content, passphrase); err != nil {
+					return "", fmt.Errorf("%q file %q: %w", ea.Name, f.Path, err)
+				}
 			}
 		}
 	}
@@ -303,7 +439,6 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 	}
 
 	serverIDs := map[string]int64{}
-	var err error
 
 	for _, es := range data.Servers {
 		existing, _ := s.findServerByName(es.Name)
@@ -312,12 +447,9 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			serverIDs[es.Name] = existing.ID
 			continue
 		}
-		sshKeyContent := es.SSHKey
-		if passphrase != "" && es.SSHKey != "" {
-			sshKeyContent, err = decrypt(es.SSHKey, passphrase)
-			if err != nil {
-				return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
-			}
+		sshKeyContent, err := dec(es.SSHKey)
+		if err != nil {
+			return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
 		}
 
 		svr := &server.Server{
@@ -366,24 +498,21 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			continue
 		}
 
-		authPass := ea.AuthPass
-		if passphrase != "" {
-			authPass, err = decrypt(ea.AuthPass, passphrase)
-			if err != nil {
-				return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
-			}
+		authPass, err := dec(ea.AuthPass)
+		if err != nil {
+			return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
 		}
 
 		ap := &app.App{
-			Name:              ea.Name,
-			ServerID:          sid,
-			Domain:            ea.Domain,
-			Port:              ea.Port,
-			Compose:           ea.Compose,
-			GitRepo:           ea.GitRepo,
-			GitBranch:         ea.GitBranch,
-			AuthUser:          ea.AuthUser,
-			AuthPass:          authPass,
+			Name:        ea.Name,
+			ServerID:    sid,
+			Domain:      ea.Domain,
+			Port:        ea.Port,
+			Compose:     ea.Compose,
+			GitRepo:     ea.GitRepo,
+			GitBranch:   ea.GitBranch,
+			AuthUser:    ea.AuthUser,
+			AuthPass:    authPass,
 			ComposeMode: ea.ComposeMode,
 		}
 		if ap.GitBranch == "" {
@@ -394,12 +523,9 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		}
 
 		for _, sec := range ea.Secrets {
-			val := sec.Value
-			if passphrase != "" {
-				val, err = decrypt(sec.Value, passphrase)
-				if err != nil {
-					return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
-				}
+			val, err := dec(sec.Value)
+			if err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
 			}
 			if err := s.appSvc.SetSecret(ap.ID, sec.Key, val); err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("set secret %q for %q: %w", sec.Key, ea.Name, err)
@@ -407,12 +533,9 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		}
 
 		for _, f := range ea.Files {
-			content := f.Content
-			if passphrase != "" {
-				content, err = decrypt(f.Content, passphrase)
-				if err != nil {
-					return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
-				}
+			content, err := dec(f.Content)
+			if err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
 			}
 			if err := s.appSvc.SetFile(ap.ID, f.Path, content); err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("set file %q for %q: %w", f.Path, ea.Name, err)
