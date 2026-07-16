@@ -22,6 +22,7 @@
       <table>
         <tr><td><strong>Domain{{if gt (len .Domains) 1}}s{{end}}</strong></td><td>{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</td></tr>
         <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
+        <tr><td><strong>Internal</strong></td><td><code>{{.ServiceName}}:{{.App.Port}}</code> <span style="color:var(--text-dim);font-size:0.82em">(plain HTTP)</span></td></tr>
         <tr><td><strong>Server</strong></td><td>{{.ServerName}}</td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
         {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
