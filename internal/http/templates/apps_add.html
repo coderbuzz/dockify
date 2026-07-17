@@ -16,38 +16,41 @@
   <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}">
     <div class="card">
       <h3>Basic</h3>
-      <div class="grid">
-        <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
-        <label>Domains
-          <div id="domains-list">
+      <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:0.8em">
+          <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
+          <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
+          <label>Server
+            <select name="server_id" required>
+              <option value="">Select a server...</option>
+              <option value="0">Auto-select (least loaded)</option>
+              {{$selected := 0}}{{if .App}}{{$selected = .App.ServerID}}{{end}}
+              {{range .Servers}}<option value="{{.ID}}" {{if eq .ID $selected}}selected{{end}}>{{.Name}} ({{.Status}})</option>{{end}}
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>Domains
             <div id="domains-list">
-              {{if .Domains}}
-              {{range $i, $d := .Domains}}
-              <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
-                <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" style="margin-bottom:0;flex:1">
-                {{if $i}}<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>{{end}}
+              <div id="domains-list">
+                {{if .Domains}}
+                {{range $i, $d := .Domains}}
+                <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
+                  <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" style="margin-bottom:0;flex:1">
+                  {{if $i}}<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>{{end}}
+                </div>
+                {{end}}
+                {{else}}
+                <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
+                  <input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}" style="margin-bottom:0;flex:1">
+                </div>
+                {{end}}
               </div>
-              {{end}}
-              {{else}}
-              <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
-                <input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}" style="margin-bottom:0;flex:1">
-              </div>
-              {{end}}
             </div>
-          </div>
-          <button type="button" class="btn btn-ghost" onclick="addDomainRow()" style="margin-top:0.2em;font-size:0.85em">+ Add Domain</button>
-          <small>First domain is primary. Leave empty for internal services.</small>
-      </div>
-      <div class="grid">
-        <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
-        <label>Server
-          <select name="server_id" required>
-            <option value="">Select a server...</option>
-            <option value="0">Auto-select (least loaded)</option>
-            {{$selected := 0}}{{if .App}}{{$selected = .App.ServerID}}{{end}}
-            {{range .Servers}}<option value="{{.ID}}" {{if eq .ID $selected}}selected{{end}}>{{.Name}} ({{.Status}})</option>{{end}}
-          </select>
-        </label>
+            <button type="button" class="btn btn-ghost" onclick="addDomainRow()" style="margin-top:0.2em;font-size:0.85em">+ Add Domain</button>
+            <small>First domain is primary. Leave empty for internal services.</small>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -104,6 +107,16 @@
                 <option value="3"{{if eq $.LogMaxFile "3"}} selected{{end}}>3</option>
                 <option value="5"{{if eq $.LogMaxFile "5"}} selected{{end}}>5</option>
                 <option value="10"{{if eq $.LogMaxFile "10"}} selected{{end}}>10</option>
+              </select>
+            </label>
+            <label>Ulimits (nofile)
+              <select name="ulimits_nofile">
+                <option value="">unset</option>
+                <option value="65536"{{if eq $.UlimitsNofile "65536"}} selected{{end}}>65536</option>
+                <option value="131072"{{if eq $.UlimitsNofile "131072"}} selected{{end}}>131072</option>
+                <option value="262144"{{if eq $.UlimitsNofile "262144"}} selected{{end}}>262144</option>
+                <option value="524288"{{if eq $.UlimitsNofile "524288"}} selected{{end}}>524288</option>
+                <option value="1048576"{{if eq $.UlimitsNofile "1048576"}} selected{{end}}>1048576</option>
               </select>
             </label>
           </div>

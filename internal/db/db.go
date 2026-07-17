@@ -65,5 +65,8 @@ func Open(path string) (*sql.DB, error) {
 	// Migration: add ports column (v0.10.0)
 	db.Exec("ALTER TABLE apps ADD COLUMN ports TEXT DEFAULT ''")
 
+	// Migration: add ulimits_nofile column (v0.11.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN ulimits_nofile TEXT DEFAULT ''")
+
 	return db, nil
 }

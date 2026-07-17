@@ -35,7 +35,7 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string, ports string) string {
+func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string, ports string, ulimitsNofile string) string {
 	svcName := "app"
 	if appName != "" {
 		svcName = sanitizeAppName(appName)
@@ -76,6 +76,10 @@ func generateCompose(image string, port int, volumes string, appName string, mem
 
 	if cpuLimit != "" {
 		compose += fmt.Sprintf("\n    cpus: %s", cpuLimit)
+	}
+
+	if ulimitsNofile != "" {
+		compose += fmt.Sprintf("\n    ulimits:\n      nofile:\n        soft: %s\n        hard: %s", ulimitsNofile, ulimitsNofile)
 	}
 
 	if logMaxSize != "" || logMaxFile != "" {
@@ -236,6 +240,7 @@ type simpleFields struct {
 	LogMaxFile  string
 	Command     string
 	Ports       string
+	UlimitsNofile string
 }
 
 func parseSimpleFields(compose string) simpleFields {
@@ -328,6 +333,18 @@ func parseSimpleFields(compose string) simpleFields {
 			sf.CPULimit = val.Value
 		case "command":
 			sf.Command = val.Value
+		case "ulimits":
+			if val.Kind == yaml.MappingNode {
+				for j := 0; j+1 < len(val.Content); j += 2 {
+					if val.Content[j].Value == "nofile" && val.Content[j+1].Kind == yaml.MappingNode {
+						for k := 0; k+1 < len(val.Content[j+1].Content); k += 2 {
+							if val.Content[j+1].Content[k].Value == "hard" {
+								sf.UlimitsNofile = val.Content[j+1].Content[k+1].Value
+							}
+						}
+					}
+				}
+			}
 		case "logging":
 			if val.Kind != yaml.MappingNode {
 				continue
