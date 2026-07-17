@@ -483,7 +483,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 
 					// Step 3: Wait for Caddy to issue certificate
 					caddyClient := caddy.NewClient(client)
-					if caddyClient.WaitForCertificate(route.Domain, 60*time.Second) {
+					if caddyClient.WaitForCertificate(route.Domain, 120*time.Second) {
 						if origProxied {
 							restored, err := s.cf.UpdateRecord(existing.ID, route.Domain, svr.Host, true)
 							if err != nil {
@@ -527,7 +527,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 				s.repo.SaveDNSRecord(app.ID, svr.ID, record.ZoneID, record.ID, record.Name, "A", record.Content, record.Proxied)
 
 				caddyClient := caddy.NewClient(client)
-				if caddyClient.WaitForCertificate(route.Domain, 60*time.Second) {
+				if caddyClient.WaitForCertificate(route.Domain, 120*time.Second) {
 					updated, err := s.cf.UpdateRecord(record.ID, route.Domain, svr.Host, true)
 					if err != nil {
 						log.Printf("Warning: failed to enable Cloudflare proxy for %s: %v", route.Domain, err)
