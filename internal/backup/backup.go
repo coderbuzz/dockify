@@ -36,8 +36,9 @@ type ExportServer struct {
 }
 
 type ExportSecret struct {
-	Key   string `yaml:"key"`
-	Value string `yaml:"value"`
+	Key      string `yaml:"key"`
+	Value    string `yaml:"value"`
+	IsSecret bool   `yaml:"is_secret"`
 }
 
 type ExportFile struct {
@@ -280,11 +281,15 @@ func (s *Service) Export(passphrase string) (string, error) {
 	}
 	secretsByApp := map[int64][]ExportSecret{}
 	for _, sec := range allSecrets {
-		val, err := enc(sec.Value)
-		if err != nil {
-			return "", fmt.Errorf("encrypt secret %q: %w", sec.Key, err)
+		val := sec.Value
+		if sec.IsSecret {
+			var err error
+			val, err = enc(sec.Value)
+			if err != nil {
+				return "", fmt.Errorf("encrypt secret %q: %w", sec.Key, err)
+			}
 		}
-		secretsByApp[sec.AppID] = append(secretsByApp[sec.AppID], ExportSecret{Key: sec.Key, Value: val})
+		secretsByApp[sec.AppID] = append(secretsByApp[sec.AppID], ExportSecret{Key: sec.Key, Value: val, IsSecret: sec.IsSecret})
 	}
 
 	allFiles, err := s.appSvc.ListAllFiles()
@@ -527,7 +532,7 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			if err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("%q: wrong passphrase or corrupted data", ea.Name)
 			}
-			if err := s.appSvc.SetSecret(ap.ID, sec.Key, val); err != nil {
+			if err := s.appSvc.SetSecretWithType(ap.ID, sec.Key, val, sec.IsSecret); err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("set secret %q for %q: %w", sec.Key, ea.Name, err)
 			}
 		}

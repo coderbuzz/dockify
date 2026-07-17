@@ -60,8 +60,53 @@
 
       <div id="simple-section" {{if and .IsEdit (eq .App.ComposeMode "advanced")}}style="display:none"{{end}}>
         <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine" value="{{if .IsEdit}}{{.Image}}{{end}}"></label>
-        <label>Environment Variables<textarea name="env_vars" rows="3" placeholder="KEY=value&#10;FOO=bar">{{if .IsEdit}}{{.EnvVars}}{{end}}</textarea><small>One KEY=value per line</small></label>
+        <label>Command<input type="text" name="command" placeholder="npm start" value="{{if .IsEdit}}{{.Command}}{{end}}"><small>Override container entrypoint (optional)</small></label>
         <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small>One volume mount per line (host:container)</small></label>
+        <div style="margin-top:1em">
+          <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.85em">(optional)</span></h4>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:0.6em">
+            <label>Memory Limit
+              <select name="memory_limit">
+                <option value="">unset</option>
+                <option value="128m"{{if eq $.MemLimit "128m"}} selected{{end}}>128m</option>
+                <option value="256m"{{if eq $.MemLimit "256m"}} selected{{end}}>256m</option>
+                <option value="512m"{{if eq $.MemLimit "512m"}} selected{{end}}>512m</option>
+                <option value="1g"{{if eq $.MemLimit "1g"}} selected{{end}}>1g</option>
+                <option value="2g"{{if eq $.MemLimit "2g"}} selected{{end}}>2g</option>
+                <option value="4g"{{if eq $.MemLimit "4g"}} selected{{end}}>4g</option>
+              </select>
+            </label>
+            <label>CPU Limit
+              <select name="cpu_limit">
+                <option value="">unset</option>
+                <option value="0.25"{{if eq $.CpuLimit "0.25"}} selected{{end}}>0.25</option>
+                <option value="0.5"{{if eq $.CpuLimit "0.5"}} selected{{end}}>0.5</option>
+                <option value="1.0"{{if eq $.CpuLimit "1.0"}} selected{{end}}>1.0</option>
+                <option value="2.0"{{if eq $.CpuLimit "2.0"}} selected{{end}}>2.0</option>
+                <option value="4.0"{{if eq $.CpuLimit "4.0"}} selected{{end}}>4.0</option>
+              </select>
+            </label>
+            <label>Log Max Size
+              <select name="log_max_size">
+                <option value="">unset</option>
+                <option value="10m"{{if eq $.LogMaxSize "10m"}} selected{{end}}>10m</option>
+                <option value="50m"{{if eq $.LogMaxSize "50m"}} selected{{end}}>50m</option>
+                <option value="100m"{{if eq $.LogMaxSize "100m"}} selected{{end}}>100m</option>
+                <option value="500m"{{if eq $.LogMaxSize "500m"}} selected{{end}}>500m</option>
+                <option value="1g"{{if eq $.LogMaxSize "1g"}} selected{{end}}>1g</option>
+              </select>
+            </label>
+            <label>Log Max File
+              <select name="log_max_file">
+                <option value="">unset</option>
+                <option value="1"{{if eq $.LogMaxFile "1"}} selected{{end}}>1</option>
+                <option value="3"{{if eq $.LogMaxFile "3"}} selected{{end}}>3</option>
+                <option value="5"{{if eq $.LogMaxFile "5"}} selected{{end}}>5</option>
+                <option value="10"{{if eq $.LogMaxFile "10"}} selected{{end}}>10</option>
+              </select>
+            </label>
+          </div>
+        </div>
       </div>
 
       <div id="advanced-section" {{if or (not .IsEdit) (eq .App.ComposeMode "simple")}}style="display:none"{{end}}>
@@ -70,23 +115,15 @@
     </div>
 
     <div class="card">
-      <h3>Secrets <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(optional — use <code>${KEY}</code> in compose to reference)</span></h3>
-      <div id="secrets-list">
-        <p id="no-secrets-msg" style="color:var(--text-muted);font-size:0.85em">No secrets added yet.</p>
+      <h3>Environment Variables <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(referenced in compose as <code>${KEY}</code>)</span></h3>
+      <div id="env-list">
+        <p id="no-env-msg" style="color:var(--text-muted);font-size:0.85em">No variables added yet.</p>
       </div>
-      <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:flex-end">
-        <input type="text" id="secret-key" placeholder="KEY" autocomplete="off" style="width:25%;min-width:140px">
-        <input type="text" id="secret-value" placeholder="value" autocomplete="off" style="width:35%;min-width:180px">
-        <button type="button" class="btn btn-primary" onclick="addFormSecret()" style="white-space:nowrap">Add Secret</button>
+      <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center">
+        <button type="button" class="btn btn-primary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
+        <button type="button" class="btn btn-ghost" onclick="openImportModal()" style="white-space:nowrap">Import from .env</button>
       </div>
-      <div id="secret-hidden-fields"></div>
-      <details style="margin-top:1em;border:1px solid var(--border);border-radius:4px;padding:0.6em 0.8em">
-        <summary style="cursor:pointer;font-weight:600;font-size:0.82em;color:var(--text-muted)">Import from .env</summary>
-        <div style="margin-top:0.6em">
-          <textarea id="env-import" rows="4" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="font-size:0.82em"></textarea>
-          <button type="button" class="btn btn-primary" onclick="importEnv()" style="margin-top:0.35em;font-size:0.82em">Import</button>
-        </div>
-      </details>
+      <div id="env-hidden-fields"></div>
     </div>
 
     <div class="card">
@@ -123,204 +160,146 @@
     </div>
 
     <div style="display:flex;gap:0.6em;align-items:center">
-      <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save & Redeploy{{else}}Deploy App{{end}}</button>
+      <button type="submit" class="btn {{if .IsEdit}}btn-danger{{else}}btn-primary{{end}}">{{if .IsEdit}}Save & Redeploy{{else}}Deploy App{{end}}</button>
       {{if .IsEdit}}<a href="/apps/{{.App.ID}}" class="btn btn-ghost">Cancel</a>{{end}}
     </div>
   </form>
 </div>
+
+<div id="import-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+    <h3 style="margin:0 0 0.6em 0">Import from .env</h3>
+    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 0.6em 0">Paste KEY=VALUE pairs below. Each line will be added as a new variable.</p>
+    <textarea id="import-textarea" rows="8" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="width:100%;box-sizing:border-box"></textarea>
+    <p style="font-size:0.82em;color:var(--text-dim);margin:0.4em 0">Imported vars will be marked as <strong>Secret</strong>. You can change the type after import.</p>
+    <div style="display:flex;gap:0.5em;margin-top:0.8em">
+      <button type="button" class="btn btn-primary" onclick="importEnvFromModal()">Import</button>
+      <button type="button" class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
-var pendingSecrets = [];
-var pendingEditKey = '';
-{{if .Secrets}}
-{{range .Secrets}}
-pendingSecrets.push({key: "{{.Key}}", value: "{{.Value}}"});
-{{end}}
+var pendingEnvVars = [];
+{{if .IsEdit}}
+var initialEnvVars = {{.SecretsJSON}};
+if (Array.isArray(initialEnvVars)) {
+  initialEnvVars.forEach(function(ev) {
+    var isSecret = ev.IsSecret || ev.isSecret || false;
+    pendingEnvVars.push({key: ev.Key || ev.key, value: isSecret ? '' : (ev.Value || ev.value), isSecret: isSecret});
+  });
+}
 {{end}}
 
-function addFormSecret() {
-  var key = document.getElementById('secret-key').value.trim();
-  var val = document.getElementById('secret-value').value;
-  if (!key) { alert('Key is required'); return; }
-  if (pendingSecrets.some(function(s){ return s.key === key; })) { alert('Key already added'); return; }
-  pendingSecrets.push({key: key, value: val});
-  renderPendingSecrets();
-  document.getElementById('secret-key').value = '';
-  document.getElementById('secret-value').value = '';
+function addEnvVar(key, value, isSecret) {
+  if (key && value && pendingEnvVars.some(function(e){ return e.key === key; })) {
+    alert('Variable "' + key + '" already exists. Remove it first to add a different value.');
+    return;
+  }
+  pendingEnvVars.push({key: key || '', value: value || '', isSecret: isSecret || false});
+  renderEnvVars();
 }
-function renderPendingSecrets() {
-  var list = document.getElementById('secrets-list');
-  var msg = document.getElementById('no-secrets-msg');
-  if (msg) msg.style.display = pendingSecrets.length ? 'none' : '';
-  var existing = list.querySelectorAll('.secret-row');
+
+function removeEnvVar(index) {
+  pendingEnvVars.splice(index, 1);
+  renderEnvVars();
+}
+
+function toggleEnvType(index) {
+  pendingEnvVars[index].isSecret = !pendingEnvVars[index].isSecret;
+  renderEnvVars();
+}
+
+function renderEnvVars() {
+  var list = document.getElementById('env-list');
+  var msg = document.getElementById('no-env-msg');
+  if (msg) msg.style.display = pendingEnvVars.length ? 'none' : '';
+  var existing = list.querySelectorAll('.env-row');
   existing.forEach(function(r){ r.remove(); });
-  pendingSecrets.forEach(function(s){
+  pendingEnvVars.forEach(function(ev, i){
     var div = document.createElement('div');
-    div.className = 'secret-row';
-    div.setAttribute('data-key', s.key);
-    var isEditing = pendingEditKey === s.key;
-    var valHtml = isEditing
-      ? '<input type="text" class="secret-edit-input" value="' + escapeAttr(s.value) + '" autocomplete="off" style="width:auto;min-width:280px;padding:0.25em 0.5em;font-size:0.85em;margin:0" onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveSecretValue(\'' + escapeAttr(s.key) + '\')}">'
-      : '<span class="secret-val">••••••••</span>';
-    var svgPencil = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>';
-    var svgCheck = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    var svgCancelX = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-    var editBtnHtml = isEditing
-      ? '<button type="button" class="btn btn-ghost btn-icon" onclick="saveSecretValue(\'' + escapeAttr(s.key) + '\')" title="Save">' + svgCheck + '</button><button type="button" class="btn btn-ghost btn-icon" onclick="cancelEditSecret()" title="Cancel">' + svgCancelX + '</button>'
-      : '<button type="button" class="btn btn-ghost btn-icon" onclick="editSecretValue(\'' + escapeAttr(s.key) + '\')" title="Edit">' + svgPencil + '</button>';
-    div.innerHTML = '<code>' + escapeHtml(s.key) + '</code> ' + valHtml + ' '
-      + editBtnHtml
-      + '<button type="button" class="btn btn-ghost btn-red btn-icon" onclick="removeFormSecret(\'' + escapeAttr(s.key) + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
+    div.className = 'env-row';
+    div.style.cssText = 'display:flex;gap:0.4em;margin-bottom:0.45em;align-items:flex-start';
+    var typeLabel = ev.isSecret ? 'Secret' : 'Plain';
+    var valDisplay = ev.isSecret ? '••••••••' : (ev.value.length > 60 ? ev.value.substring(0, 60) + '...' : ev.value);
+    if (!ev.value) valDisplay = '';
+    var svgEye = ev.isSecret
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    div.innerHTML = '<input type="text" class="env-key-input" value="' + escapeAttr(ev.key) + '" placeholder="KEY" autocomplete="off" style="margin-bottom:0;width:25%;min-width:120px" onchange="updateEnvKey(' + i + ', this.value)">'
+      + '<textarea class="env-val-input" rows="1" placeholder="value" style="margin-bottom:0;flex:1;min-width:160px;resize:vertical" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
+      + '<button type="button" class="btn btn-ghost btn-icon" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '">' + svgEye + '</button>'
+      + '<button type="button" class="btn btn-ghost btn-red btn-icon" onclick="removeEnvVar(' + i + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
     list.appendChild(div);
   });
-  if (pendingEditKey) {
-    var input = list.querySelector('.secret-edit-input');
-    if (input) setTimeout(function(){ input.focus(); }, 0);
-  }
-  syncHiddenFields();
+  syncEnvHiddenFields();
 }
-function editSecretValue(key) {
-  pendingEditKey = key;
-  renderPendingSecrets();
+
+function updateEnvKey(index, val) {
+  pendingEnvVars[index].key = val;
 }
-function cancelEditSecret() {
-  pendingEditKey = '';
-  renderPendingSecrets();
+
+function updateEnvVal(index, val) {
+  pendingEnvVars[index].value = val;
 }
-function saveSecretValue(key) {
-  var input = document.querySelector('.secret-row[data-key="' + CSS.escape(key) + '"] .secret-edit-input');
-  if (!input) return;
-  var newVal = input.value;
-  for (var i = 0; i < pendingSecrets.length; i++) {
-    if (pendingSecrets[i].key === key) {
-      pendingSecrets[i].value = newVal;
-      break;
-    }
-  }
-  pendingEditKey = '';
-  renderPendingSecrets();
-}
-function removeFormSecret(key) {
-  pendingSecrets = pendingSecrets.filter(function(s){ return s.key !== key; });
-  renderPendingSecrets();
-}
-function syncHiddenFields() {
-  var container = document.getElementById('secret-hidden-fields');
+
+function syncEnvHiddenFields() {
+  var container = document.getElementById('env-hidden-fields');
   container.innerHTML = '';
-  pendingSecrets.forEach(function(s){
+  pendingEnvVars.forEach(function(ev){
     var k = document.createElement('input');
     k.type = 'hidden';
-    k.name = 'secret_key';
-    k.value = s.key;
-    var v = document.createElement('input');
-    v.type = 'hidden';
-    v.name = 'secret_val';
-    v.value = s.value;
+    k.name = 'env_key';
+    k.value = ev.key;
+    var v = document.createElement('textarea');
+    v.name = 'env_val';
+    v.style.display = 'none';
+    v.textContent = ev.value;
+    var t = document.createElement('input');
+    t.type = 'hidden';
+    t.name = 'env_type';
+    t.value = ev.isSecret ? 'secret' : 'plain';
     container.appendChild(k);
     container.appendChild(v);
+    container.appendChild(t);
   });
 }
-function importEnv() {
-  var text = document.getElementById('env-import').value.trim();
+
+function openImportModal() {
+  document.getElementById('import-modal').style.display = 'flex';
+  document.getElementById('import-textarea').value = '';
+  document.getElementById('import-textarea').focus();
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').style.display = 'none';
+}
+
+function importEnvFromModal() {
+  var text = document.getElementById('import-textarea').value.trim();
   if (!text) { alert('Paste KEY=VALUE pairs first'); return; }
   var lines = text.split(/[\r\n]+/).filter(function(l){ return l.trim() && l.indexOf('=') > 0; });
   if (lines.length === 0) { alert('No valid KEY=VALUE lines found'); return; }
-  var keys = [];
   lines.forEach(function(line) {
     var idx = line.indexOf('=');
     var key = line.substring(0, idx).trim();
-    var val = line.substring(idx + 1).trim();
-    if (!key || !val) return;
-    keys.push(key);
-    if (!pendingSecrets.some(function(s){ return s.key === key; })) {
-      pendingSecrets.push({key: key, value: val});
+    var val = line.substring(idx + 1);
+    if (!key) return;
+    if (!pendingEnvVars.some(function(e){ return e.key === key; })) {
+      pendingEnvVars.push({key: key, value: val, isSecret: true});
     }
   });
-  renderPendingSecrets();
-  var envEl = document.getElementsByName('env_vars')[0];
-  if (envEl) {
-    var existing = envEl.value ? envEl.value.split('\n').filter(function(l){return l.trim()}) : [];
-    var existingKeys = {};
-    existing.forEach(function(l){
-      var idx = l.indexOf('=');
-      if (idx > 0) existingKeys[l.substring(0, idx).trim()] = true;
-    });
-    keys.forEach(function(k){
-      if (!existingKeys[k]) existing.push(k + '=${' + k + '}');
-    });
-    envEl.value = existing.join('\n') + (existing.length ? '\n' : '');
-  }
-  var composeEl = document.getElementsByName('compose')[0];
-  if (composeEl && keys.length > 0) injectEnvToCompose(keys);
-  document.getElementById('env-import').value = '';
+  renderEnvVars();
+  closeImportModal();
 }
-function injectEnvToCompose(keys) {
-  var composeEl = document.getElementsByName('compose')[0];
-  if (!composeEl) return;
-  var text = composeEl.value;
-  var lines = text.split('\n');
-  var envIndex = -1, envIndent = '', listMode = false;
-  var existing = {};
-  for (var i = 0; i < lines.length; i++) {
-    var t = lines[i];
-    var m = t.match(/^(\s*)environment\s*:\s*$/);
-    if (m) {
-      envIndex = i;
-      envIndent = m[1];
-      listMode = false;
-      for (var j = i + 1; j < lines.length; j++) {
-        var tj = lines[j];
-        var trimmed = tj.trim();
-        if (trimmed === '') continue;
-        listMode = trimmed.startsWith('- ');
-        break;
-      }
-      for (var j = i + 1; j < lines.length; j++) {
-        var tj = lines[j], tm;
-        if (listMode) tm = tj.match(/^\s*-\s*(\w+)=/);
-        else tm = tj.match(/^\s*(\w+)=/);
-        if (tm) existing[tm[1]] = true;
-        else if (tj.trim() !== '' && !tm) break;
-      }
-      break;
-    }
-  }
-  var newLines = [];
-  keys.forEach(function(k) {
-    if (!existing[k]) {
-      var indent = envIndent + '  ';
-      newLines.push(listMode ? indent + '- ' + k + '=${' + k + '}' : indent + k + '=${' + k + '}');
-    }
-  });
-  if (newLines.length === 0) return;
-  if (envIndex === -1) {
-    var insIdx = -1;
-    for (var i = 0; i < lines.length; i++) {
-      if (/^\s{4}image\s*:/.test(lines[i])) { insIdx = i; break; }
-    }
-    var section = ['    environment:'];
-    keys.forEach(function(k){
-      if (!existing[k]) section.push('      - ' + k + '=${' + k + '}');
-    });
-    if (section.length <= 1) return;
-    if (insIdx >= 0) lines.splice(insIdx + 1, 0, ...section);
-    else lines.push(...section);
-  } else {
-    var after = envIndex;
-    for (var i = envIndex + 1; i < lines.length; i++) {
-      var t = lines[i];
-      if (t.trim() === '' || /^\s*(-\s*)?\w+=/.test(t)) after = i;
-      else break;
-    }
-    lines.splice(after + 1, 0, ...newLines);
-  }
-  composeEl.value = lines.join('\n');
-}
+
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escapeAttr(s) {
-  return s.replace(/&/g,'&amp;').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
 function addDomainRow() {
   var list = document.getElementById('domains-list');
   var div = document.createElement('div');
@@ -359,7 +338,7 @@ function uploadToFileRow(input) {
   };
   reader.readAsText(file);
 }
-renderPendingSecrets();
+renderEnvVars();
 </script>
 {{template "scripts" .}}
 </body>

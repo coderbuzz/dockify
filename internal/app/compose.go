@@ -35,7 +35,7 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func generateCompose(image string, port int, envVars string, volumes string, appName string) string {
+func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string) string {
 	svcName := "app"
 	if appName != "" {
 		svcName = sanitizeAppName(appName)
@@ -47,10 +47,12 @@ func generateCompose(image string, port int, envVars string, volumes string, app
     networks:
       - dockify`, svcName, image)
 
-	if envVars != "" {
+	if len(envKeys) > 0 {
 		compose += "\n    environment:"
-		for _, kv := range splitEnvVars(envVars) {
-			compose += fmt.Sprintf("\n      - %s", kv)
+		for _, k := range envKeys {
+			if strings.TrimSpace(k) != "" {
+				compose += fmt.Sprintf("\n      - %s=${%s}", k, k)
+			}
 		}
 	}
 
@@ -62,6 +64,30 @@ func generateCompose(image string, port int, envVars string, volumes string, app
 		compose += "\n    volumes:"
 		for _, vol := range splitEnvVars(volumes) {
 			compose += fmt.Sprintf("\n      - %s", vol)
+		}
+	}
+
+	if memoryLimit != "" {
+		compose += fmt.Sprintf("\n    mem_limit: %s", memoryLimit)
+	}
+
+	if cpuLimit != "" {
+		compose += fmt.Sprintf("\n    cpus: %s", cpuLimit)
+	}
+
+	if command != "" {
+		compose += "\n    command: " + command
+	}
+
+	if logMaxSize != "" || logMaxFile != "" {
+		compose += "\n    logging:"
+		compose += "\n      driver: json-file"
+		compose += "\n      options:"
+		if logMaxSize != "" {
+			compose += fmt.Sprintf("\n        max-size: \"%s\"", logMaxSize)
+		}
+		if logMaxFile != "" {
+			compose += fmt.Sprintf("\n        max-file: \"%s\"", logMaxFile)
 		}
 	}
 
@@ -192,10 +218,15 @@ func splitEnvVars(envVars string) []string {
 }
 
 type simpleFields struct {
-	Image   string
-	Port    int
-	EnvVars string
-	Volumes string
+	Image      string
+	Port       int
+	EnvKeys    []string
+	Volumes    string
+	MemoryLimit string
+	CPULimit    string
+	LogMaxSize  string
+	LogMaxFile  string
+	Command     string
 }
 
 func parseSimpleFields(compose string) simpleFields {
@@ -247,13 +278,20 @@ func parseSimpleFields(compose string) simpleFields {
 			}
 		case "environment":
 			if val.Kind == yaml.SequenceNode {
-				var lines []string
+				var keys []string
 				for _, item := range val.Content {
-					if item.Value != "" {
-						lines = append(lines, item.Value)
+					v := item.Value
+					if v == "" {
+						continue
+					}
+					// Match ${KEY} or KEY=value patterns
+					if strings.HasPrefix(v, "${") && strings.HasSuffix(v, "}") {
+						keys = append(keys, strings.TrimSuffix(strings.TrimPrefix(v, "${"), "}"))
+					} else if idx := strings.Index(v, "="); idx > 0 {
+						keys = append(keys, v[:idx])
 					}
 				}
-				sf.EnvVars = strings.Join(lines, "\n")
+				sf.EnvKeys = keys
 			}
 		case "volumes":
 			if val.Kind == yaml.SequenceNode {
@@ -264,6 +302,32 @@ func parseSimpleFields(compose string) simpleFields {
 					}
 				}
 				sf.Volumes = strings.Join(lines, "\n")
+			}
+		case "mem_limit":
+			sf.MemoryLimit = val.Value
+		case "cpus":
+			sf.CPULimit = val.Value
+		case "command":
+			sf.Command = val.Value
+		case "logging":
+			if val.Kind != yaml.MappingNode {
+				continue
+			}
+			for j := 0; j+1 < len(val.Content); j += 2 {
+				switch val.Content[j].Value {
+				case "options":
+					if val.Content[j+1].Kind != yaml.MappingNode {
+						continue
+					}
+					for k := 0; k+1 < len(val.Content[j+1].Content); k += 2 {
+						switch val.Content[j+1].Content[k].Value {
+						case "max-size":
+							sf.LogMaxSize = strings.Trim(val.Content[j+1].Content[k+1].Value, "\"")
+						case "max-file":
+							sf.LogMaxFile = strings.Trim(val.Content[j+1].Content[k+1].Value, "\"")
+						}
+					}
+				}
 			}
 		}
 	}

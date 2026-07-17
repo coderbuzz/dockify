@@ -16,7 +16,9 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+		       memory_limit, cpu_limit, log_max_size, log_max_file,
+		       command, created_at, updated_at
 		FROM apps ORDER BY name ASC
 	`)
 	if err != nil {
@@ -30,7 +32,9 @@ func (r *Repository) List() ([]App, error) {
 		var gitRepo, gitBranch sql.NullString
 		if err := rows.Scan(
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode, &a.CreatedAt, &a.UpdatedAt,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+			&a.Command, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -46,11 +50,15 @@ func (r *Repository) Get(id int64) (*App, error) {
 	var gitRepo, gitBranch sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+		       memory_limit, cpu_limit, log_max_size, log_max_file,
+		       command, created_at, updated_at
 		FROM apps WHERE id = ?
 	`, id).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode, &a.CreatedAt, &a.UpdatedAt,
+		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+		&a.Command, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -66,7 +74,9 @@ func (r *Repository) Get(id int64) (*App, error) {
 func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+		       memory_limit, cpu_limit, log_max_size, log_max_file,
+		       command, created_at, updated_at
 		FROM apps WHERE git_repo = ? AND git_branch = ? ORDER BY id
 	`, repo, branch)
 	if err != nil {
@@ -80,7 +90,9 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 		var gitRepo, gitBranch sql.NullString
 		if err := rows.Scan(
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode, &a.CreatedAt, &a.UpdatedAt,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+			&a.Command, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -96,11 +108,15 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 	var gitRepo, gitBranch sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+		       memory_limit, cpu_limit, log_max_size, log_max_file,
+		       command, created_at, updated_at
 		FROM apps WHERE git_repo = ? AND git_branch = ? LIMIT 1
 	`, repo, branch).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode, &a.CreatedAt, &a.UpdatedAt,
+		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+		&a.Command, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -116,7 +132,9 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode, created_at, updated_at
+		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+		       memory_limit, cpu_limit, log_max_size, log_max_file,
+		       command, created_at, updated_at
 		FROM apps WHERE server_id = ? ORDER BY created_at DESC
 	`, serverID)
 	if err != nil {
@@ -130,7 +148,9 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 		var gitRepo, gitBranch sql.NullString
 		if err := rows.Scan(
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode, &a.CreatedAt, &a.UpdatedAt,
+			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+			&a.Command, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -143,9 +163,9 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 
 func (r *Repository) Create(a *App) error {
 	result, err := r.db.Exec(`
-		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status, compose_mode)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created", a.ComposeMode)
+		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created", a.ComposeMode, a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile, a.Command)
 	if err != nil {
 		return fmt.Errorf("insert app: %w", err)
 	}
@@ -158,10 +178,14 @@ func (r *Repository) Update(a *App) error {
 	_, err := r.db.Exec(`
 		UPDATE apps SET
 			name=?, server_id=?, domain=?, port=?, compose=?,
-			git_repo=?, git_branch=?, auth_user=?, auth_pass=?, status=?, compose_mode=?, updated_at=CURRENT_TIMESTAMP
+			git_repo=?, git_branch=?, auth_user=?, auth_pass=?, status=?, compose_mode=?,
+			memory_limit=?, cpu_limit=?, log_max_size=?, log_max_file=?,
+			command=?, updated_at=CURRENT_TIMESTAMP
 		WHERE id=?
 	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose,
-		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.Status, a.ComposeMode, a.ID)
+		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.Status, a.ComposeMode,
+		a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile,
+		a.Command, a.ID)
 	return err
 }
 
@@ -398,14 +422,15 @@ type DNSRecordInfo struct {
 }
 
 type AppSecret struct {
-	ID    int64
-	AppID int64
-	Key   string
-	Value string
+	ID       int64
+	AppID    int64
+	Key      string
+	Value    string
+	IsSecret bool
 }
 
 func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
-	rows, err := r.db.Query(`SELECT id, app_id, key, value FROM app_secrets WHERE app_id = ? ORDER BY key`, appID)
+	rows, err := r.db.Query(`SELECT id, app_id, key, value, is_secret FROM app_secrets WHERE app_id = ? ORDER BY key`, appID)
 	if err != nil {
 		return nil, err
 	}
@@ -413,16 +438,18 @@ func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
 	var secrets []AppSecret
 	for rows.Next() {
 		var s AppSecret
-		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value); err != nil {
+		var isSecret int
+		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value, &isSecret); err != nil {
 			return nil, err
 		}
+		s.IsSecret = isSecret == 1
 		secrets = append(secrets, s)
 	}
 	return secrets, rows.Err()
 }
 
 func (r *Repository) ListAllSecrets() ([]AppSecret, error) {
-	rows, err := r.db.Query(`SELECT id, app_id, key, value FROM app_secrets ORDER BY app_id, key`)
+	rows, err := r.db.Query(`SELECT id, app_id, key, value, is_secret FROM app_secrets ORDER BY app_id, key`)
 	if err != nil {
 		return nil, err
 	}
@@ -430,9 +457,11 @@ func (r *Repository) ListAllSecrets() ([]AppSecret, error) {
 	var secrets []AppSecret
 	for rows.Next() {
 		var s AppSecret
-		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value); err != nil {
+		var isSecret int
+		if err := rows.Scan(&s.ID, &s.AppID, &s.Key, &s.Value, &isSecret); err != nil {
 			return nil, err
 		}
+		s.IsSecret = isSecret == 1
 		secrets = append(secrets, s)
 	}
 	return secrets, rows.Err()
@@ -440,6 +469,15 @@ func (r *Repository) ListAllSecrets() ([]AppSecret, error) {
 
 func (r *Repository) SetSecret(appID int64, key, value string) error {
 	_, err := r.db.Exec(`INSERT INTO app_secrets (app_id, key, value) VALUES (?, ?, ?) ON CONFLICT(app_id, key) DO UPDATE SET value = ?`, appID, key, value, value)
+	return err
+}
+
+func (r *Repository) SetSecretWithType(appID int64, key, value string, isSecret bool) error {
+	isSecretInt := 0
+	if isSecret {
+		isSecretInt = 1
+	}
+	_, err := r.db.Exec(`INSERT INTO app_secrets (app_id, key, value, is_secret) VALUES (?, ?, ?, ?) ON CONFLICT(app_id, key) DO UPDATE SET value = ?, is_secret = ?`, appID, key, value, isSecretInt, value, isSecretInt)
 	return err
 }
 

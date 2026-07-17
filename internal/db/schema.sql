@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS apps (
     auth_pass           TEXT DEFAULT '',
     status              TEXT DEFAULT 'created',
     compose_mode       TEXT DEFAULT 'advanced',
+    memory_limit       TEXT DEFAULT '',
+    cpu_limit          TEXT DEFAULT '',
+    log_max_size       TEXT DEFAULT '',
+    log_max_file       TEXT DEFAULT '',
+    command            TEXT DEFAULT '',
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -69,10 +74,11 @@ CREATE TABLE IF NOT EXISTS dns_records (
 );
 
 CREATE TABLE IF NOT EXISTS app_secrets (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    app_id   INTEGER REFERENCES apps(id) ON DELETE CASCADE,
-    key      TEXT NOT NULL,
-    value    TEXT NOT NULL,
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id     INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    is_secret  INTEGER DEFAULT 0,
     UNIQUE(app_id, key)
 );
 

@@ -15,6 +15,11 @@ type App struct {
 	AuthPass          string    `json:"auth_pass"`
 	Status            string    `json:"status"`
 	ComposeMode       string    `json:"compose_mode"`
+	MemoryLimit       string    `json:"memory_limit"`
+	CPULimit          string    `json:"cpu_limit"`
+	LogMaxSize        string    `json:"log_max_size"`
+	LogMaxFile        string    `json:"log_max_file"`
+	Command           string    `json:"command"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
