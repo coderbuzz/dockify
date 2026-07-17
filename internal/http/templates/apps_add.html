@@ -196,18 +196,24 @@ function addEnvVar(key, value, isSecret) {
     alert('Variable "' + key + '" already exists. Remove it first to add a different value.');
     return;
   }
+  var sy = window.scrollY;
   pendingEnvVars.push({key: key || '', value: value || '', isSecret: isSecret || false});
   renderEnvVars();
+  window.scrollTo(0, sy);
 }
 
 function removeEnvVar(index) {
+  var sy = window.scrollY;
   pendingEnvVars.splice(index, 1);
   renderEnvVars();
+  window.scrollTo(0, sy);
 }
 
 function toggleEnvType(index) {
+  var sy = window.scrollY;
   pendingEnvVars[index].isSecret = !pendingEnvVars[index].isSecret;
   renderEnvVars();
+  window.scrollTo(0, sy);
 }
 
 function renderEnvVars() {
