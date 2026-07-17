@@ -61,6 +61,9 @@ var funcMap = template.FuncMap{
 	"relativeTime": relativeTime,
 	"usedAmount":   usedAmount,
 	"freeAmount":   freeAmount,
+	"nl2br": func(s string) template.HTML {
+		return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
+	},
 }
 
 var tmpl = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))

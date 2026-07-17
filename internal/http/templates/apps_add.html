@@ -61,6 +61,7 @@
       <div id="simple-section" {{if and .IsEdit (eq .App.ComposeMode "advanced")}}style="display:none"{{end}}>
         <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine" value="{{if .IsEdit}}{{.Image}}{{end}}"></label>
         <label>Command<input type="text" name="command" placeholder="npm start" value="{{if .IsEdit}}{{.Command}}{{end}}"><small>Override container entrypoint (optional)</small></label>
+        <label>Ports<textarea name="ports" rows="2" placeholder="27017:27017&#10;6379:6379">{{if .IsEdit}}{{.Ports}}{{end}}</textarea><small>One port mapping per line (host:container)</small></label>
         <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small>One volume mount per line (host:container)</small></label>
         <div style="margin-top:1em">
           <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.85em">(optional)</span></h4>

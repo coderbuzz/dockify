@@ -56,6 +56,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		LogMaxSize  string        `json:"log_max_size"`
 		LogMaxFile  string        `json:"log_max_file"`
 		Command     string        `json:"command"`
+		Ports       string        `json:"ports"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -77,7 +78,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	compose := input.Compose
 	if compose == "" && input.Image != "" {
-		compose = generateCompose(input.Image, input.Port, input.Volumes, input.Name, input.MemoryLimit, input.CPULimit, input.LogMaxSize, input.LogMaxFile, envKeys, input.Command)
+		compose = generateCompose(input.Image, input.Port, input.Volumes, input.Name, input.MemoryLimit, input.CPULimit, input.LogMaxSize, input.LogMaxFile, envKeys, input.Command, input.Ports)
 	}
 	if compose == "" {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "provide either compose or image"})
@@ -113,6 +114,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		LogMaxSize:  input.LogMaxSize,
 		LogMaxFile:  input.LogMaxFile,
 		Command:     input.Command,
+		Ports:       input.Ports,
 	}
 
 	if err := h.service.Create(app); err != nil {
@@ -471,6 +473,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	logMaxSize := strings.TrimSpace(r.FormValue("log_max_size"))
 	logMaxFile := strings.TrimSpace(r.FormValue("log_max_file"))
 	command := strings.TrimSpace(r.FormValue("command"))
+	ports := strings.TrimSpace(r.FormValue("ports"))
 	envKeysRaw := r.Form["env_key"]
 
 	envKeys := make([]string, 0, len(envKeysRaw))
@@ -483,7 +486,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 
 	composeMode := "advanced"
 	if mode == "simple" && image != "" {
-		compose = generateCompose(image, port, volumes, strings.TrimSpace(r.FormValue("name")), memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command)
+		compose = generateCompose(image, port, volumes, strings.TrimSpace(r.FormValue("name")), memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command, ports)
 		composeMode = "simple"
 	}
 
@@ -515,6 +518,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		LogMaxSize:        logMaxSize,
 		LogMaxFile:        logMaxFile,
 		Command:           command,
+		Ports:             ports,
 	}
 
 	if app.Name == "" || app.Compose == "" {
@@ -619,6 +623,7 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 		"LogMaxSize":  sf.LogMaxSize,
 		"LogMaxFile":  sf.LogMaxFile,
 		"Command":     sf.Command,
+		"Ports":       sf.Ports,
 	})
 }
 
@@ -654,6 +659,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	logMaxSize := strings.TrimSpace(r.FormValue("log_max_size"))
 	logMaxFile := strings.TrimSpace(r.FormValue("log_max_file"))
 	command := strings.TrimSpace(r.FormValue("command"))
+	ports := strings.TrimSpace(r.FormValue("ports"))
 
 	mode := r.FormValue("mode")
 	compose := strings.TrimSpace(r.FormValue("compose"))
@@ -671,7 +677,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	if mode == "simple" && image != "" {
-		compose = generateCompose(image, port, volumes, newName, memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command)
+		compose = generateCompose(image, port, volumes, newName, memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command, ports)
 		app.ComposeMode = "simple"
 	} else {
 		if compose == "" {
@@ -703,6 +709,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.LogMaxSize = logMaxSize
 	app.LogMaxFile = logMaxFile
 	app.Command = command
+	app.Ports = ports
 
 	if app.GitBranch == "" {
 		app.GitBranch = "main"

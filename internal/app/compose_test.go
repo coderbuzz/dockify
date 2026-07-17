@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerateSimple(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "", "", "", "", "", "", nil, "")
+	c := generateCompose("nginx:alpine", 80, "", "", "", "", "", "", nil, "", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -26,7 +26,7 @@ func TestGenerateSimple(t *testing.T) {
 }
 
 func TestGenerateSimpleWithAppName(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "", "", nil, "")
+	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "", "", nil, "", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -46,7 +46,7 @@ func TestGenerateSimpleWithAppName(t *testing.T) {
 }
 
 func TestGenerateWithVolumes(t *testing.T) {
-	c := generateCompose("postgres:16", 5432, "./db:/var/lib/postgresql/data", "", "", "", "", "", nil, "")
+	c := generateCompose("postgres:16", 5432, "./db:/var/lib/postgresql/data", "", "", "", "", "", nil, "", "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
