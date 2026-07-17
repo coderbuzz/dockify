@@ -62,5 +62,8 @@ func Open(path string) (*sql.DB, error) {
 	// Migration: add command column (v0.9.0)
 	db.Exec("ALTER TABLE apps ADD COLUMN command TEXT DEFAULT ''")
 
+	// Migration: add ports column (v0.10.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN ports TEXT DEFAULT ''")
+
 	return db, nil
 }

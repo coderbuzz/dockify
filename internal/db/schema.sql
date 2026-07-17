@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS apps (
     log_max_size       TEXT DEFAULT '',
     log_max_file       TEXT DEFAULT '',
     command            TEXT DEFAULT '',
+    ports              TEXT DEFAULT '',
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
 );

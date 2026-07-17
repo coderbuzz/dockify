@@ -35,24 +35,25 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
-func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string) string {
+func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string, ports string) string {
 	svcName := "app"
 	if appName != "" {
 		svcName = sanitizeAppName(appName)
 	}
 	compose := fmt.Sprintf(`services:
   %s:
-    image: %s
-    restart: unless-stopped
-    networks:
-      - dockify`, svcName, image)
+    image: %s`, svcName, image)
 
-	if len(envKeys) > 0 {
-		compose += "\n    environment:"
-		for _, k := range envKeys {
-			if strings.TrimSpace(k) != "" {
-				compose += fmt.Sprintf("\n      - %s=${%s}", k, k)
-			}
+	compose += "\n    restart: unless-stopped"
+
+	if command != "" {
+		compose += "\n    command: " + command
+	}
+
+	if ports != "" {
+		compose += "\n    ports:"
+		for _, p := range splitEnvVars(ports) {
+			compose += fmt.Sprintf("\n      - %s", p)
 		}
 	}
 
@@ -67,16 +68,14 @@ func generateCompose(image string, port int, volumes string, appName string, mem
 		}
 	}
 
+	compose += "\n    networks:\n      - dockify"
+
 	if memoryLimit != "" {
 		compose += fmt.Sprintf("\n    mem_limit: %s", memoryLimit)
 	}
 
 	if cpuLimit != "" {
 		compose += fmt.Sprintf("\n    cpus: %s", cpuLimit)
-	}
-
-	if command != "" {
-		compose += "\n    command: " + command
 	}
 
 	if logMaxSize != "" || logMaxFile != "" {
@@ -88,6 +87,15 @@ func generateCompose(image string, port int, volumes string, appName string, mem
 		}
 		if logMaxFile != "" {
 			compose += fmt.Sprintf("\n        max-file: \"%s\"", logMaxFile)
+		}
+	}
+
+	if len(envKeys) > 0 {
+		compose += "\n    environment:"
+		for _, k := range envKeys {
+			if strings.TrimSpace(k) != "" {
+				compose += fmt.Sprintf("\n      - %s=${%s}", k, k)
+			}
 		}
 	}
 
@@ -227,6 +235,7 @@ type simpleFields struct {
 	LogMaxSize  string
 	LogMaxFile  string
 	Command     string
+	Ports       string
 }
 
 func parseSimpleFields(compose string) simpleFields {
@@ -275,6 +284,16 @@ func parseSimpleFields(compose string) simpleFields {
 				if p, err := strconv.Atoi(portStr); err == nil {
 					sf.Port = p
 				}
+			}
+		case "ports":
+			if val.Kind == yaml.SequenceNode {
+				var lines []string
+				for _, item := range val.Content {
+					if item.Value != "" {
+						lines = append(lines, item.Value)
+					}
+				}
+				sf.Ports = strings.Join(lines, "\n")
 			}
 		case "environment":
 			if val.Kind == yaml.SequenceNode {

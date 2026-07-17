@@ -20,6 +20,7 @@ type App struct {
 	LogMaxSize        string    `json:"log_max_size"`
 	LogMaxFile        string    `json:"log_max_file"`
 	Command           string    `json:"command"`
+	Ports             string    `json:"ports"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

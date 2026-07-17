@@ -13,6 +13,9 @@ func TestTemplatesParse(t *testing.T) {
 		"relativeTime": relativeTime,
 		"usedAmount":   usedAmount,
 		"freeAmount":   freeAmount,
+		"nl2br": func(s string) template.HTML {
+			return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
+		},
 	})
 	_, err := tmpl.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
