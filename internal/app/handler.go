@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"sort"
@@ -29,21 +30,32 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, apps)
 }
 
+type envVarInput struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	IsSecret bool   `json:"is_secret"`
+}
+
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name     string   `json:"name"`
-		ServerID int64    `json:"server_id"`
-		Domain   string   `json:"domain"`
-		Domains  []string `json:"domains"`
-		Port     int      `json:"port"`
-		Compose  string   `json:"compose"`
-		Image    string   `json:"image"`
-		EnvVars  string   `json:"env_vars"`
-		Volumes  string   `json:"volumes"`
-		GitRepo  string   `json:"git_repo"`
-		GitBranch string  `json:"git_branch"`
-		AuthUser string   `json:"auth_user"`
-		AuthPass string   `json:"auth_pass"`
+		Name        string        `json:"name"`
+		ServerID    int64         `json:"server_id"`
+		Domain      string        `json:"domain"`
+		Domains     []string      `json:"domains"`
+		Port        int           `json:"port"`
+		Compose     string        `json:"compose"`
+		Image       string        `json:"image"`
+		EnvVars     []envVarInput `json:"env_vars"`
+		Volumes     string        `json:"volumes"`
+		GitRepo     string        `json:"git_repo"`
+		GitBranch   string        `json:"git_branch"`
+		AuthUser    string        `json:"auth_user"`
+		AuthPass    string        `json:"auth_pass"`
+		MemoryLimit string        `json:"memory_limit"`
+		CPULimit    string        `json:"cpu_limit"`
+		LogMaxSize  string        `json:"log_max_size"`
+		LogMaxFile  string        `json:"log_max_file"`
+		Command     string        `json:"command"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -56,9 +68,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	envKeys := make([]string, 0, len(input.EnvVars))
+	for _, e := range input.EnvVars {
+		if strings.TrimSpace(e.Key) != "" {
+			envKeys = append(envKeys, strings.TrimSpace(e.Key))
+		}
+	}
+
 	compose := input.Compose
 	if compose == "" && input.Image != "" {
-		compose = generateCompose(input.Image, input.Port, input.EnvVars, input.Volumes, input.Name)
+		compose = generateCompose(input.Image, input.Port, input.Volumes, input.Name, input.MemoryLimit, input.CPULimit, input.LogMaxSize, input.LogMaxFile, envKeys, input.Command)
 	}
 	if compose == "" {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "provide either compose or image"})
@@ -89,11 +108,23 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		AuthUser:    input.AuthUser,
 		AuthPass:    input.AuthPass,
 		ComposeMode: composeMode,
+		MemoryLimit: input.MemoryLimit,
+		CPULimit:    input.CPULimit,
+		LogMaxSize:  input.LogMaxSize,
+		LogMaxFile:  input.LogMaxFile,
+		Command:     input.Command,
 	}
 
 	if err := h.service.Create(app); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+
+	for _, e := range input.EnvVars {
+		if strings.TrimSpace(e.Key) == "" {
+			continue
+		}
+		h.service.SetSecretWithType(app.ID, strings.TrimSpace(e.Key), e.Value, e.IsSecret)
 	}
 
 	allDomains := []string{app.Domain}
@@ -434,12 +465,25 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	mode := r.FormValue("mode")
 	compose := strings.TrimSpace(r.FormValue("compose"))
 	image := strings.TrimSpace(r.FormValue("image"))
-	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
+	memoryLimit := strings.TrimSpace(r.FormValue("memory_limit"))
+	cpuLimit := strings.TrimSpace(r.FormValue("cpu_limit"))
+	logMaxSize := strings.TrimSpace(r.FormValue("log_max_size"))
+	logMaxFile := strings.TrimSpace(r.FormValue("log_max_file"))
+	command := strings.TrimSpace(r.FormValue("command"))
+	envKeysRaw := r.Form["env_key"]
+
+	envKeys := make([]string, 0, len(envKeysRaw))
+	for _, k := range envKeysRaw {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			envKeys = append(envKeys, k)
+		}
+	}
 
 	composeMode := "advanced"
 	if mode == "simple" && image != "" {
-		compose = generateCompose(image, port, envVars, volumes, strings.TrimSpace(r.FormValue("name")))
+		compose = generateCompose(image, port, volumes, strings.TrimSpace(r.FormValue("name")), memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command)
 		composeMode = "simple"
 	}
 
@@ -466,6 +510,11 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		AuthUser:          strings.TrimSpace(r.FormValue("auth_user")),
 		AuthPass:          strings.TrimSpace(r.FormValue("auth_pass")),
 		ComposeMode:       composeMode,
+		MemoryLimit:       memoryLimit,
+		CPULimit:          cpuLimit,
+		LogMaxSize:        logMaxSize,
+		LogMaxFile:        logMaxFile,
+		Command:           command,
 	}
 
 	if app.Name == "" || app.Compose == "" {
@@ -502,7 +551,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		return
 	}
 
-	saveFormSecrets(r, h.service, app.ID)
+	saveFormEnvVars(r, h.service, app.ID)
 	saveFormFiles(r, h.service, app.ID)
 
 	for _, d := range domains {
@@ -536,7 +585,6 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 	// Parse simple fields from compose for pre-filling the edit form
 	sf := parseSimpleFields(app.Compose)
 	image := sf.Image
-	envVars := sf.EnvVars
 	volumes := sf.Volumes
 	if sf.Port > 0 {
 		app.Port = sf.Port
@@ -553,17 +601,24 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
+	secretsJSON, _ := json.Marshal(secrets)
+
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
-		"Title":    "Edit " + app.Name,
-		"Servers":  servers,
-		"App":      app,
-		"Secrets":  secrets,
-		"Files":    files,
-		"IsEdit":   true,
-		"Image":    image,
-		"EnvVars":  envVars,
-		"Volumes":  volumes,
-		"Domains":  domainList,
+		"Title":       "Edit " + app.Name,
+		"Servers":     servers,
+		"App":         app,
+		"Secrets":     secrets,
+		"SecretsJSON": template.JS(secretsJSON),
+		"Files":       files,
+		"IsEdit":      true,
+		"Image":       image,
+		"Volumes":     volumes,
+		"Domains":     domainList,
+		"MemLimit":    sf.MemoryLimit,
+		"CpuLimit":    sf.CPULimit,
+		"LogMaxSize":  sf.LogMaxSize,
+		"LogMaxFile":  sf.LogMaxFile,
+		"Command":     sf.Command,
 	})
 }
 
@@ -593,16 +648,30 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 	port, _ := strconv.Atoi(r.FormValue("port"))
 
-	envVars := strings.TrimSpace(r.FormValue("env_vars"))
 	volumes := strings.TrimSpace(r.FormValue("volumes"))
+	memoryLimit := strings.TrimSpace(r.FormValue("memory_limit"))
+	cpuLimit := strings.TrimSpace(r.FormValue("cpu_limit"))
+	logMaxSize := strings.TrimSpace(r.FormValue("log_max_size"))
+	logMaxFile := strings.TrimSpace(r.FormValue("log_max_file"))
+	command := strings.TrimSpace(r.FormValue("command"))
 
 	mode := r.FormValue("mode")
 	compose := strings.TrimSpace(r.FormValue("compose"))
 	image := strings.TrimSpace(r.FormValue("image"))
 	newName := strings.TrimSpace(r.FormValue("name"))
 
+	envKeysRaw := r.Form["env_key"]
+
+	envKeys := make([]string, 0, len(envKeysRaw))
+	for _, k := range envKeysRaw {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			envKeys = append(envKeys, k)
+		}
+	}
+
 	if mode == "simple" && image != "" {
-		compose = generateCompose(image, port, envVars, volumes, newName)
+		compose = generateCompose(image, port, volumes, newName, memoryLimit, cpuLimit, logMaxSize, logMaxFile, envKeys, command)
 		app.ComposeMode = "simple"
 	} else {
 		if compose == "" {
@@ -629,6 +698,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.GitBranch = strings.TrimSpace(r.FormValue("git_branch"))
 	app.AuthUser = strings.TrimSpace(r.FormValue("auth_user"))
 	app.AuthPass = strings.TrimSpace(r.FormValue("auth_pass"))
+	app.MemoryLimit = memoryLimit
+	app.CPULimit = cpuLimit
+	app.LogMaxSize = logMaxSize
+	app.LogMaxFile = logMaxFile
+	app.Command = command
 
 	if app.GitBranch == "" {
 		app.GitBranch = "main"
@@ -679,7 +753,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		))
 	}
 
-	saveFormSecrets(r, h.service, id)
+	saveFormEnvVars(r, h.service, id)
 	saveFormFiles(r, h.service, id)
 
 	oldRoutes, _ := h.service.GetRoutes(id)
@@ -843,20 +917,38 @@ func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
-func saveFormSecrets(r *http.Request, svc *Service, appID int64) {
-	svc.DeleteSecrets(appID)
-	keys := r.Form["secret_key"]
-	vals := r.Form["secret_val"]
+func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {
+	existing, _ := svc.ListSecrets(appID)
+	existingMap := make(map[string]AppSecret)
+	for _, ev := range existing {
+		existingMap[ev.Key] = ev
+	}
+
+	keys := r.Form["env_key"]
+	vals := r.Form["env_val"]
+	types := r.Form["env_type"]
+	submitted := make(map[string]bool)
+
 	for i, k := range keys {
 		k = strings.TrimSpace(k)
 		if k == "" || i >= len(vals) {
 			continue
 		}
-		v := strings.TrimSpace(vals[i])
-		if v == "" {
+		submitted[k] = true
+		v := vals[i]
+		isSecret := i < len(types) && types[i] == "secret"
+
+		if isSecret && v == "" {
 			continue
 		}
-		svc.SetSecret(appID, k, v)
+
+		svc.SetSecretWithType(appID, k, v, isSecret)
+	}
+
+	for _, ev := range existing {
+		if !submitted[ev.Key] {
+			svc.DeleteSecret(appID, ev.Key)
+		}
 	}
 }
 

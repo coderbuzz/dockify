@@ -50,5 +50,17 @@ func Open(path string) (*sql.DB, error) {
 	db.Exec("ALTER TABLE apps ADD COLUMN compose_mode TEXT DEFAULT 'advanced'")
 	db.Exec("UPDATE apps SET compose_mode = 'simple' WHERE unique_service_name = 1")
 
+	// Migration: add resource limit columns (v0.7.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN memory_limit TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE apps ADD COLUMN cpu_limit TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE apps ADD COLUMN log_max_size TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE apps ADD COLUMN log_max_file TEXT DEFAULT ''")
+
+	// Migration: add is_secret column (v0.8.0)
+	db.Exec("ALTER TABLE app_secrets ADD COLUMN is_secret INTEGER DEFAULT 0")
+
+	// Migration: add command column (v0.9.0)
+	db.Exec("ALTER TABLE apps ADD COLUMN command TEXT DEFAULT ''")
+
 	return db, nil
 }

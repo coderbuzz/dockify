@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerateSimple(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "", "")
+	c := generateCompose("nginx:alpine", 80, "", "", "", "", "", "", nil, "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -26,7 +26,7 @@ func TestGenerateSimple(t *testing.T) {
 }
 
 func TestGenerateSimpleWithAppName(t *testing.T) {
-	c := generateCompose("nginx:alpine", 80, "FOO=bar,BAZ=qux", "", "my-app")
+	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "", "", nil, "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -46,7 +46,7 @@ func TestGenerateSimpleWithAppName(t *testing.T) {
 }
 
 func TestGenerateWithVolumes(t *testing.T) {
-	c := generateCompose("postgres:16", 5432, "POSTGRES_PASSWORD=secret", "./db:/var/lib/postgresql/data", "")
+	c := generateCompose("postgres:16", 5432, "./db:/var/lib/postgresql/data", "", "", "", "", "", nil, "")
 	if c == "" {
 		t.Fatal("empty compose")
 	}
@@ -177,8 +177,8 @@ networks:
 	if sf.Port != 80 {
 		t.Fatalf("expected 80, got %d", sf.Port)
 	}
-	if sf.EnvVars != "FOO=bar\nBAZ=qux" {
-		t.Fatalf("expected FOO=bar\\nBAZ=qux, got %q", sf.EnvVars)
+	if len(sf.EnvKeys) != 2 || sf.EnvKeys[0] != "FOO" || sf.EnvKeys[1] != "BAZ" {
+		t.Fatalf("expected [FOO BAZ], got %v", sf.EnvKeys)
 	}
 	if sf.Volumes != "./data:/data" {
 		t.Fatalf("expected ./data:/data, got %q", sf.Volumes)
@@ -187,7 +187,7 @@ networks:
 
 func TestParseSimpleFieldsEmpty(t *testing.T) {
 	sf := parseSimpleFields("")
-	if sf.Image != "" || sf.Port != 0 || sf.EnvVars != "" || sf.Volumes != "" {
+	if sf.Image != "" || sf.Port != 0 || len(sf.EnvKeys) != 0 || sf.Volumes != "" {
 		t.Fatal("expected empty fields for empty compose")
 	}
 }

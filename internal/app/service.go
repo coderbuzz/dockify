@@ -65,6 +65,10 @@ func (s *Service) SetSecret(appID int64, key, value string) error {
 	return s.repo.SetSecret(appID, key, value)
 }
 
+func (s *Service) SetSecretWithType(appID int64, key, value string, isSecret bool) error {
+	return s.repo.SetSecretWithType(appID, key, value, isSecret)
+}
+
 func (s *Service) DeleteSecret(appID int64, key string) error {
 	return s.repo.DeleteSecret(appID, key)
 }
@@ -167,13 +171,13 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
 
-	secrets, _ := s.repo.ListSecrets(id)
-	if len(secrets) > 0 {
-		envPath := fmt.Sprintf("%s/.env", remoteDir)
-		var envLines []string
-		for _, sec := range secrets {
-			envLines = append(envLines, sec.Key+"="+strings.ReplaceAll(sec.Value, "$", "$$"))
-		}
+	envPath := fmt.Sprintf("%s/.env", remoteDir)
+	envVars, _ := s.repo.ListSecrets(id)
+	var envLines []string
+	for _, ev := range envVars {
+		envLines = append(envLines, ev.Key+"="+strings.ReplaceAll(ev.Value, "$", "$$"))
+	}
+	if len(envLines) > 0 {
 		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
 			log.Printf("Warning: write .env: %v", err)
 		}
@@ -427,6 +431,9 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 		records, err := s.cf.ListRecords(route.Domain)
 		if err != nil {
 			log.Printf("Warning: Cloudflare DNS lookup failed for %s: %v", route.Domain, err)
+			if logs != nil {
+				*logs = append(*logs, fmt.Sprintf("dns/%s: lookup failed: %v", route.Domain, err))
+			}
 			return
 		}
 		var existing *cloudflare.DNSRecord
@@ -440,15 +447,70 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 		if existing != nil {
 			if existing.Content != svr.Host {
 				log.Printf("DNS A record IP mismatch for %s: current=%s, expected=%s, updating...", route.Domain, existing.Content, svr.Host)
-				record, err := s.cf.UpdateRecord(existing.ID, route.Domain, svr.Host, existing.Proxied)
+				origProxied := existing.Proxied
+				if logs != nil {
+					*logs = append(*logs, fmt.Sprintf("dns/%s: IP changed (proxied=%v), disabling proxy for cert validation", route.Domain, origProxied))
+				}
+
+				// Step 1: Save/update DNS record in our DB
+				savedRecords, _ := s.repo.GetDNSRecords(app.ID)
+				needsSave := true
+				for _, sr := range savedRecords {
+					if sr.RecordID == existing.ID {
+						needsSave = false
+						break
+					}
+				}
+				if needsSave {
+					s.repo.SaveDNSRecord(app.ID, svr.ID, existing.ZoneID, existing.ID, existing.Name, "A", existing.Content, false)
+					// Re-fetch to get the saved record ID
+					savedRecords, _ = s.repo.GetDNSRecords(app.ID)
+				}
+
+				// Step 2: Update DNS with proxied=false so Caddy can validate
+				updated, err := s.cf.UpdateRecord(existing.ID, route.Domain, svr.Host, false)
 				if err != nil {
 					log.Printf("Warning: Cloudflare DNS update failed for %s: %v", route.Domain, err)
 					if logs != nil {
-						*logs = append(*logs, fmt.Sprintf("dns/%s: %v", route.Domain, err))
+						*logs = append(*logs, fmt.Sprintf("dns/%s: update failed: %v", route.Domain, err))
 					}
 				} else {
-					log.Printf("DNS A record updated: %s -> %s", record.Name, record.Content)
-					_ = record
+					log.Printf("DNS A record updated: %s -> %s (proxied disabled)", route.Domain, svr.Host)
+					if logs != nil {
+						*logs = append(*logs, fmt.Sprintf("dns/%s: IP updated, proxied disabled", route.Domain))
+					}
+					_ = updated
+
+					// Step 3: Wait for Caddy to issue certificate
+					caddyClient := caddy.NewClient(client)
+					if caddyClient.WaitForCertificate(route.Domain, 60*time.Second) {
+						if origProxied {
+							restored, err := s.cf.UpdateRecord(existing.ID, route.Domain, svr.Host, true)
+							if err != nil {
+								log.Printf("Warning: failed to re-enable Cloudflare proxy for %s: %v", route.Domain, err)
+								if logs != nil {
+									*logs = append(*logs, fmt.Sprintf("dns/%s: re-enable proxy failed: %v", route.Domain, err))
+								}
+							} else {
+								log.Printf("Cloudflare proxy re-enabled for %s", route.Domain)
+								s.repo.UpdateDNSRecordProxied(existing.ID, true)
+								if logs != nil {
+									*logs = append(*logs, fmt.Sprintf("dns/%s: proxy re-enabled (cert ok)", route.Domain))
+								}
+								_ = restored
+							}
+						} else {
+							log.Printf("Caddy cert ready for %s (proxy was disabled, leaving as-is)", route.Domain)
+							if logs != nil {
+								*logs = append(*logs, fmt.Sprintf("dns/%s: cert ok, proxy stays disabled", route.Domain))
+							}
+						}
+					} else {
+						log.Printf("Timeout waiting for Caddy cert for %s, leaving proxied disabled", route.Domain)
+						if logs != nil {
+							*logs = append(*logs, fmt.Sprintf("dns/%s: cert timeout, proxy disabled", route.Domain))
+						}
+					}
 				}
 			} else {
 				log.Printf("DNS A record already exists for %s, IP matches (IP: %s, proxied: %v)", route.Domain, existing.Content, existing.Proxied)
@@ -458,7 +520,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 			if err != nil {
 				log.Printf("Warning: Cloudflare DNS failed for %s: %v", route.Domain, err)
 				if logs != nil {
-					*logs = append(*logs, fmt.Sprintf("dns/%s: %v", route.Domain, err))
+					*logs = append(*logs, fmt.Sprintf("dns/%s: create failed: %v", route.Domain, err))
 				}
 			} else {
 				log.Printf("DNS A record created: %s -> %s (proxied=false)", record.Name, record.Content)
