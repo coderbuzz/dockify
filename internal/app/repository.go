@@ -18,7 +18,7 @@ func (r *Repository) List() ([]App, error) {
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
 		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, created_at, updated_at
+		       command, ports, ulimits_nofile, created_at, updated_at
 		FROM apps ORDER BY name ASC
 	`)
 	if err != nil {
@@ -34,7 +34,7 @@ func (r *Repository) List() ([]App, error) {
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.CreatedAt, &a.UpdatedAt,
+			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -52,13 +52,13 @@ func (r *Repository) Get(id int64) (*App, error) {
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
 		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, created_at, updated_at
+		       command, ports, ulimits_nofile, created_at, updated_at
 		FROM apps WHERE id = ?
 	`, id).Scan(
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-		&a.Command, &a.Ports, &a.CreatedAt, &a.UpdatedAt,
+		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -76,7 +76,7 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
 		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, created_at, updated_at
+		       command, ports, ulimits_nofile, created_at, updated_at
 		FROM apps WHERE git_repo = ? AND git_branch = ? ORDER BY id
 	`, repo, branch)
 	if err != nil {
@@ -92,7 +92,7 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.CreatedAt, &a.UpdatedAt,
+			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-		&a.Command, &a.Ports, &a.CreatedAt, &a.UpdatedAt,
+		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -134,7 +134,7 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
 		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, created_at, updated_at
+		       command, ports, ulimits_nofile, created_at, updated_at
 		FROM apps WHERE server_id = ? ORDER BY created_at DESC
 	`, serverID)
 	if err != nil {
@@ -150,7 +150,7 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.CreatedAt, &a.UpdatedAt,
+			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -163,9 +163,9 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 
 func (r *Repository) Create(a *App) error {
 	result, err := r.db.Exec(`
-		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command, ports)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created", a.ComposeMode, a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile, a.Command, a.Ports)
+		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command, ports, ulimits_nofile)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created", a.ComposeMode, a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile, a.Command, a.Ports, a.UlimitsNofile)
 	if err != nil {
 		return fmt.Errorf("insert app: %w", err)
 	}
@@ -180,12 +180,12 @@ func (r *Repository) Update(a *App) error {
 			name=?, server_id=?, domain=?, port=?, compose=?,
 			git_repo=?, git_branch=?, auth_user=?, auth_pass=?, status=?, compose_mode=?,
 			memory_limit=?, cpu_limit=?, log_max_size=?, log_max_file=?,
-			command=?, ports=?, updated_at=CURRENT_TIMESTAMP
+			command=?, ports=?, ulimits_nofile=?, updated_at=CURRENT_TIMESTAMP
 		WHERE id=?
 	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose,
 		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.Status, a.ComposeMode,
 		a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile,
-		a.Command, a.Ports, a.ID)
+		a.Command, a.Ports, a.UlimitsNofile, a.ID)
 	return err
 }
 

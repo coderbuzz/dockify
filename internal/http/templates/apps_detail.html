@@ -29,6 +29,7 @@
         {{if .App.Ports}}<tr><td><strong>Ports</strong></td><td><code>{{.App.Ports | nl2br}}</code></td></tr>{{end}}
         {{if .App.MemoryLimit}}<tr><td><strong>Memory Limit</strong></td><td>{{.App.MemoryLimit}}</td></tr>{{end}}
         {{if .App.CPULimit}}<tr><td><strong>CPU Limit</strong></td><td>{{.App.CPULimit}}</td></tr>{{end}}
+        {{if .App.UlimitsNofile}}<tr><td><strong>Ulimits (nofile)</strong></td><td>{{.App.UlimitsNofile}}</td></tr>{{end}}
         {{if or .App.LogMaxSize .App.LogMaxFile}}<tr><td><strong>Log Limits</strong></td><td>{{if .App.LogMaxSize}}max-size={{.App.LogMaxSize}}{{end}}{{if and .App.LogMaxSize .App.LogMaxFile}}, {{end}}{{if .App.LogMaxFile}}max-file={{.App.LogMaxFile}}{{end}}</td></tr>{{end}}
         {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
         {{if .App.GitRepo}}<tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
