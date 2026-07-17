@@ -250,10 +250,25 @@ The **Apps** page lists all deployed apps. Click any app for its detail page wit
 
 ### Deploy Modes
 
-- **Simple Mode** — provide an image name, port, environment variables, and volumes. Dockify auto-generates the docker-compose file.
+- **Simple Mode** — provide an image name, port, volumes, environment variables, resource limits, and an optional command override. Dockify auto-generates the docker-compose file.
 - **Advanced Mode** — paste a full `docker-compose.yml` with complete control over the stack.
 
 The compose mode (`simple` / `advanced`) is tracked per app and used to render the correct edit form.
+
+### Resource Limits (Simple Mode)
+
+Optionally enforce container resource constraints via dropdown selects:
+
+- **Memory Limit** — `128m`, `256m`, `512m`, `1g`, `2g`, `4g`
+- **CPU Limit** — `0.25`, `0.5`, `1.0`, `2.0`, `4.0`
+- **Log Max Size** — max size per log file (`10m`, `50m`, `100m`, `500m`, `1g`)
+- **Log Max File** — number of log files to keep (`1`, `3`, `5`, `10`)
+
+Defaults to "unset" (no limit applied). In Advanced mode, set resource limits directly in the compose YAML.
+
+### Command (Simple Mode)
+
+Override the container's default command/entrypoint. Useful for passing flags or running a specific script instead of the image's built-in CMD. Leave empty to use the image default.
 
 ### Edit App
 
@@ -283,13 +298,22 @@ Stream container logs via SSH (`docker compose logs`). Lazy-load buttons on the 
 
 While an app is deploying or a server is initializing, the detail page auto-refreshes every 2 seconds until the operation completes.
 
-## Secrets & Config Files
+## Environment Variables & Config Files
 
-### Environment Variables (Secrets)
+### Environment Variables
 
-Each app can have key-value secrets managed through a **GitHub-style editor** in the web UI — inline add, edit, delete with show/hide toggles. On deploy, secrets are written as a `.env` file to `/opt/dockify/apps/<name>/.env` on the worker VM.
+Each app's environment variables are managed through a **unified editor** with per-variable type control:
 
-**`.env` import:** Paste `KEY=VALUE` lines into the import textarea to bulk-add secrets. Dockify parses the format and also auto-injects `${KEY}` environment variable references into the docker-compose file, so secrets are available to containers without manual compose editing.
+- **Plain** — value is visible in the UI and editable inline
+- **Secret** — value is masked (`••••••`) in the UI and encrypted in exports
+
+**Multi-line support** — values can span multiple lines (useful for private keys, certificates, etc.) using resizable textareas.
+
+On deploy, **all** variables (plain + secret) are written to a `.env` file at `/opt/dockify/apps/<name>/.env` on the worker VM. In Simple mode, the compose file auto-generates `${KEY}` environment variable references, so containers can access all variables without manual compose editing.
+
+**Editing secrets:** On the edit page, secret values are shown as empty (like GitHub Actions). Leave empty to keep the existing value. Type a new value to override.
+
+**Import from .env:** Click the import button to open a modal dialog, paste `KEY=VALUE` lines, and bulk-add variables. Imported variables default to the Secret type.
 
 ### Config Files
 
@@ -449,6 +473,7 @@ When `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` are configured, Dockify aut
 - Skips creation if a matching record already exists (deduplication)
 - Upserts records if the worker IP changes on re-deploy
 - DNS records are tracked in the database for cleanup
+- **Certificate-safe updates:** When updating an existing A record with a different IP, Dockify temporarily disables Cloudflare's proxy (orange cloud → gray) to allow Caddy to complete HTTP-based certificate validation. Once the certificate is issued, the proxy is re-enabled to its original state.
 
 No DNS automation occurs if the env vars are not set.
 
@@ -460,10 +485,12 @@ Export your configuration (servers + apps + secrets + config files) as YAML and 
 
 Backups can be protected with a passphrase using **AES-GCM encryption** (PBKDF2 key derivation, 600,000 iterations):
 
-- Secrets, SSH keys, auth passwords, and config file contents are encrypted before export
+- **Secret** environment variables, SSH keys, and auth passwords are encrypted before export
+- **Plain** environment variables are exported as readable YAML (they are not sensitive by definition)
+- The `is_secret` flag is preserved on import, so plain/secret distinctions survive migration
 - Encrypted values use the prefix `enc:` with base64 salt + nonce + ciphertext
 - The export page includes a client-side passphrase generator (32-character hex, via `crypto.getRandomValues`)
-- Without a passphrase, sensitive data is exported as plaintext (still useful for offline/internal backups)
+- Without a passphrase, data is exported without encryption (still useful for offline/internal backups)
 
 When importing on a new instance, all servers and their SSH keys are restored automatically — no need to re-enter keys one by one, as long as the target VMs are reachable or use the same key pair.
 
