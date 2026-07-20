@@ -1,5 +1,6 @@
 {{define "apps_list"}}
 {{if .Apps}}
+<input type="text" id="app-filter" placeholder="Filter apps by name or domain..." style="margin-bottom:1.2rem;font-size:0.85em">
 {{range .ServerGroups}}
 <div class="app-group" style="margin-bottom:1.5rem">
   <h3 style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
@@ -13,7 +14,7 @@
     </thead>
     <tbody>
       {{range .Apps}}
-      <tr>
+      <tr data-name="{{.Name}}" data-domain="{{.Domain}}">
         <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
         <td style="white-space:nowrap">{{.Domain}}</td>
         <td>{{.Port}}</td>
@@ -31,6 +32,35 @@
   </table>
 </div>
 {{end}}
+<div id="app-filter-empty" class="empty-state" style="display:none">
+  <p>No apps match your filter.</p>
+</div>
+<script>
+(function(){
+  var input = document.getElementById('app-filter');
+  if (!input) return;
+  input.addEventListener('input', function(){
+    var q = input.value.trim().toLowerCase();
+    var groups = document.querySelectorAll('.app-group');
+    var anyVisible = false;
+    groups.forEach(function(g){
+      var rows = g.querySelectorAll('tr[data-name]');
+      var matchCount = 0;
+      rows.forEach(function(r){
+        var name = (r.getAttribute('data-name') || '').toLowerCase();
+        var domain = (r.getAttribute('data-domain') || '').toLowerCase();
+        var hit = q === '' || name.indexOf(q) > -1 || domain.indexOf(q) > -1;
+        r.style.display = hit ? '' : 'none';
+        if (hit) matchCount++;
+      });
+      g.style.display = matchCount > 0 ? '' : 'none';
+      if (matchCount > 0) anyVisible = true;
+    });
+    var empty = document.getElementById('app-filter-empty');
+    if (empty) empty.style.display = anyVisible ? 'none' : 'block';
+  });
+})();
+</script>
 {{else}}
 <div class="empty-state">
   <p>No apps deployed yet.</p>

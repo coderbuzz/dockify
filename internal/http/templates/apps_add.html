@@ -71,7 +71,7 @@
           <div class="grid" style="grid-template-columns:1fr 1fr;gap:0.6em">
             <label>Memory Limit
               <select name="memory_limit">
-                <option value="">unset</option>
+                <option value="">-</option>
                 <option value="128m"{{if eq $.MemLimit "128m"}} selected{{end}}>128m</option>
                 <option value="256m"{{if eq $.MemLimit "256m"}} selected{{end}}>256m</option>
                 <option value="512m"{{if eq $.MemLimit "512m"}} selected{{end}}>512m</option>
@@ -82,7 +82,7 @@
             </label>
             <label>CPU Limit
               <select name="cpu_limit">
-                <option value="">unset</option>
+                <option value="">-</option>
                 <option value="0.25"{{if eq $.CpuLimit "0.25"}} selected{{end}}>0.25</option>
                 <option value="0.5"{{if eq $.CpuLimit "0.5"}} selected{{end}}>0.5</option>
                 <option value="1.0"{{if eq $.CpuLimit "1.0"}} selected{{end}}>1.0</option>
@@ -92,7 +92,7 @@
             </label>
             <label>Log Max Size
               <select name="log_max_size">
-                <option value="">unset</option>
+                <option value="">-</option>
                 <option value="10m"{{if eq $.LogMaxSize "10m"}} selected{{end}}>10m</option>
                 <option value="50m"{{if eq $.LogMaxSize "50m"}} selected{{end}}>50m</option>
                 <option value="100m"{{if eq $.LogMaxSize "100m"}} selected{{end}}>100m</option>
@@ -102,7 +102,7 @@
             </label>
             <label>Log Max File
               <select name="log_max_file">
-                <option value="">unset</option>
+                <option value="">-</option>
                 <option value="1"{{if eq $.LogMaxFile "1"}} selected{{end}}>1</option>
                 <option value="3"{{if eq $.LogMaxFile "3"}} selected{{end}}>3</option>
                 <option value="5"{{if eq $.LogMaxFile "5"}} selected{{end}}>5</option>
@@ -111,7 +111,7 @@
             </label>
             <label>Ulimits (nofile)
               <select name="ulimits_nofile">
-                <option value="">unset</option>
+                <option value="">-</option>
                 <option value="65536"{{if eq $.UlimitsNofile "65536"}} selected{{end}}>65536</option>
                 <option value="131072"{{if eq $.UlimitsNofile "131072"}} selected{{end}}>131072</option>
                 <option value="262144"{{if eq $.UlimitsNofile "262144"}} selected{{end}}>262144</option>

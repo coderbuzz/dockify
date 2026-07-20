@@ -1,12 +1,13 @@
 {{define "servers_list"}}
 {{if .Servers}}
+<input type="text" id="server-filter" placeholder="Filter servers by name, host or user..." style="margin-bottom:1.2rem;font-size:0.85em">
 <table style="font-size:0.85em">
   <thead>
     <tr><th>Name</th><th>Host</th><th>User</th><th>Status</th><th>CPU</th><th>RAM</th><th>Disk</th><th></th></tr>
   </thead>
   <tbody>
     {{range .Servers}}
-    <tr>
+    <tr data-name="{{.Name}}" data-host="{{.Host}}" data-user="{{.User}}">
       <td style="white-space:nowrap"><a href="servers/{{.ID}}">{{.Name}}</a></td>
       <td>{{.Host}}:{{.Port}}</td>
       <td>{{.User}}</td>
@@ -24,6 +25,30 @@
     {{end}}
   </tbody>
 </table>
+<div id="server-filter-empty" class="empty-state" style="display:none">
+  <p>No servers match your filter.</p>
+</div>
+<script>
+(function(){
+  var input = document.getElementById('server-filter');
+  if (!input) return;
+  input.addEventListener('input', function(){
+    var q = input.value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#server-filter ~ table tbody tr[data-name]');
+    var matchCount = 0;
+    rows.forEach(function(r){
+      var name = (r.getAttribute('data-name') || '').toLowerCase();
+      var host = (r.getAttribute('data-host') || '').toLowerCase();
+      var user = (r.getAttribute('data-user') || '').toLowerCase();
+      var hit = q === '' || name.indexOf(q) > -1 || host.indexOf(q) > -1 || user.indexOf(q) > -1;
+      r.style.display = hit ? '' : 'none';
+      if (hit) matchCount++;
+    });
+    var empty = document.getElementById('server-filter-empty');
+    if (empty) empty.style.display = matchCount > 0 ? 'none' : 'block';
+  });
+})();
+</script>
 {{else}}
 <div class="empty-state">
   <p>No servers registered yet.</p>
