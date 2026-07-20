@@ -18,13 +18,13 @@
   <div class="grid">
     <div class="card">
       <h3>Connection</h3>
-      <table style="font-size:0.85em">
+      <div class="table-wrap"><table style="font-size:0.85em">
         <tr><td><strong>Host</strong></td><td>{{.Server.Host}}</td></tr>
         <tr><td><strong>Port</strong></td><td>{{.Server.Port}}</td></tr>
         <tr><td><strong>User</strong></td><td>{{.Server.User}}</td></tr>
         <tr><td><strong>SSH Key</strong></td><td><code style="word-break:break-all;font-size:0.78em">{{.Server.SSHKey}}</code></td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></td></tr>
-      </table>
+      </table></div>
     </div>
     {{template "servers_resources_card" .}}
   </div>

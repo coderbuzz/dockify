@@ -22,9 +22,9 @@
 
       <label style="display:block;margin-bottom:0.5em">
         <span style="font-size:0.85em;color:var(--text-muted)">Passphrase (save this — you'll need it to import)</span>
-        <div style="display:flex;gap:0.4em;margin-top:0.3em">
+        <div style="display:flex;gap:0.4em;margin-top:0.3em;flex-wrap:wrap">
           <input type="text" name="passphrase" id="passphrase" value="{{.Passphrase}}" readonly
-                 style="flex:1;font-family:ui-monospace,monospace;font-size:0.85em" required>
+                 style="flex:1 1 200px;min-width:0;font-family:ui-monospace,monospace;font-size:0.85em" required>
           <button type="button" class="btn btn-ghost" onclick="regenerate()">Regenerate</button>
           <button type="button" class="btn btn-ghost" onclick="copyPassphrase()">Copy</button>
         </div>

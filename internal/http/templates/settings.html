@@ -18,7 +18,7 @@
     </p>
     <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap" id="wh-active">
       <input type="password" id="wh-secret" value="{{.WebhookSecret}}" readonly
-             style="flex:1;font-family:monospace;font-size:0.85em;min-width:280px;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+             style="flex:1 1 200px;font-family:monospace;font-size:0.85em;min-width:0;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       <button class="btn btn-ghost" onclick="toggleSecret()" style="font-size:0.85em" id="toggle-btn">Show</button>
       <button class="btn btn-ghost" onclick="copySecret()" style="font-size:0.85em">Copy</button>
       <button class="btn btn-ghost" onclick="rollSecret()" style="font-size:0.85em">Roll</button>
