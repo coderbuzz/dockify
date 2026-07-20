@@ -20,7 +20,7 @@
 
   {{if .Servers}}
   <h2>Servers ({{len .Servers}})</h2>
-  <table style="font-size:0.85em">
+  <div class="table-wrap"><table style="font-size:0.85em">
     <thead>
       <tr><th>Name</th><th>Host</th><th>Status</th><th>CPU</th><th>RAM</th></tr>
     </thead>
@@ -35,7 +35,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{else}}
   <div class="empty-state">
     <p>No servers registered yet.</p>
@@ -52,7 +52,7 @@
       <span class="badge badge-{{.Status}}" style="font-size:0.7rem">{{.Status}}</span>
       <small style="color:var(--muted);font-weight:400">— {{len .Apps}} app(s)</small>
     </h3>
-    <table style="font-size:0.85em">
+    <div class="table-wrap"><table style="font-size:0.85em">
       <thead>
         <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th></tr>
       </thead>
@@ -66,7 +66,7 @@
         </tr>
         {{end}}
       </tbody>
-    </table>
+    </table></div>
   </div>
   {{end}}
   {{else}}

@@ -16,7 +16,7 @@
   <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}">
     <div class="card">
       <h3>Basic</h3>
-      <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+      <div class="grid-2" style="align-items:start">
         <div style="display:flex;flex-direction:column;gap:0.8em">
           <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
           <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
@@ -68,7 +68,7 @@
         <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small>One volume mount per line (host:container)</small></label>
         <div style="margin-top:1em">
           <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.85em">(optional)</span></h4>
-          <div class="grid" style="grid-template-columns:1fr 1fr;gap:0.6em">
+          <div class="grid-2" style="gap:0.6em">
             <label>Memory Limit
               <select name="memory_limit">
                 <option value="">-</option>

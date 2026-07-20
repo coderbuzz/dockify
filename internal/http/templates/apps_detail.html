@@ -19,7 +19,7 @@
   <div class="grid grid-fill">
     <div class="card">
       <h3>Details</h3>
-      <table>
+      <div class="table-wrap"><table>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
         <tr><td><strong>Server</strong></td><td>{{.ServerName}}</td></tr>
         <tr><td><strong>Domain{{if gt (len .Domains) 1}}s{{end}}</strong></td><td>{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</td></tr>
@@ -34,7 +34,7 @@
         {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
         {{if .App.GitRepo}}<tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
         <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>{{end}}
-      </table>
+      </table></div>
     </div>
     <div class="card">
       <h3>Docker Compose</h3>
@@ -48,7 +48,7 @@
         Use <code>${KEY}</code> in your compose to reference these values.
       </p>
       {{if .Secrets}}
-      <table style="width:100%;border-collapse:collapse">
+      <div class="table-wrap"><table style="width:100%;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--border)">
           <th style="text-align:left;padding:0.4em 0.6em;font-size:0.82em;color:var(--text-dim)">Key</th>
           <th style="text-align:left;padding:0.4em 0.6em;font-size:0.82em;color:var(--text-dim)">Value</th>
@@ -61,7 +61,7 @@
           </td>
         </tr>
         {{end}}
-      </table>
+      </table></div>
       {{else}}
       <p style="color:var(--text-muted);font-size:0.85em">No environment variables configured.</p>
       {{end}}
@@ -134,7 +134,7 @@
   {{if .Deployments}}
   <div class="card" style="margin-top:1em">
     <h3>Deployment History</h3>
-    <table style="font-size:0.85em">
+    <div class="table-wrap"><table style="font-size:0.85em">
       <thead>
         <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>
       </thead>
@@ -148,7 +148,7 @@
         </tr>
         {{end}}
       </tbody>
-    </table>
+    </table></div>
   </div>
   {{end}}
 
