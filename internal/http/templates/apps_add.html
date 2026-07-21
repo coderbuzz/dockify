@@ -303,7 +303,7 @@ function importEnvFromModal() {
   lines.forEach(function(line) {
     var idx = line.indexOf('=');
     var key = line.substring(0, idx).trim();
-    var val = line.substring(idx + 1);
+    var val = line.substring(idx + 1).trim();
     if (!key) return;
     if (!pendingEnvVars.some(function(e){ return e.key === key; })) {
       pendingEnvVars.push({key: key, value: val, isSecret: true});
