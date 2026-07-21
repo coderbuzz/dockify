@@ -42,19 +42,21 @@ func NewService(db *sql.DB, version string) *Service {
 	return s
 }
 
-func (s *Service) CheckUpdate() (*UpdateInfo, error) {
+func (s *Service) CheckUpdate(force bool) (*UpdateInfo, error) {
 	current := s.version
 	if current == "" {
 		current = "0.0.0"
 	}
 
-	s.cacheMu.Lock()
-	if s.cache != nil && time.Since(s.cache.timestamp) < 5*time.Minute {
-		info, err := s.cache.info, s.cache.err
+	if !force {
+		s.cacheMu.Lock()
+		if s.cache != nil && time.Since(s.cache.timestamp) < 5*time.Minute {
+			info, err := s.cache.info, s.cache.err
+			s.cacheMu.Unlock()
+			return info, err
+		}
 		s.cacheMu.Unlock()
-		return info, err
 	}
-	s.cacheMu.Unlock()
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get("https://api.github.com/repos/coderbuzz/dockify/releases/latest")
