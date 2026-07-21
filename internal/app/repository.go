@@ -432,11 +432,11 @@ type DNSRecordInfo struct {
 }
 
 type AppSecret struct {
-	ID       int64
-	AppID    int64
-	Key      string
-	Value    string
-	IsSecret bool
+	ID       int64  `json:"id"`
+	AppID    int64  `json:"app_id"`
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	IsSecret bool   `json:"is_secret"`
 }
 
 func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
