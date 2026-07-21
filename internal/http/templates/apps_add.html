@@ -257,10 +257,12 @@ function renderEnvVars() {
 
 function updateEnvKey(index, val) {
   pendingEnvVars[index].key = val;
+  syncEnvHiddenFields();
 }
 
 function updateEnvVal(index, val) {
   pendingEnvVars[index].value = val;
+  syncEnvHiddenFields();
 }
 
 function syncEnvHiddenFields() {
