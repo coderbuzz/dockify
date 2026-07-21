@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -37,13 +39,38 @@ func Connect(host string, port int, user, keyPath string) (*Client, error) {
 		Timeout:         10 * time.Second,
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	conn, err := gossh.Dial("tcp", addr, config)
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+
+	netConn, err := (&net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 15 * time.Second,
+	}).Dial("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("connect %s: %w", addr, err)
 	}
 
-	return &Client{conn: conn, Host: host, Port: port, User: user}, nil
+	conn, chans, reqs, err := gossh.NewClientConn(netConn, addr, config)
+	if err != nil {
+		netConn.Close()
+		return nil, fmt.Errorf("ssh handshake %s: %w", addr, err)
+	}
+
+	sshClient := gossh.NewClient(conn, chans, reqs)
+
+	client := &Client{conn: sshClient, Host: host, Port: port, User: user}
+
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			_, _, err := sshClient.Conn.SendRequest("keepalive@openssh.com", true, nil)
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	return client, nil
 }
 
 func (c *Client) Exec(cmd string) (string, error) {

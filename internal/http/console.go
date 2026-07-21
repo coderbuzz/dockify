@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/server"
@@ -15,10 +16,38 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	wsPongWait   = 60 * time.Second
+	wsPingPeriod = 20 * time.Second
+)
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
+}
+
+func wsKeepAlive(conn *websocket.Conn, ctx context.Context) {
+	conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		return nil
+	})
+
+	go func() {
+		ticker := time.NewTicker(wsPingPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+					return
+				}
+			}
+		}
+	}()
 }
 
 type ConsoleHandler struct {
@@ -55,6 +84,8 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
+
+	wsKeepAlive(conn, ctx)
 
 	var client ssh.Connector
 
@@ -154,6 +185,8 @@ func (h *ConsoleHandler) ServeAppContainerWS(w http.ResponseWriter, r *http.Requ
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
+
+	wsKeepAlive(conn, ctx)
 
 	var client ssh.Connector
 
