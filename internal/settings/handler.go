@@ -57,7 +57,8 @@ func (h *Handler) DisableWebhookSecret(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CheckUpdate(w http.ResponseWriter, r *http.Request) {
-	info, err := h.service.CheckUpdate()
+	force := r.URL.Query().Get("force") == "1"
+	info, err := h.service.CheckUpdate(force)
 	if err != nil {
 		jsonResponse(w, http.StatusOK, map[string]interface{}{
 			"current":    h.service.version,

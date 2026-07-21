@@ -26,7 +26,7 @@
       Latest:  <strong id="lat-ver">-</strong>
     </p>
     <div class="btn-group">
-      <button class="btn btn-ghost" onclick="checkUpdate()">Check for Updates</button>
+      <button class="btn" onclick="checkUpdate()">Check for Updates</button>
       <button class="btn btn-primary" id="update-btn" style="display:none" onclick="runUpdate()">Update Now</button>
     </div>
     <pre id="update-log" style="display:none;margin-top:0.5em;font-size:0.8em;max-height:200px;overflow:auto"></pre>
@@ -45,7 +45,7 @@ function checkUpdate() {
   var btn = event.target;
   btn.disabled = true;
   btn.textContent = 'Checking...';
-  fetch('api/settings/update/check').then(function(r){return r.json()}).then(function(d){
+  fetch('api/settings/update/check?force=1').then(function(r){return r.json()}).then(function(d){
     document.getElementById('cur-ver').textContent = 'v' + d.current;
     if (d.latest) {
       document.getElementById('lat-ver').textContent = d.latest;
