@@ -5,7 +5,7 @@
 <div class="app-group" style="margin-bottom:1.5rem">
   <h3 style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
     {{if .ServerID}}<a href="servers/{{.ServerID}}" style="text-decoration:none">{{.ServerName}}</a>{{else}}{{.ServerName}}{{end}}
-    <span class="badge badge-{{.Status}}" style="font-size:0.7rem">{{.Status}}</span>
+    {{if .Status}}<span class="badge badge-{{.Status}}" style="font-size:0.7rem">{{.Status}}</span>{{end}}
     <small style="color:var(--muted);font-weight:400">— {{len .Apps}} app(s)</small>
   </h3>
     <div class="table-wrap"><table style="font-size:0.85em">
@@ -22,8 +22,8 @@
           <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
           <td style="width:1%;white-space:nowrap">
             <form method="POST" action="apps/{{.ID}}/undeploy" style="display:inline"
-                  onsubmit="return confirm('Undeploy {{.Name}}? This will stop and remove the app.')">
-              <button type="submit" class="btn btn-ghost btn-red">Undeploy</button>
+                  onsubmit="return confirm('{{if eq .Status "draft"}}Delete draft {{.Name}}?{{else}}Undeploy {{.Name}}? This will stop and remove the app.{{end}}')">
+              <button type="submit" class="btn btn-ghost btn-red">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
             </form>
           </td>
         </tr>

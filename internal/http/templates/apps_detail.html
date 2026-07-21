@@ -21,7 +21,14 @@
       <h3>Details</h3>
       <div class="table-wrap"><table>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
-        <tr><td><strong>Server</strong></td><td>{{.ServerName}}</td></tr>
+        <tr><td><strong>Server</strong></td><td>
+          {{if eq .App.ServerID 0}}
+            <span style="color:var(--orange);font-size:0.85em">Not assigned</span>
+            <a href="apps/{{.App.ID}}/edit" style="margin-left:0.5em;font-size:0.85em">Select one →</a>
+          {{else}}
+            {{.ServerName}}
+          {{end}}
+        </td></tr>
         <tr><td><strong>Domain{{if gt (len .Domains) 1}}s{{end}}</strong></td><td>{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</td></tr>
         <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
         <tr><td><strong>Internal</strong></td><td><code>{{.ServiceName}}:{{.App.Port}}</code> <span style="color:var(--text-dim);font-size:0.82em">(plain HTTP)</span></td></tr>
@@ -89,6 +96,12 @@
 
   <div class="btn-group">
     <div class="btn-group-left">
+      {{if eq .App.Status "draft"}}
+      <form method="POST" action="apps/{{.App.ID}}/deploy" style="display:inline">
+        <button type="submit" class="btn btn-danger"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
+      </form>
+      <a href="apps/{{.App.ID}}/edit" class="btn">Edit</a>
+      {{else}}
       {{if eq .App.Status "running"}}
       <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
         <button type="submit" class="btn">Stop</button>
@@ -105,18 +118,19 @@
       <a href="apps/{{.App.ID}}/edit" class="btn">Edit</a>
       {{end}}
       <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
-        <button type="submit" class="btn">Redeploy</button>
+        <button type="submit" class="btn btn-danger">Redeploy</button>
       </form>
       <form method="POST" action="apps/{{.App.ID}}/rollback" style="display:inline"
             onsubmit="return confirm('Rollback to the last successful deployment?')">
-        <button type="submit" class="btn btn-ghost">Rollback</button>
+        <button type="submit" class="btn btn-danger">Rollback</button>
       </form>
       <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
+      {{end}}
     </div>
     <div class="btn-group-right">
       <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
-            onsubmit="return confirm('Undeploy {{.App.Name}}? This will stop and remove the app.')">
-        <button type="submit" class="btn btn-red">Undeploy</button>
+            onsubmit="return confirm('{{if eq .App.Status "draft"}}Delete draft {{.App.Name}}?{{else}}Undeploy {{.App.Name}}? This will stop and remove the app.{{end}}')">
+        <button type="submit" class="btn btn-red">{{if eq .App.Status "draft"}}Delete Draft{{else}}Undeploy{{end}}</button>
       </form>
     </div>
   </div>

@@ -8,6 +8,7 @@ import (
 
 	"github.com/coderbuzz/dockify/internal/caddy"
 	"github.com/coderbuzz/dockify/internal/cloudflare"
+	"github.com/coderbuzz/dockify/internal/model"
 	"github.com/coderbuzz/dockify/internal/scheduler"
 	"github.com/coderbuzz/dockify/internal/server"
 	"github.com/coderbuzz/dockify/internal/ssh"
@@ -19,6 +20,7 @@ const (
 	StatusRunning   = "running"
 	StatusStopped   = "stopped"
 	StatusFailed    = "failed"
+	StatusDraft     = "draft"
 )
 
 type Service struct {
@@ -39,6 +41,26 @@ func NewService(repo *Repository, serverRepo *server.Repository, cf *cloudflare.
 
 func (s *Service) List() ([]App, error) {
 	return s.repo.List()
+}
+
+func (s *Service) ListByServer(serverID int64) ([]model.AppSummary, error) {
+	apps, err := s.repo.ListByServer(serverID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]model.AppSummary, len(apps))
+	for i, a := range apps {
+		result[i] = model.AppSummary{
+			ID:        a.ID,
+			Name:      a.Name,
+			Domain:    a.Domain,
+			Port:      a.Port,
+			Status:    a.Status,
+			GitRepo:   a.GitRepo,
+			GitBranch: a.GitBranch,
+		}
+	}
+	return result, nil
 }
 
 func (s *Service) Get(id int64) (*App, error) {
@@ -106,6 +128,10 @@ func (s *Service) PickServerID() (int64, error) {
 
 func (s *Service) Delete(id int64) error {
 	return s.repo.Delete(id)
+}
+
+func (s *Service) UpdateStatus(id int64, status string) error {
+	return s.repo.UpdateStatus(id, status)
 }
 
 func (s *Service) DeleteRoutes(appID int64) error {
@@ -309,6 +335,13 @@ func (s *Service) Undeploy(id int64) error {
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return fmt.Errorf("app not found")
+	}
+
+	if app.Status == StatusDraft {
+		s.repo.DeleteRoutes(app.ID)
+		s.repo.DeleteDeployments(app.ID)
+		s.repo.Delete(id)
+		return nil
 	}
 
 	svr, err := s.serverRepo.Get(app.ServerID)

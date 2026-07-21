@@ -27,7 +27,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	authEnabled := cfgPass != ""
 
 	apiHandler := server.NewHandler(svc, sshKeyDir)
-	webHandler := server.NewWebHandler(svc, sshKeyDir)
+	webHandler := server.NewWebHandler(svc, sshKeyDir, appSvc)
 	consoleHandler := NewConsoleHandler(svc, appSvc, sshKeyDir)
 
 	appAPIHandler := app.NewHandler(appSvc)
@@ -152,6 +152,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			})
 			r.Post("/{id}/undeploy", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppDeleteWeb(w, r, render)
+			})
+			r.Post("/{id}/deploy", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppDeployWeb(w, r, render)
 			})
 			r.Post("/{id}/redeploy", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppRedeployWeb(w, r, render)

@@ -58,6 +58,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Command     string        `json:"command"`
 		Ports       string        `json:"ports"`
 		UlimitsNofile string       `json:"ulimits_nofile"`
+		Draft       bool          `json:"draft"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -86,7 +87,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.ServerID == 0 {
+	if input.ServerID == 0 && !input.Draft {
 		id, err := h.service.PickServerID()
 		if err != nil {
 			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "auto-select failed: " + err.Error()})
@@ -117,6 +118,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Command:     input.Command,
 		Ports:       input.Ports,
 		UlimitsNofile: input.UlimitsNofile,
+	}
+	if input.Draft {
+		app.Status = StatusDraft
 	}
 
 	if err := h.service.Create(app); err != nil {
@@ -152,7 +156,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	go h.service.Deploy(app.ID)
+	if !input.Draft {
+		go h.service.Deploy(app.ID)
+	}
 
 	jsonResponse(w, http.StatusCreated, app)
 }
@@ -203,6 +209,12 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
+	app, _ := h.service.Get(id)
+	if app != nil && app.Status == StatusDraft {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "cannot stop a draft — deploy it first"})
+		return
+	}
+
 	if err := h.service.Stop(id); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -213,6 +225,12 @@ func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	app, _ := h.service.Get(id)
+	if app != nil && app.Status == StatusDraft {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "cannot start a draft — deploy it first"})
+		return
+	}
 
 	if err := h.service.Start(id); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -525,25 +543,60 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		UlimitsNofile:     ulimitsNofile,
 	}
 
+	isDraft := r.FormValue("draft") == "1"
+	if isDraft {
+		app.Status = StatusDraft
+	}
+
+	envVals := r.Form["env_val"]
+	envTypes := r.Form["env_type"]
+	envList := make([]map[string]interface{}, 0, len(envKeysRaw))
+	for i, k := range envKeysRaw {
+		k = strings.TrimSpace(k)
+		if k == "" || i >= len(envVals) {
+			continue
+		}
+		envList = append(envList, map[string]interface{}{
+			"key":      k,
+			"value":    envVals[i],
+			"isSecret": i < len(envTypes) && envTypes[i] == "secret",
+		})
+	}
+	envJSON, _ := json.Marshal(envList)
+
+	formCtx := func(servers interface{}, errMsg string) map[string]interface{} {
+		return map[string]interface{}{
+			"Title":       "Deploy App",
+			"Servers":     servers,
+			"App":         app,
+			"SecretsJSON": template.JS(envJSON),
+			"Image":       image,
+			"Volumes":     volumes,
+			"Domains":     domains,
+			"MemLimit":    memoryLimit,
+			"CpuLimit":    cpuLimit,
+			"LogMaxSize":  logMaxSize,
+			"LogMaxFile":  logMaxFile,
+			"Command":     command,
+			"Ports":       ports,
+			"UlimitsNofile": ulimitsNofile,
+			"Error":       errMsg,
+		}
+	}
+
 	if app.Name == "" || app.Compose == "" {
 		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
-			"Title":   "Deploy App",
-			"Servers": servers,
-			"Error":   "name, domain, port, and either compose or image are required",
-		})
+		msg := "name and compose (or image) are required"
+		render(w, r, http.StatusBadRequest, "apps_add.html", formCtx(servers, msg))
 		return
 	}
 
-	if app.ServerID == 0 {
+	if app.ServerID == 0 && !isDraft {
 		id, err := h.service.PickServerID()
 		if err != nil {
 			servers, _ := h.serverRepo.List()
-			render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
-				"Title":   "Deploy App",
-				"Servers": servers,
-				"Error":   "auto-select failed: " + err.Error(),
-			})
+			msg := "no available servers — save as draft or add a server first"
+			render(w, r, http.StatusBadRequest, "apps_add.html", formCtx(servers, msg))
 			return
 		}
 		app.ServerID = id
@@ -551,11 +604,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 
 	if err := h.service.Create(app); err != nil {
 		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusInternalServerError, "apps_add.html", map[string]interface{}{
-			"Title":   "Deploy App",
-			"Servers": servers,
-			"Error":   err.Error(),
-		})
+		render(w, r, http.StatusInternalServerError, "apps_add.html", formCtx(servers, friendlyError(err)))
 		return
 	}
 
@@ -574,7 +623,9 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		})
 	}
 
-	go h.service.Deploy(app.ID)
+	if !isDraft {
+		go h.service.Deploy(app.ID)
+	}
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
 }
@@ -639,6 +690,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
 		return
 	}
+	isDraft := app.Status == StatusDraft
 	oldServerID := app.ServerID
 	if err := r.ParseForm(); err != nil {
 		servers, _ := h.serverRepo.List()
@@ -653,7 +705,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	serverID, _ := strconv.ParseInt(r.FormValue("server_id"), 10, 64)
-	if serverID == 0 {
+	if serverID == 0 && !isDraft {
 		serverID = app.ServerID
 	}
 	port, _ := strconv.Atoi(r.FormValue("port"))
@@ -718,35 +770,60 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.Ports = ports
 	app.UlimitsNofile = ulimitsNofile
 
+	envVals := r.Form["env_val"]
+	envTypes := r.Form["env_type"]
+	envList := make([]map[string]interface{}, 0, len(envKeysRaw))
+	for i, k := range envKeysRaw {
+		k = strings.TrimSpace(k)
+		if k == "" || i >= len(envVals) {
+			continue
+		}
+		envList = append(envList, map[string]interface{}{
+			"key":      k,
+			"value":    envVals[i],
+			"isSecret": i < len(envTypes) && envTypes[i] == "secret",
+		})
+	}
+	envJSON, _ := json.Marshal(envList)
+
+	editCtx := func(servers interface{}, errMsg string) map[string]interface{} {
+		return map[string]interface{}{
+			"Title":       "Edit " + app.Name,
+			"Servers":     servers,
+			"App":         app,
+			"SecretsJSON": template.JS(envJSON),
+			"Image":       image,
+			"Volumes":     volumes,
+			"Domains":     domains,
+			"MemLimit":    memoryLimit,
+			"CpuLimit":    cpuLimit,
+			"LogMaxSize":  logMaxSize,
+			"LogMaxFile":  logMaxFile,
+			"Command":     command,
+			"Ports":       ports,
+			"UlimitsNofile": ulimitsNofile,
+			"IsEdit":      true,
+			"Error":       errMsg,
+		}
+	}
+
 	if app.GitBranch == "" {
 		app.GitBranch = "main"
 	}
 	if app.Name == "" || app.Compose == "" {
 		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusBadRequest, "apps_add.html", map[string]interface{}{
-			"Title":   "Edit " + app.Name,
-			"Servers": servers,
-			"App":     app,
-			"IsEdit":  true,
-			"Error":   "name and compose are required",
-		})
+		render(w, r, http.StatusBadRequest, "apps_add.html", editCtx(servers, "name and compose are required"))
 		return
 	}
 
 	if err := h.service.Update(app); err != nil {
 		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusInternalServerError, "apps_add.html", map[string]interface{}{
-			"Title":   "Edit " + app.Name,
-			"Servers": servers,
-			"App":     app,
-			"IsEdit":  true,
-			"Error":   err.Error(),
-		})
+		render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, err.Error()))
 		return
 	}
 
 	var flashMsg string
-	if oldServerID != 0 && oldServerID != serverID {
+	if !isDraft && oldServerID != 0 && oldServerID != serverID {
 		oldServerName := fmt.Sprintf("#%d", oldServerID)
 		newServerName := fmt.Sprintf("#%d", serverID)
 		if servers, err := h.serverRepo.List(); err == nil {
@@ -814,7 +891,9 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	go h.service.Redeploy(id, removedDomains...)
+	if !isDraft {
+		go h.service.Redeploy(id, removedDomains...)
+	}
 
 	redirectURL := "/apps/" + strconv.FormatInt(id, 10)
 	if flashMsg != "" {
@@ -893,6 +972,26 @@ func (h *WebHandler) AppDeleteWeb(w http.ResponseWriter, r *http.Request, render
 func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
+	go h.service.Redeploy(id)
+
+	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	app, err := h.service.Get(id)
+	if err != nil || app == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "app not found"})
+		return
+	}
+
+	if app.ServerID == 0 {
+		http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
+		return
+	}
+
+	h.service.UpdateStatus(id, StatusDeploying)
 	go h.service.Redeploy(id)
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
@@ -1002,4 +1101,15 @@ func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+func friendlyError(err error) string {
+	msg := err.Error()
+	if strings.Contains(msg, "FOREIGN KEY") {
+		return "please select a server or save as draft"
+	}
+	if strings.Contains(msg, "UNIQUE constraint") {
+		return "an app with this name already exists"
+	}
+	return msg
 }

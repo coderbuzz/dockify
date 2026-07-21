@@ -33,7 +33,7 @@
     <div class="btn-group-left">
       <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>
       <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
-        <button type="submit" class="btn">Init Worker</button>
+        <button type="submit" class="btn btn-danger">Init Worker</button>
       </form>
       <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh</button>
       <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
@@ -54,6 +54,36 @@
       </div>
       <div id="terminal"></div>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:1em">
+    <h3>Apps <small style="font-weight:400;color:var(--text-dim)">{{len .Apps}} app(s)</small></h3>
+    {{if .Apps}}
+    <div class="table-wrap"><table style="font-size:0.85em">
+      <thead>
+        <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th><th>Git</th><th></th></tr>
+      </thead>
+      <tbody>
+      {{range .Apps}}
+        <tr>
+          <td style="white-space:nowrap"><a href="/apps/{{.ID}}">{{.Name}}</a></td>
+          <td style="white-space:nowrap">{{.Domain}}</td>
+          <td>{{.Port}}</td>
+          <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+          <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
+          <td style="width:1%;white-space:nowrap">
+            <form method="POST" action="/apps/{{.ID}}/undeploy" style="display:inline"
+                  onsubmit="return confirm('{{if eq .Status "draft"}}Delete draft {{.Name}}?{{else}}Undeploy {{.Name}}? This will stop and remove the app.{{end}}')">
+              <button class="btn btn-ghost btn-red">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table></div>
+    {{else}}
+    <p style="color:var(--text-muted);font-size:0.85em">No apps on this server.</p>
+    {{end}}
   </div>
 </div>
 {{template "scripts" .}}

@@ -30,14 +30,16 @@ func (r *Repository) List() ([]App, error) {
 	for rows.Next() {
 		var a App
 		var gitRepo, gitBranch sql.NullString
+		var serverID sql.NullInt64
 		if err := rows.Scan(
-			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+			&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
 			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		a.ServerID = serverID.Int64
 		a.GitRepo = gitRepo.String
 		a.GitBranch = gitBranch.String
 		apps = append(apps, a)
@@ -48,6 +50,7 @@ func (r *Repository) List() ([]App, error) {
 func (r *Repository) Get(id int64) (*App, error) {
 	a := &App{}
 	var gitRepo, gitBranch sql.NullString
+	var serverID sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
@@ -55,7 +58,7 @@ func (r *Repository) Get(id int64) (*App, error) {
 		       command, ports, ulimits_nofile, created_at, updated_at
 		FROM apps WHERE id = ?
 	`, id).Scan(
-		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+		&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
 		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
 		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
@@ -66,6 +69,7 @@ func (r *Repository) Get(id int64) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.ServerID = serverID.Int64
 	a.GitRepo = gitRepo.String
 	a.GitBranch = gitBranch.String
 	return a, nil
@@ -77,7 +81,7 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
 		       memory_limit, cpu_limit, log_max_size, log_max_file,
 		       command, ports, ulimits_nofile, created_at, updated_at
-		FROM apps WHERE git_repo = ? AND git_branch = ? ORDER BY id
+		FROM apps WHERE git_repo = ? AND git_branch = ? AND status != 'draft' ORDER BY id
 	`, repo, branch)
 	if err != nil {
 		return nil, err
@@ -88,14 +92,16 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 	for rows.Next() {
 		var a App
 		var gitRepo, gitBranch sql.NullString
+		var serverID sql.NullInt64
 		if err := rows.Scan(
-			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+			&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
 			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		a.ServerID = serverID.Int64
 		a.GitRepo = gitRepo.String
 		a.GitBranch = gitBranch.String
 		apps = append(apps, a)
@@ -106,6 +112,7 @@ func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
 func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 	a := &App{}
 	var gitRepo, gitBranch sql.NullString
+	var serverID sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT id, name, server_id, domain, port, compose,
 		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
@@ -113,7 +120,7 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 		       command, created_at, updated_at
 		FROM apps WHERE git_repo = ? AND git_branch = ? LIMIT 1
 	`, repo, branch).Scan(
-		&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+		&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
 		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
 		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
@@ -124,6 +131,7 @@ func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.ServerID = serverID.Int64
 	a.GitRepo = gitRepo.String
 	a.GitBranch = gitBranch.String
 	return a, nil
@@ -146,14 +154,16 @@ func (r *Repository) ListByServer(serverID int64) ([]App, error) {
 	for rows.Next() {
 		var a App
 		var gitRepo, gitBranch sql.NullString
+		var ns sql.NullInt64
 		if err := rows.Scan(
-			&a.ID, &a.Name, &a.ServerID, &a.Domain, &a.Port, &a.Compose,
+			&a.ID, &a.Name, &ns, &a.Domain, &a.Port, &a.Compose,
 			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
 			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
 			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		a.ServerID = ns.Int64
 		a.GitRepo = gitRepo.String
 		a.GitBranch = gitBranch.String
 		apps = append(apps, a)
@@ -165,7 +175,7 @@ func (r *Repository) Create(a *App) error {
 	result, err := r.db.Exec(`
 		INSERT INTO apps (name, server_id, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, status, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command, ports, ulimits_nofile)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, "created", a.ComposeMode, a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile, a.Command, a.Ports, a.UlimitsNofile)
+	`, a.Name, nullInt64(a.ServerID), a.Domain, a.Port, a.Compose, nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, defaultStatus(a.Status), a.ComposeMode, a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile, a.Command, a.Ports, a.UlimitsNofile)
 	if err != nil {
 		return fmt.Errorf("insert app: %w", err)
 	}
@@ -182,7 +192,7 @@ func (r *Repository) Update(a *App) error {
 			memory_limit=?, cpu_limit=?, log_max_size=?, log_max_file=?,
 			command=?, ports=?, ulimits_nofile=?, updated_at=CURRENT_TIMESTAMP
 		WHERE id=?
-	`, a.Name, a.ServerID, a.Domain, a.Port, a.Compose,
+	`, a.Name, nullInt64(a.ServerID), a.Domain, a.Port, a.Compose,
 		nullString(a.GitRepo), nullString(a.GitBranch), a.AuthUser, a.AuthPass, a.Status, a.ComposeMode,
 		a.MemoryLimit, a.CPULimit, a.LogMaxSize, a.LogMaxFile,
 		a.Command, a.Ports, a.UlimitsNofile, a.ID)
@@ -540,6 +550,13 @@ func (r *Repository) SetFile(appID int64, path, content string) error {
 func (r *Repository) DeleteFile(appID int64, path string) error {
 	_, err := r.db.Exec(`DELETE FROM app_files WHERE app_id = ? AND path = ?`, appID, path)
 	return err
+}
+
+func defaultStatus(s string) string {
+	if s == "" {
+		return "created"
+	}
+	return s
 }
 
 func nullString(s string) interface{} {

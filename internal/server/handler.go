@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/coderbuzz/dockify/internal/model"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -204,13 +205,18 @@ func (h *Handler) Init(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusAccepted, map[string]string{"message": "initialization started"})
 }
 
+type AppLister interface {
+	ListByServer(serverID int64) ([]model.AppSummary, error)
+}
+
 type WebHandler struct {
 	service   *Service
 	sshKeyDir string
+	appSvc    AppLister
 }
 
-func NewWebHandler(service *Service, sshKeyDir string) *WebHandler {
-	return &WebHandler{service: service, sshKeyDir: sshKeyDir}
+func NewWebHandler(service *Service, sshKeyDir string, appSvc AppLister) *WebHandler {
+	return &WebHandler{service: service, sshKeyDir: sshKeyDir, appSvc: appSvc}
 }
 
 func saveKeyFile(dir string, id int64, content string) (string, error) {
@@ -421,9 +427,12 @@ func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, re
 		return
 	}
 
+	apps, _ := h.appSvc.ListByServer(id)
+
 	render(w, r, http.StatusOK, "servers_detail.html", map[string]interface{}{
 		"Title":  server.Name,
 		"Server": server,
+		"Apps":   apps,
 	})
 }
 

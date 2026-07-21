@@ -211,6 +211,10 @@ small { font-size: 0.82em; color: var(--text-dim); display: block; margin-top: 0
 .badge-pending, .badge-created { background: var(--text-dim); color: var(--text); }
 .badge-initializing, .badge-deploying { background: var(--yellow); color: #000; }
 .badge-stopped { background: var(--orange); color: #fff; }
+.badge-draft { background: transparent; color: var(--text-dim); border: 1px dashed var(--border); }
+
+/* Disabled */
+.btn:disabled, .btn-danger:disabled, .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Stats */
 .stat { text-align: center; padding: 0.8em; }

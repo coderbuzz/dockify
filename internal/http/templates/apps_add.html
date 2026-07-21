@@ -13,7 +13,8 @@
   <div class="card" style="color:var(--red)">{{.Error}}</div>
   {{end}}
 
-  <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}">
+  <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}" onsubmit="return validateServer()">
+    {{if and .IsEdit (eq .App.Status "draft")}}<input type="hidden" name="draft" value="1">{{end}}
     <div class="card">
       <h3>Basic</h3>
       <div class="grid-2" style="align-items:start">
@@ -21,7 +22,7 @@
           <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
           <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
           <label>Server
-            <select name="server_id" required>
+            <select name="server_id">
               <option value="">Select a server...</option>
               <option value="0">Auto-select (least loaded)</option>
               {{$selected := 0}}{{if .App}}{{$selected = .App.ServerID}}{{end}}
@@ -174,8 +175,17 @@
     </div>
 
     <div style="display:flex;gap:0.6em;align-items:center">
-      <button type="submit" class="btn {{if .IsEdit}}btn-danger{{else}}btn-primary{{end}}">{{if .IsEdit}}Save & Redeploy{{else}}Deploy App{{end}}</button>
-      {{if .IsEdit}}<a href="/apps/{{.App.ID}}" class="btn btn-ghost">Cancel</a>{{end}}
+      {{if .IsEdit}}
+        {{if eq .App.Status "draft"}}
+          <button type="submit" class="btn btn-primary">Save as Draft</button>
+        {{else}}
+          <button type="submit" class="btn btn-danger">Save &amp; Redeploy</button>
+        {{end}}
+        <a href="/apps/{{.App.ID}}" class="btn btn-ghost">Cancel</a>
+      {{else}}
+        <button type="submit" class="btn btn-primary">Deploy App</button>
+        <button type="button" class="btn btn-ghost" onclick="saveAsDraft()">Save as Draft</button>
+      {{end}}
     </div>
   </form>
 </div>
@@ -195,12 +205,12 @@
 
 <script>
 var pendingEnvVars = [];
-{{if .IsEdit}}
+{{if .SecretsJSON}}
 var initialEnvVars = {{.SecretsJSON}};
 if (Array.isArray(initialEnvVars)) {
   initialEnvVars.forEach(function(ev) {
-    var isSecret = ev.IsSecret || ev.isSecret || false;
-    pendingEnvVars.push({key: ev.Key || ev.key, value: ev.Value || ev.value, isSecret: isSecret});
+    var isSecret = ev.isSecret || false;
+    pendingEnvVars.push({key: ev.key || '', value: ev.value || '', isSecret: isSecret});
   });
 }
 {{end}}
@@ -359,6 +369,21 @@ function uploadToFileRow(input) {
     row.querySelector('input[name=file_content]').value = e.target.result;
   };
   reader.readAsText(file);
+}
+function saveAsDraft() {
+  var form = document.querySelector('form');
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'draft';
+  input.value = '1';
+  form.appendChild(input);
+  form.submit();
+}
+function validateServer() {
+  if (document.querySelector('input[name="draft"]')) return true;
+  var sel = document.querySelector('select[name="server_id"]');
+  if (!sel.value) { alert('Please select a server or save as draft.'); return false; }
+  return true;
 }
 renderEnvVars();
 </script>
