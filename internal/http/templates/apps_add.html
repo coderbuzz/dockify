@@ -136,7 +136,8 @@
       </div>
       <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center">
         <button type="button" class="btn btn-primary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
-        <button type="button" class="btn btn-ghost" onclick="openImportModal()" style="white-space:nowrap">Import from .env</button>
+        <button type="button" class="btn btn-ghost" onclick="openImportModal()" style="white-space:nowrap">Import</button>
+        <button type="button" class="btn btn-ghost" onclick="openExportModal()" style="white-space:nowrap">Export</button>
       </div>
       <div id="env-hidden-fields"></div>
     </div>
@@ -192,13 +193,25 @@
 
 <div id="import-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeImportModal()">
   <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
-    <h3 style="margin:0 0 0.6em 0">Import from .env</h3>
+    <h3 style="margin:0 0 0.6em 0">Import</h3>
     <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 0.6em 0">Paste KEY=VALUE pairs below. Each line will be added as a new variable.</p>
     <textarea id="import-textarea" rows="8" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="width:100%;box-sizing:border-box"></textarea>
     <p style="font-size:0.82em;color:var(--text-dim);margin:0.4em 0">Imported vars will be marked as <strong>Secret</strong>. You can change the type after import.</p>
     <div style="display:flex;gap:0.5em;margin-top:0.8em">
       <button type="button" class="btn btn-primary" onclick="importEnvFromModal()">Import</button>
       <button type="button" class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="export-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+    <h3 style="margin:0 0 0.6em 0">Export</h3>
+    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 0.6em 0">Copy this to a <code>.env</code> file or another app.</p>
+    <textarea id="export-textarea" rows="10" readonly style="width:100%;box-sizing:border-box;resize:vertical" spellcheck="false"></textarea>
+    <div style="display:flex;gap:0.5em;margin-top:0.8em">
+      <button type="button" class="btn btn-primary" onclick="copyExport()">Copy</button>
+      <button type="button" class="btn btn-ghost" onclick="closeExportModal()">Close</button>
     </div>
   </div>
 </div>
@@ -323,6 +336,34 @@ function importEnvFromModal() {
   });
   renderEnvVars();
   closeImportModal();
+}
+
+function openExportModal() {
+  var lines = [];
+  pendingEnvVars.forEach(function(ev) {
+    if (ev.key) {
+      lines.push(ev.key + '=' + ev.value);
+    }
+  });
+  if (lines.length === 0) {
+    alert('No variables to export');
+    return;
+  }
+  document.getElementById('export-textarea').value = lines.join('\n');
+  document.getElementById('export-modal').style.display = 'flex';
+  var ta = document.getElementById('export-textarea');
+  ta.focus();
+  ta.select();
+}
+
+function closeExportModal() {
+  document.getElementById('export-modal').style.display = 'none';
+}
+
+function copyExport() {
+  var ta = document.getElementById('export-textarea');
+  ta.select();
+  navigator.clipboard.writeText(ta.value);
 }
 
 function escapeHtml(s) {
