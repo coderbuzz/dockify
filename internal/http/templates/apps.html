@@ -4,9 +4,16 @@
 <body>
 {{template "nav" .}}
 <div class="container">
+  {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
   <hgroup>
     <h1>Apps</h1>
-    <p><a href="apps/add" class="btn btn-primary">Deploy App</a></p>
+    <p>
+      <a href="apps/add" class="btn btn-primary">Deploy App</a>
+      <form method="POST" action="apps/redeploy-all" style="display:inline;margin-left:0.5em"
+            onsubmit="return confirm('Redeploy all running apps?')">
+        <button type="submit" class="btn btn-red">Redeploy All</button>
+      </form>
+    </p>
   </hgroup>
 
   {{template "apps_list" .}}
