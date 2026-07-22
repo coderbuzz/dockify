@@ -118,11 +118,12 @@ func (s *Service) InitWorker(id int64) error {
 	}
 
 	caddyRunning, _ := client.Exec("docker ps -q --filter name=^/caddy$")
+	caddyConfig := `{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"]}}}},"metrics":{}}`
 	if strings.TrimSpace(caddyRunning) == "" {
 		log.Printf("Deploying Caddy on %s...", server.Name)
-		caddyRun := `mkdir -p /opt/dockify/caddy
+		caddyRun := fmt.Sprintf(`mkdir -p /opt/dockify/caddy
 if [ ! -f /opt/dockify/caddy/config.json ]; then
-  echo '{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"]}}}}}' > /opt/dockify/caddy/config.json
+  echo '%s' > /opt/dockify/caddy/config.json
 fi
 docker rm -f caddy 2>/dev/null
 docker run -d \
@@ -134,7 +135,7 @@ docker run -d \
   -v caddy_data:/data \
   -v /opt/dockify/caddy/config.json:/data/config.json \
   --restart unless-stopped \
-  caddy:latest caddy run --config /data/config.json`
+  caddy:latest caddy run --config /data/config.json`, caddyConfig)
 		_, err = client.Exec(caddyRun)
 		if err != nil {
 			s.repo.UpdateStatus(id, StatusError)
@@ -142,21 +143,25 @@ docker run -d \
 		}
 	} else {
 		log.Printf("Caddy already running on %s, checking config...", server.Name)
-		migrateCmd := `if [ ! -f /opt/dockify/caddy/config.json ]; then
-  mkdir -p /opt/dockify/caddy
+		migrateCmd := fmt.Sprintf(`mkdir -p /opt/dockify/caddy
+if [ ! -f /opt/dockify/caddy/config.json ]; then
   docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
-  docker rm -f caddy 2>/dev/null
-  docker run -d \
-    --name caddy \
-    --network dockify \
-    -p 80:80 \
-    -p 443:443 \
-    -p 127.0.0.1:2019:2019 \
-    -v caddy_data:/data \
-    -v /opt/dockify/caddy/config.json:/data/config.json \
-    --restart unless-stopped \
-    caddy:latest caddy run --config /data/config.json
-fi`
+fi
+if ! grep -q '"metrics"' /opt/dockify/caddy/config.json 2>/dev/null; then
+  echo '%s' > /opt/dockify/caddy/config.json
+  docker exec caddy curl -s -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}'
+fi
+docker rm -f caddy 2>/dev/null
+docker run -d \
+  --name caddy \
+  --network dockify \
+  -p 80:80 \
+  -p 443:443 \
+  -p 127.0.0.1:2019:2019 \
+  -v caddy_data:/data \
+  -v /opt/dockify/caddy/config.json:/data/config.json \
+  --restart unless-stopped \
+  caddy:latest caddy run --config /data/config.json`, caddyConfig)
 		_, err = client.Exec(migrateCmd)
 		if err != nil {
 			log.Printf("Warning: caddy config migration failed for %s: %v", server.Name, err)

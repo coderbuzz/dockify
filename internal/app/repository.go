@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 type Repository struct {
@@ -571,4 +572,144 @@ func nullInt64(i int64) interface{} {
 		return nil
 	}
 	return i
+}
+
+func (r *Repository) InsertContainerStats(s *ContainerStats) error {
+	_, err := r.db.Exec(`
+		INSERT INTO container_stats (app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.AppID, s.ServerID, s.ContainerName, s.CPUPercent, s.MemUsageBytes, s.MemLimitBytes, s.MemPercent, s.NetIORxBytes, s.NetIOTxBytes, s.BlockIORead, s.BlockIOWrite, s.PIDs)
+	return err
+}
+
+func (r *Repository) LatestContainerStats(appID int64) (*ContainerStats, error) {
+	s := &ContainerStats{}
+	err := r.db.QueryRow(`
+		SELECT id, app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids, created_at
+		FROM container_stats WHERE app_id = ? ORDER BY created_at DESC LIMIT 1
+	`, appID).Scan(&s.ID, &s.AppID, &s.ServerID, &s.ContainerName, &s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent, &s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &s.PIDs, &s.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+func (r *Repository) ContainerStatsHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, AVG(cpu_percent) as cpu, AVG(mem_percent) as mem
+		FROM container_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
+
+	rows, err := r.db.Query(query, appID, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []ChartPoint
+	for rows.Next() {
+		var bucket string
+		var cpuVal, memVal float64
+		if err := rows.Scan(&bucket, &cpuVal, &memVal); err != nil {
+			return nil, err
+		}
+		points = append(points, ChartPoint{Time: bucket, Value: cpuVal + memVal})
+	}
+	return points, rows.Err()
+}
+
+func (r *Repository) ContainerStatsCPUHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, AVG(cpu_percent)
+		FROM container_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
+	return r.queryChartPoints(query, appID, since)
+}
+
+func (r *Repository) ContainerStatsMemHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, AVG(mem_percent)
+		FROM container_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
+	return r.queryChartPoints(query, appID, since)
+}
+
+func (r *Repository) ContainerStatsNetHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, AVG(net_io_rx_bytes + net_io_tx_bytes)
+		FROM container_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
+	return r.queryChartPoints(query, appID, since)
+}
+
+func (r *Repository) queryChartPoints(query string, args ...interface{}) ([]ChartPoint, error) {
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []ChartPoint
+	for rows.Next() {
+		var bucket string
+		var val float64
+		if err := rows.Scan(&bucket, &val); err != nil {
+			return nil, err
+		}
+		points = append(points, ChartPoint{Time: bucket, Value: val})
+	}
+	return points, rows.Err()
+}
+
+func (r *Repository) PruneContainerStats(before time.Time) error {
+	_, err := r.db.Exec(`DELETE FROM container_stats WHERE created_at < ?`, before)
+	return err
+}
+
+func (r *Repository) InsertRouteStats(s *RouteStats) error {
+	_, err := r.db.Exec(`
+		INSERT INTO route_stats (app_id, domain, total_requests, requests_rps, status_2xx, status_3xx, status_4xx, status_5xx)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.AppID, s.Domain, s.TotalRequests, s.RequestsRPS, s.Status2xx, s.Status3xx, s.Status4xx, s.Status5xx)
+	return err
+}
+
+func (r *Repository) LatestRouteStats(appID int64) (*RouteStats, error) {
+	s := &RouteStats{}
+	err := r.db.QueryRow(`
+		SELECT id, app_id, domain, total_requests, requests_rps, status_2xx, status_3xx, status_4xx, status_5xx, created_at
+		FROM route_stats WHERE app_id = ? ORDER BY created_at DESC LIMIT 1
+	`, appID).Scan(&s.ID, &s.AppID, &s.Domain, &s.TotalRequests, &s.RequestsRPS, &s.Status2xx, &s.Status3xx, &s.Status4xx, &s.Status5xx, &s.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+func (r *Repository) RouteStatsHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, MAX(requests_rps)
+		FROM route_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
+	return r.queryChartPoints(query, appID, since)
+}
+
+func (r *Repository) PruneRouteStats(before time.Time) error {
+	_, err := r.db.Exec(`DELETE FROM route_stats WHERE created_at < ?`, before)
+	return err
 }

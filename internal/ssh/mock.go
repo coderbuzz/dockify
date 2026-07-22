@@ -21,9 +21,25 @@ func NewMockClient() *MockClient {
 			"cpu /":                      "23.5",
 			"$3/$2 * 100":               "45.2",
 			"gsub(/%/,\"\"); print $5}": "67",
-			"docker":                    "Docker version 28.0.4, build b8034c0",
+			"docker":                     "Docker version 28.0.4, build b8034c0",
+			"docker compose version":    "Docker Compose version v2.24.0",
+			"docker stats":             `{"BlockIO":"1.5MB / 0B","CPUPerc":"12.34%","Container":"abc12345","ID":"abc12345","MemPerc":"8.20%","MemUsage":"256MiB / 3.125GiB","Name":"app","NetIO":"45.6MB / 12.3MB","PIDs":"3"}`,
+			"docker compose ps":        "app\n",
+			"caddy_http_requests_total": mockMetrics(),
 		},
 	}
+}
+
+func mockMetrics() string {
+	return `# HELP caddy_http_requests_total Counter of total HTTP(S) requests.
+# TYPE caddy_http_requests_total counter
+caddy_http_requests_total{host="app.example.com",method="GET",status="200"} 15234
+caddy_http_requests_total{host="app.example.com",method="POST",status="201"} 890
+caddy_http_requests_total{host="app.example.com",method="GET",status="404"} 12
+caddy_http_requests_total{host="app.example.com",method="GET",status="500"} 3
+caddy_http_request_duration_seconds_count{host="app.example.com"} 16139
+caddy_http_request_duration_seconds_sum{host="app.example.com"} 423.56
+`
 }
 
 func (m *MockClient) Exec(cmd string) (string, error) {

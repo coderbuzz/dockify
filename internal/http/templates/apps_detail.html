@@ -16,6 +16,15 @@
     <p>{{if .Domains}}{{index .Domains 0}}{{if .ExtraDomainCount}} <span class="badge" style="font-size:0.65rem;vertical-align:middle">+{{.ExtraDomainCount}} more</span>{{end}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
   </hgroup>
 
+  {{if eq .App.Status "running"}}
+  <div hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card" style="margin-bottom:1em">
+      <h3>Resource Usage</h3>
+      <p style="color:var(--text-muted);font-size:0.85em">Loading stats&hellip;</p>
+    </div>
+  </div>
+  {{end}}
+
   <div class="grid grid-fill">
     <div class="card">
       <h3>Details</h3>

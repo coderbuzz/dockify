@@ -337,6 +337,29 @@ pre {
 #terminal { padding: 0.3em; }
 html.dark .console-container { background: #0d0d0d; }
 html:not(.dark) .console-container { background: #1a1a1a; }
+
+.stats-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5em; }
+.stats-header h3 { margin:0; }
+.chart-range-btns { display:flex; gap:0.3em; flex-wrap:wrap; }
+.chart-range-btns .btn { font-size:0.75em; padding:0.25em 0.6em; }
+.chart-range-btns .btn-active { background:var(--bg-elevated); border-color:var(--accent); color:var(--text); }
+
+.stats-gauges { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.5em 1.5em; margin-bottom:0.75em; }
+.stat-gauge { min-width:0; }
+.stat-gauge-label { font-size:0.65em; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+.stat-gauge-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.15em; }
+.stat-gauge-row { display:flex; align-items:center; gap:0.4em; }
+.stat-gauge-bar { width:100%; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.stat-gauge-fill { height:100%; border-radius:3px; transition:width 0.5s ease; }
+.stat-gauge-cpu { background:var(--orange); }
+.stat-gauge-mem { background:var(--green); }
+.stat-gauge-value { font-size:0.8em; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stat-gauge-detail { font-size:0.8em; color:var(--text-muted); font-weight:400; }
+.stat-gauge-net { font-size:0.8em; font-weight:400; color:var(--text); line-height:1.4; word-break:break-word; }
+
+.chart-section { margin-top:0.6em; }
+.chart-title { font-size:0.72em; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.2em; }
+.chart-svg { width:100%; height:100px; display:block; background:var(--bg); border-radius:4px; }
 </style>
 {{end}}
 

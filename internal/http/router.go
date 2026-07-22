@@ -130,6 +130,10 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/files", appAPIHandler.SetFile)
 			r.Delete("/{id}/files/{path}", appAPIHandler.DeleteFile)
 			r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
+			r.Get("/{id}/stats", appAPIHandler.Stats)
+			r.Get("/{id}/stats/history", appAPIHandler.StatsHistory)
+			r.Get("/{id}/traffic", appAPIHandler.Traffic)
+			r.Get("/{id}/traffic/history", appAPIHandler.TrafficHistory)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)
@@ -173,6 +177,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			})
 			r.Post("/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppEditForm(w, r, render)
+			})
+			r.Get("/{id}/stats", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppStatsCard(w, r, render)
 			})
 		})
 

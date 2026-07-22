@@ -5,9 +5,12 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/coderbuzz/dockify/internal/app"
 )
 
 //go:embed templates/*.html
@@ -55,12 +58,75 @@ func freeAmount(total int, pct float64) float64 {
 	return float64(total) - usedAmount(total, pct)
 }
 
+func formatBytes(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func chartPoints(points []app.ChartPoint, width, height int, maxVal float64) template.HTMLAttr {
+	if len(points) == 0 || maxVal <= 0 {
+		return ""
+	}
+	parts := make([]string, len(points))
+	step := float64(width) / float64(len(points)-1)
+	if len(points) == 1 {
+		step = float64(width)
+	}
+	for i, p := range points {
+		x := float64(i) * step
+		y := float64(height) - (p.Value/maxVal)*float64(height)
+		parts[i] = fmt.Sprintf("%.1f,%.1f", x, y)
+	}
+	return template.HTMLAttr(strings.Join(parts, " "))
+}
+
+func chartMax(points []app.ChartPoint) float64 {
+	if len(points) == 0 {
+		return 0
+	}
+	maxVal := points[0].Value
+	for _, p := range points {
+		if p.Value > maxVal {
+			maxVal = p.Value
+		}
+	}
+	if maxVal == 0 {
+		return 1
+	}
+	magnitude := math.Pow(10, math.Floor(math.Log10(maxVal)))
+	return math.Ceil(maxVal/magnitude) * magnitude
+}
+
+func div(a, b float64) float64 {
+	if b == 0 {
+		return 0
+	}
+	return a / b
+}
+
+func mul(a, b float64) float64 {
+	return a * b
+}
+
 var funcMap = template.FuncMap{
 	"lower":        strings.ToLower,
 	"upper":        strings.ToUpper,
 	"relativeTime": relativeTime,
 	"usedAmount":   usedAmount,
 	"freeAmount":   freeAmount,
+	"formatBytes":  formatBytes,
+	"chartPoints":  chartPoints,
+	"chartMax":     chartMax,
+	"div":          div,
+	"mul":          mul,
 	"nl2br": func(s string) template.HTML {
 		return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 	},

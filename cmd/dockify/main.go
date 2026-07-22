@@ -68,6 +68,8 @@ func main() {
 		log.Println("DEV MOCK MODE: using mock SSH client")
 	}
 
+	appSvc.StartStatsCollector()
+
 	settingsSvc := settings.NewService(database, version)
 	settingsHandler := settings.NewHandler(settingsSvc)
 

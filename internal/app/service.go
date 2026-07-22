@@ -693,6 +693,40 @@ type DashboardStats struct {
 	OnlineServers int
 }
 
+func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
+	cs, err := s.repo.LatestContainerStats(appID)
+	if err != nil || cs == nil {
+		return nil
+	}
+	return &StatsOverview{
+		CPUPercent:    cs.CPUPercent,
+		MemPercent:     cs.MemPercent,
+		MemUsageBytes:  cs.MemUsageBytes,
+		MemLimitBytes:  cs.MemLimitBytes,
+		NetIORxBytes:   cs.NetIORxBytes,
+		NetIOTxBytes:   cs.NetIOTxBytes,
+		BlockIORead:    cs.BlockIORead,
+		BlockIOWrite:   cs.BlockIOWrite,
+		PIDs:           cs.PIDs,
+		ContainerName:  cs.ContainerName,
+	}
+}
+
+func (s *Service) GetTrafficOverview(appID int64) *TrafficOverview {
+	rs, err := s.repo.LatestRouteStats(appID)
+	if err != nil || rs == nil {
+		return nil
+	}
+	return &TrafficOverview{
+		RequestsRPS:   rs.RequestsRPS,
+		TotalRequests: rs.TotalRequests,
+		Status2xx:     rs.Status2xx,
+		Status3xx:     rs.Status3xx,
+		Status4xx:     rs.Status4xx,
+		Status5xx:     rs.Status5xx,
+	}
+}
+
 func (s *Service) recordDeployment(appID, serverID int64, status, logMsg, commitSHA, composeSnapshot string) {
 	d := &Deployment{
 		AppID:           appID,

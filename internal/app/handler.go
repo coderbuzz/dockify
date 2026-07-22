@@ -1097,6 +1097,86 @@ func saveFormFiles(r *http.Request, svc *Service, appID int64) {
 
 type RenderFunc = func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})
 
+func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	overview := h.service.GetStatsOverview(id)
+	if overview == nil {
+		jsonResponse(w, http.StatusOK, map[string]interface{}{"available": false})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"available":      true,
+		"cpu_percent":    overview.CPUPercent,
+		"mem_percent":    overview.MemPercent,
+		"mem_usage_bytes": overview.MemUsageBytes,
+		"mem_limit_bytes": overview.MemLimitBytes,
+		"net_io_rx_bytes": overview.NetIORxBytes,
+		"net_io_tx_bytes": overview.NetIOTxBytes,
+		"block_io_read":  overview.BlockIORead,
+		"block_io_write": overview.BlockIOWrite,
+		"pids":           overview.PIDs,
+		"container_name": overview.ContainerName,
+	})
+}
+
+func (h *Handler) StatsHistory(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
+	}
+	jsonResponse(w, http.StatusOK, h.service.GetStatsHistory(id, rangeParam))
+}
+
+func (h *Handler) Traffic(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	overview := h.service.GetTrafficOverview(id)
+	if overview == nil {
+		jsonResponse(w, http.StatusOK, map[string]interface{}{"available": false})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"available":       true,
+		"requests_rps":    overview.RequestsRPS,
+		"total_requests":  overview.TotalRequests,
+		"status_2xx":      overview.Status2xx,
+		"status_3xx":      overview.Status3xx,
+		"status_4xx":      overview.Status4xx,
+		"status_5xx":      overview.Status5xx,
+	})
+}
+
+func (h *Handler) TrafficHistory(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
+	}
+	jsonResponse(w, http.StatusOK, h.service.GetTrafficHistory(id, rangeParam))
+}
+
+func (h *WebHandler) AppStatsCard(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	overview := h.service.GetStatsOverview(id)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
+	}
+	chartData := h.service.GetStatsHistory(id, rangeParam)
+
+	trafficOverview := h.service.GetTrafficOverview(id)
+	trafficData := h.service.GetTrafficHistory(id, rangeParam)
+
+	render(w, r, http.StatusOK, "apps_stats_card.html", map[string]interface{}{
+		"AppID":       id,
+		"Stats":       overview,
+		"ChartData":   chartData,
+		"Traffic":     trafficOverview,
+		"TrafficData": trafficData,
+		"Range":       rangeParam,
+	})
+}
+
 func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
