@@ -7,13 +7,13 @@
   {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
   <hgroup>
     <h1>Apps</h1>
-    <p>
+    <div style="display:flex;justify-content:space-between;align-items:center">
       <a href="apps/add" class="btn btn-primary">Deploy App</a>
-      <form method="POST" action="apps/redeploy-all" style="display:inline;margin-left:0.5em"
+      <form method="POST" action="apps/redeploy-all" style="margin:0"
             onsubmit="return confirm('Redeploy all running apps?')">
         <button type="submit" class="btn btn-red">Redeploy All</button>
       </form>
-    </p>
+    </div>
   </hgroup>
 
   {{template "apps_list" .}}
