@@ -148,6 +148,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/add", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppAddForm(w, r, render)
 			})
+			r.Post("/redeploy-all", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppRedeployAll(w, r, render)
+			})
 			r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppDetailPage(w, r, render)
 			})

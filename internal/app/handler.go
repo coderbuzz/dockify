@@ -454,6 +454,7 @@ func (h *WebHandler) AppListPage(w http.ResponseWriter, r *http.Request, render 
 		"Title":        "Apps",
 		"Apps":         apps,
 		"ServerGroups": groups,
+		"Flash":        r.URL.Query().Get("flash"),
 	})
 }
 
@@ -1028,6 +1029,24 @@ func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+}
+
+func (h *WebHandler) AppRedeployAll(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	apps, err := h.service.List()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	count := 0
+	for _, a := range apps {
+		if a.Status == StatusRunning {
+			go h.service.Redeploy(a.ID)
+			count++
+		}
+	}
+
+	http.Redirect(w, r, "/apps?flash="+url.QueryEscape(fmt.Sprintf("Redeploying %d running apps...", count)), http.StatusSeeOther)
 }
 
 func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {
