@@ -436,7 +436,7 @@ type AppSecret struct {
 	AppID    int64  `json:"app_id"`
 	Key      string `json:"key"`
 	Value    string `json:"value"`
-	IsSecret bool   `json:"is_secret"`
+	IsSecret bool   `json:"isSecret"`
 }
 
 func (r *Repository) ListSecrets(appID int64) ([]AppSecret, error) {
