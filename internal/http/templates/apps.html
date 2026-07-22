@@ -7,7 +7,7 @@
   {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
   <hgroup>
     <h1>Apps</h1>
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em">
       <a href="apps/add" class="btn btn-primary">Deploy App</a>
       <form method="POST" action="apps/redeploy-all" style="margin:0"
             onsubmit="return confirm('Redeploy all running apps?')">
