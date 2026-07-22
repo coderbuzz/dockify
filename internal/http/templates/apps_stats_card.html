@@ -1,0 +1,140 @@
+{{$range := .Range}}
+{{$width := 600}}
+{{$height := 100}}
+
+<div id="app-stats-cards">
+
+{{if .Stats}}
+<div class="card" style="margin-top:1em">
+  <div class="stats-header">
+    <h3>Resource Usage</h3>
+    <div class="chart-range-btns">
+      <button class="btn btn-ghost{{if eq $range "1h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=1h" hx-target="#app-stats-cards" hx-swap="outerHTML">1h</button>
+      <button class="btn btn-ghost{{if eq $range "6h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=6h" hx-target="#app-stats-cards" hx-swap="outerHTML">6h</button>
+      <button class="btn btn-ghost{{if eq $range "24h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=24h" hx-target="#app-stats-cards" hx-swap="outerHTML">24h</button>
+      <button class="btn btn-ghost{{if eq $range "7d"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=7d" hx-target="#app-stats-cards" hx-swap="outerHTML">7d</button>
+    </div>
+  </div>
+
+  <div class="stats-gauges">
+    <div class="stat-gauge">
+      <div class="stat-gauge-header">
+        <div class="stat-gauge-label">CPU</div>
+        <div class="stat-gauge-value">{{printf "%.1f" .Stats.CPUPercent}}%</div>
+      </div>
+      <div class="stat-gauge-bar">
+        <div class="stat-gauge-fill stat-gauge-cpu" style="width:{{printf "%.1f" .Stats.CPUPercent}}%"></div>
+      </div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-header">
+        <div class="stat-gauge-label">Memory</div>
+        <div class="stat-gauge-value">{{printf "%.1f" .Stats.MemPercent}}% <span class="stat-gauge-detail">{{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}</span></div>
+      </div>
+      <div class="stat-gauge-bar">
+        <div class="stat-gauge-fill stat-gauge-mem" style="width:{{printf "%.1f" .Stats.MemPercent}}%"></div>
+      </div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">Net I/O</div>
+      <div class="stat-gauge-net">{{formatBytes .Stats.NetIORxBytes}} RX &middot; {{formatBytes .Stats.NetIOTxBytes}} TX</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">Block I/O</div>
+      <div class="stat-gauge-net">{{formatBytes .Stats.BlockIORead}} R &middot; {{formatBytes .Stats.BlockIOWrite}} W</div>
+    </div>
+  </div>
+
+  {{if .ChartData.cpu}}
+  {{$cpuMax := chartMax .ChartData.cpu}}
+  {{if eq $cpuMax 0.0}}{{$cpuMax = 1.0}}{{end}}
+  <div class="chart-section">
+    <div class="chart-title">CPU</div>
+    <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
+      <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
+    </svg>
+  </div>
+  {{end}}
+
+  {{if .ChartData.memory}}
+  {{$memMax := chartMax .ChartData.memory}}
+  {{if eq $memMax 0.0}}{{$memMax = 1.0}}{{end}}
+  <div class="chart-section">
+    <div class="chart-title">Memory</div>
+    <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
+      <polyline fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="{{chartPoints .ChartData.memory $width $height $memMax}}" />
+    </svg>
+  </div>
+  {{end}}
+
+  {{if .ChartData.network}}
+  {{$netMax := chartMax .ChartData.network}}
+  {{if eq $netMax 0.0}}{{$netMax = 1.0}}{{end}}
+  <div class="chart-section">
+    <div class="chart-title">Network I/O</div>
+    <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
+      <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="{{chartPoints .ChartData.network $width $height $netMax}}" />
+    </svg>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="card" style="margin-top:1em">
+  <h3>Resource Usage</h3>
+  <p style="color:var(--text-muted);font-size:0.85em">Stats not yet available. Data collects every 60 seconds.</p>
+</div>
+{{end}}
+
+{{if .Traffic}}
+<div class="card" style="margin-top:1em">
+  <h3>Traffic</h3>
+  <div class="stats-gauges">
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">RPS</div>
+      <div class="stat-gauge-value stat-gauge-net">{{printf "%.1f" .Traffic.RequestsRPS}} req/s</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">Total</div>
+      <div class="stat-gauge-value stat-gauge-net">{{.Traffic.TotalRequests}}</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">2xx</div>
+      <div class="stat-gauge-value stat-gauge-net" style="color:var(--green)">{{.Traffic.Status2xx}}</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">3xx</div>
+      <div class="stat-gauge-value stat-gauge-net" style="color:var(--link)">{{.Traffic.Status3xx}}</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">4xx</div>
+      <div class="stat-gauge-value stat-gauge-net" style="color:var(--yellow)">{{.Traffic.Status4xx}}</div>
+    </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">5xx</div>
+      <div class="stat-gauge-value stat-gauge-net" style="color:var(--red)">{{.Traffic.Status5xx}}</div>
+    </div>
+  </div>
+
+  {{if .TrafficData.rps}}
+  {{$rpsMax := chartMax .TrafficData.rps}}
+  {{if eq $rpsMax 0.0}}{{$rpsMax = 1.0}}{{end}}
+  <div class="chart-section">
+    <div class="chart-title">Requests / sec</div>
+    <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
+      <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="{{chartPoints .TrafficData.rps $width $height $rpsMax}}" />
+    </svg>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="card" style="margin-top:1em">
+  <h3>Traffic</h3>
+  <p style="color:var(--text-muted);font-size:0.85em">Traffic data not available. Ensure Caddy metrics are enabled (re-init worker).</p>
+</div>
+{{end}}
+
+</div>

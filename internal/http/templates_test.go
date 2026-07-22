@@ -13,6 +13,11 @@ func TestTemplatesParse(t *testing.T) {
 		"relativeTime": relativeTime,
 		"usedAmount":   usedAmount,
 		"freeAmount":   freeAmount,
+		"formatBytes":  formatBytes,
+		"chartPoints":  chartPoints,
+		"chartMax":     chartMax,
+		"div":          div,
+		"mul":          mul,
 		"nl2br": func(s string) template.HTML {
 			return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 		},
@@ -35,6 +40,7 @@ func TestTemplatesLookup(t *testing.T) {
 		"apps.html",
 		"apps_add.html",
 		"apps_detail.html",
+		"apps_stats_card.html",
 		"login.html",
 		"error.html",
 		"about.html",
