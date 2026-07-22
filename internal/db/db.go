@@ -100,5 +100,19 @@ func Open(path string) (*sql.DB, error) {
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_route_stats_app_time ON route_stats(app_id, created_at)`)
 
+	// Migration: add server_stats table (v0.13.0)
+	db.Exec(`CREATE TABLE IF NOT EXISTS server_stats (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		server_id   INTEGER REFERENCES servers(id) ON DELETE CASCADE,
+		cpu_percent REAL,
+		ram_percent REAL,
+		disk_percent REAL,
+		cpu_cores   INTEGER,
+		ram_mb      INTEGER,
+		disk_gb     INTEGER,
+		created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_server_stats_time ON server_stats(server_id, created_at)`)
+
 	return db, nil
 }

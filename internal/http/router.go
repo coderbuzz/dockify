@@ -74,6 +74,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/init", apiHandler.Init)
 			r.Post("/{id}/refresh", apiHandler.Refresh)
 			r.Get("/{id}/console", consoleHandler.ServeWS)
+			r.Get("/{id}/stats/history", apiHandler.StatsHistory)
 		})
 
 		r.Route("/servers", func(r chi.Router) {
@@ -100,6 +101,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			})
 			r.Get("/{id}/resources", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerResourcesCard(w, r, render)
+			})
+			r.Get("/{id}/stats", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerStatsCard(w, r, render)
 			})
 			r.Post("/{id}/refresh", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerRefreshWeb(w, r, render)

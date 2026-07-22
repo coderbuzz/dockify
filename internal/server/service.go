@@ -217,12 +217,56 @@ func (s *Service) RefreshResources(id int64) error {
 	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage, diskUsage)
 	s.repo.UpdateStatus(id, StatusOnline)
 
+	s.repo.InsertStats(&ServerStats{
+		ServerID:   id,
+		CPUPercent: cpuUsage,
+		RAMPercent: ramUsage,
+		DiskPercent: diskUsage,
+		CPUCores:   cpuCores,
+		RAMMB:      ramMB,
+		DiskGB:     diskGB,
+	})
+
 	return nil
 }
 
 func (s *Service) StartMonitor() {
 	s.monitor = NewMonitor(s)
 	go s.monitor.Run()
+}
+
+func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]interface{} {
+	now := time.Now()
+	var since time.Time
+	var bucketMins int
+
+	switch duration {
+	case "1h":
+		since = now.Add(-1 * time.Hour)
+		bucketMins = 1
+	case "6h":
+		since = now.Add(-6 * time.Hour)
+		bucketMins = 5
+	case "24h":
+		since = now.Add(-24 * time.Hour)
+		bucketMins = 10
+	case "7d":
+		since = now.Add(-7 * 24 * time.Hour)
+		bucketMins = 60
+	default:
+		since = now.Add(-1 * time.Hour)
+		bucketMins = 1
+	}
+
+	cpu, _ := s.repo.StatsHistory(serverID, since, bucketMins, "cpu")
+	ram, _ := s.repo.StatsHistory(serverID, since, bucketMins, "ram")
+	disk, _ := s.repo.StatsHistory(serverID, since, bucketMins, "disk")
+
+	return map[string]interface{}{
+		"cpu":  cpu,
+		"ram":  ram,
+		"disk": disk,
+	}
 }
 
 func parseCPUCount(c ssh.Connector) (int, error) {
@@ -256,7 +300,7 @@ func parseDisk(c ssh.Connector) (int, error) {
 }
 
 func parseCPUUsage(c ssh.Connector) (float64, error) {
-	out, err := c.Exec("awk '/^cpu / {printf \"%.1f\", ($2+$4)*100/($2+$4+$5)}' /proc/stat")
+	out, err := c.Exec("top -bn2 -d 2 | awk '/^%Cpu/{c++; if(c==2){printf \"%.1f\",100-$8; exit}}'")
 	if err != nil {
 		return 0, err
 	}
@@ -297,23 +341,35 @@ func (m *Monitor) Run() {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		servers, err := m.service.List()
-		if err != nil {
-			log.Printf("Monitor: failed to list servers: %v", err)
+	pruneTicker := time.NewTicker(1 * time.Hour)
+	defer pruneTicker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			m.refreshAll()
+		case <-pruneTicker.C:
+			m.service.repo.PruneStats(time.Now().Add(-7 * 24 * time.Hour))
+		}
+	}
+}
+
+func (m *Monitor) refreshAll() {
+	servers, err := m.service.List()
+	if err != nil {
+		log.Printf("Monitor: failed to list servers: %v", err)
+		return
+	}
+
+	for _, server := range servers {
+		if server.Status != StatusOnline && server.Status != StatusOffline {
 			continue
 		}
 
-		for _, server := range servers {
-			if server.Status != StatusOnline && server.Status != StatusOffline {
-				continue
+		go func(id int64, name string) {
+			if err := m.service.RefreshResources(id); err != nil {
+				log.Printf("Monitor: refresh %q failed: %v", name, err)
 			}
-
-			go func(id int64, name string) {
-				if err := m.service.RefreshResources(id); err != nil {
-					log.Printf("Monitor: refresh %q failed: %v", name, err)
-				}
-			}(server.ID, server.Name)
-		}
+		}(server.ID, server.Name)
 	}
 }

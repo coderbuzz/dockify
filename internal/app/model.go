@@ -1,6 +1,10 @@
 package app
 
-import "time"
+import (
+	"time"
+
+	"github.com/coderbuzz/dockify/internal/model"
+)
 
 type App struct {
 	ID                int64     `json:"id"`
@@ -67,10 +71,7 @@ type RouteStats struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-type ChartPoint struct {
-	Time  string  `json:"time"`
-	Value float64 `json:"value"`
-}
+type ChartPoint = model.ChartPoint
 
 type StatsOverview struct {
 	CPUPercent     float64 `json:"cpu_percent"`

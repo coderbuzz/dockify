@@ -9,3 +9,8 @@ type AppSummary struct {
 	GitRepo   string
 	GitBranch string
 }
+
+type ChartPoint struct {
+	Time  string  `json:"time"`
+	Value float64 `json:"value"`
+}

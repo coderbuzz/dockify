@@ -18,7 +18,7 @@ func NewMockClient() *MockClient {
 			"nproc":                     "4",
 			"Mem:":                      "16000",
 			"NR==2 {gsub(/G/,\"\"); print $2}": "100",
-			"cpu /":                      "23.5",
+			"top -bn2":                  "23.5",
 			"$3/$2 * 100":               "45.2",
 			"gsub(/%/,\"\"); print $5}": "67",
 			"docker":                     "Docker version 28.0.4, build b8034c0",

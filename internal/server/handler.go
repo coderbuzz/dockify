@@ -483,6 +483,37 @@ func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, ren
 	http.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
 
+func (h *WebHandler) ServerStatsCard(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
+	}
+
+	server, err := h.service.Get(id)
+	if err != nil || server == nil {
+		render(w, r, http.StatusNotFound, "error.html", map[string]interface{}{"Message": "server not found"})
+		return
+	}
+
+	chartData := h.service.GetStatsHistory(id, rangeParam)
+
+	render(w, r, http.StatusOK, "servers_stats_card.html", map[string]interface{}{
+		"Server":    server,
+		"ChartData": chartData,
+		"Range":     rangeParam,
+	})
+}
+
+func (h *Handler) StatsHistory(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
+	}
+	JSON(w, http.StatusOK, h.service.GetStatsHistory(id, rangeParam))
+}
+
 func JSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
