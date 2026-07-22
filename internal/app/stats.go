@@ -89,6 +89,9 @@ func (s *Service) collectContainerStats(client ssh.Connector, serverID int64, ap
 		dc := detectDockerCompose(client)
 		containerList, err := client.Exec(fmt.Sprintf("%s -f %s ps --format '{{.Names}}' 2>/dev/null", dc, composePath))
 		if err != nil || strings.TrimSpace(containerList) == "" {
+			containerList, err = client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", dc, composePath))
+		}
+		if err != nil || strings.TrimSpace(containerList) == "" {
 			continue
 		}
 

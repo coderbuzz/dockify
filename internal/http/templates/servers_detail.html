@@ -15,6 +15,15 @@
     <p>{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
   </hgroup>
 
+  {{if eq .Server.Status "online"}}
+  <div hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card" style="margin-bottom:1em">
+      <h3>Resource History</h3>
+      <p style="color:var(--text-muted);font-size:0.85em">Loading charts&hellip;</p>
+    </div>
+  </div>
+  {{end}}
+
   <div class="grid">
     <div class="card">
       <h3>Connection</h3>

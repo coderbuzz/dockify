@@ -1,6 +1,10 @@
 package server
 
-import "time"
+import (
+	"time"
+
+	"github.com/coderbuzz/dockify/internal/model"
+)
 
 type Server struct {
 	ID        int64     `json:"id"`
@@ -20,3 +24,17 @@ type Server struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
+
+type ServerStats struct {
+	ID         int64     `json:"id"`
+	ServerID   int64     `json:"server_id"`
+	CPUPercent float64   `json:"cpu_percent"`
+	RAMPercent float64   `json:"ram_percent"`
+	DiskPercent float64  `json:"disk_percent"`
+	CPUCores   int       `json:"cpu_cores"`
+	RAMMB      int       `json:"ram_mb"`
+	DiskGB     int       `json:"disk_gb"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ChartPoint = model.ChartPoint

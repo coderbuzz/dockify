@@ -129,3 +129,16 @@ CREATE TABLE IF NOT EXISTS route_stats (
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_route_stats_app_time ON route_stats(app_id, created_at);
+
+CREATE TABLE IF NOT EXISTS server_stats (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER REFERENCES servers(id) ON DELETE CASCADE,
+    cpu_percent REAL,
+    ram_percent REAL,
+    disk_percent REAL,
+    cpu_cores   INTEGER,
+    ram_mb      INTEGER,
+    disk_gb     INTEGER,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_server_stats_time ON server_stats(server_id, created_at);

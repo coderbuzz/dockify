@@ -198,4 +198,67 @@ func nullInt64(v sql.NullInt64) int64 {
 	return 0
 }
 
+func (r *Repository) InsertStats(s *ServerStats) error {
+	_, err := r.db.Exec(`
+		INSERT INTO server_stats (server_id, cpu_percent, ram_percent, disk_percent, cpu_cores, ram_mb, disk_gb)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, s.ServerID, s.CPUPercent, s.RAMPercent, s.DiskPercent, s.CPUCores, s.RAMMB, s.DiskGB)
+	return err
+}
+
+func (r *Repository) LatestStats(serverID int64) (*ServerStats, error) {
+	s := &ServerStats{}
+	err := r.db.QueryRow(`
+		SELECT id, server_id, cpu_percent, ram_percent, disk_percent, cpu_cores, ram_mb, disk_gb, created_at
+		FROM server_stats WHERE server_id = ? ORDER BY created_at DESC LIMIT 1
+	`, serverID).Scan(&s.ID, &s.ServerID, &s.CPUPercent, &s.RAMPercent, &s.DiskPercent, &s.CPUCores, &s.RAMMB, &s.DiskGB, &s.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+func (r *Repository) StatsHistory(serverID int64, since time.Time, bucketMinutes int, field string) ([]ChartPoint, error) {
+	fieldCol := "cpu_percent"
+	switch field {
+	case "ram":
+		fieldCol = "ram_percent"
+	case "disk":
+		fieldCol = "disk_percent"
+	}
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, AVG(%s)
+		FROM server_stats
+		WHERE server_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy, fieldCol)
+
+	return queryChartPoints(r.db, query, serverID, since)
+}
+
+func queryChartPoints(db *sql.DB, query string, args ...interface{}) ([]ChartPoint, error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []ChartPoint
+	for rows.Next() {
+		var bucket string
+		var val float64
+		if err := rows.Scan(&bucket, &val); err != nil {
+			return nil, err
+		}
+		points = append(points, ChartPoint{Time: bucket, Value: val})
+	}
+	return points, rows.Err()
+}
+
+func (r *Repository) PruneStats(before time.Time) error {
+	_, err := r.db.Exec(`DELETE FROM server_stats WHERE created_at < ?`, before)
+	return err
+}
+
 var _ = time.Now

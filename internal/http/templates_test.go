@@ -37,6 +37,7 @@ func TestTemplatesLookup(t *testing.T) {
 		"servers_detail.html",
 		"servers_edit.html",
 		"servers_resources_card",
+		"servers_stats_card.html",
 		"apps.html",
 		"apps_add.html",
 		"apps_detail.html",

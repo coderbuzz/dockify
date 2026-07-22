@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coderbuzz/dockify/internal/app"
+	"github.com/coderbuzz/dockify/internal/model"
 )
 
 //go:embed templates/*.html
@@ -71,7 +71,7 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-func chartPoints(points []app.ChartPoint, width, height int, maxVal float64) template.HTMLAttr {
+func chartPoints(points []model.ChartPoint, width, height int, maxVal float64) template.HTMLAttr {
 	if len(points) == 0 || maxVal <= 0 {
 		return ""
 	}
@@ -88,7 +88,7 @@ func chartPoints(points []app.ChartPoint, width, height int, maxVal float64) tem
 	return template.HTMLAttr(strings.Join(parts, " "))
 }
 
-func chartMax(points []app.ChartPoint) float64 {
+func chartMax(points []model.ChartPoint) float64 {
 	if len(points) == 0 {
 		return 0
 	}
