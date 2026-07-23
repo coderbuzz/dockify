@@ -62,8 +62,13 @@ func (m *MockClient) ExecStream(ctx context.Context, cmd string) (<-chan string,
 		defer close(outCh)
 		for _, r := range m.responses {
 			if strings.Contains(cmd, r.pattern) {
+				// Simulate real docker stats streaming output, which includes
+				// ANSI escape sequences (\x1b[2J\x1b[H = clear screen + cursor home)
+				// before each JSON line. This ensures the app stats parser correctly
+				// strips them.
+				resp := "\x1b[2J\x1b[H" + r.response
 				select {
-				case outCh <- r.response:
+				case outCh <- resp:
 				case <-ctx.Done():
 					return
 				}

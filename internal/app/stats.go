@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,6 +13,12 @@ import (
 
 	"github.com/coderbuzz/dockify/internal/ssh"
 )
+
+var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]")
+
+func stripANSI(s string) string {
+	return ansiEscape.ReplaceAllString(s, "")
+}
 
 type dockerStat struct {
 	CPUPerc  string `json:"CPUPerc"`
@@ -299,7 +306,7 @@ func (s *Service) StreamStats(ctx context.Context, client ssh.Connector, app *Ap
 			if !ok {
 				return nil
 			}
-			line = strings.TrimSpace(line)
+			line = stripANSI(strings.TrimSpace(line))
 			if line == "" {
 				continue
 			}
