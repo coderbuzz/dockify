@@ -584,13 +584,14 @@ curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/gen-
 
 The script will:
 
-1. Generate an SSH key pair at `/root/.ssh/remote-access` (ed25519, no passphrase)
-2. Add the public key to `/root/.ssh/authorized_keys`
-3. Output the **private key content** — copy this into your agentic-AI / SSH client config
+1. Generate an SSH key pair at `$HOME/.ssh/remote-access` (ed25519, no passphrase)
+2. Add the public key to `$HOME/.ssh/authorized_keys`
+3. Configure `KexAlgorithms` in `/etc/ssh/sshd_config` (requires `sudo`)
+4. Output the **private key content** — copy this into your agentic-AI / SSH client config
 
 The key is generic and separate from Dockify's `/root/.ssh/dockify` automation key.
-To revoke access later: `rm /root/.ssh/remote-access*` and remove its line from
-`/root/.ssh/authorized_keys`.
+To revoke access later: `rm ~/.ssh/remote-access*` and remove its line from
+`~/.ssh/authorized_keys`.
 
 ## Project Structure
 
