@@ -7,7 +7,7 @@
 {{if .Stats}}
 <div class="card" style="margin-top:1em">
   <div class="stats-header">
-    <h3>Resource Usage <span id="app-live-indicator" class="live-badge" style="display:none">● LIVE</span></h3>
+    <h3>Resource Usage <span id="app-live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
     <div class="chart-range-btns">
       <button class="btn btn-ghost{{if eq $range "1h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=1h" hx-target="#app-stats-cards" hx-swap="outerHTML">1h</button>
       <button class="btn btn-ghost{{if eq $range "6h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=6h" hx-target="#app-stats-cards" hx-swap="outerHTML">6h</button>

@@ -705,6 +705,13 @@ func (r *Repository) PruneContainerStats(before time.Time) error {
 	return err
 }
 
+func (r *Repository) UpdateDiskUsage(appID int64, createdAt time.Time, bytes int64) error {
+	_, err := r.db.Exec(
+		`UPDATE container_stats SET disk_usage_bytes = ? WHERE app_id = ? AND created_at = ?`,
+		bytes, appID, createdAt)
+	return err
+}
+
 func (r *Repository) InsertRouteStats(s *RouteStats) error {
 	_, err := r.db.Exec(`
 		INSERT INTO route_stats (app_id, domain, total_requests, requests_rps, status_2xx, status_3xx, status_4xx, status_5xx)

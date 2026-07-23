@@ -370,7 +370,15 @@ html:not(.dark) .console-container { background: #1a1a1a; }
   color: var(--green);
   background: rgba(45, 122, 58, 0.1);
   border-radius: 3px;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.35s, visibility 0.35s;
   animation: blink-pulse 1.5s ease-in-out infinite;
+}
+.live-badge--hidden {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s, visibility 0.35s;
 }
 </style>
 {{template "live_charts"}}

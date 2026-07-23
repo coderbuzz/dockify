@@ -35,16 +35,26 @@ func (s *Service) StartStatsCollector() {
 }
 
 func (s *Service) statsLoop() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	statsTicker := time.NewTicker(10 * time.Second)
+	defer statsTicker.Stop()
+
+	caddyTicker := time.NewTicker(30 * time.Second)
+	defer caddyTicker.Stop()
+
+	diskTicker := time.NewTicker(5 * time.Minute)
+	defer diskTicker.Stop()
 
 	pruneTicker := time.NewTicker(1 * time.Hour)
 	defer pruneTicker.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-statsTicker.C:
 			s.collectAllStats()
+		case <-caddyTicker.C:
+			s.collectAllCaddyTraffic()
+		case <-diskTicker.C:
+			s.collectAppDiskUsage()
 		case <-pruneTicker.C:
 			s.pruneOldStats()
 		}
@@ -73,6 +83,141 @@ func (s *Service) collectAllStats() {
 	}
 }
 
+// collectAllCaddyTraffic collects Caddy traffic metrics for all servers with
+// running apps. Runs on a separate 30s ticker (not with every 10s stats tick).
+func (s *Service) collectAllCaddyTraffic() {
+	apps, err := s.repo.List()
+	if err != nil {
+		return
+	}
+
+	serverApps := make(map[int64][]App)
+	for _, a := range apps {
+		if a.Status != StatusRunning || a.ServerID == 0 {
+			continue
+		}
+		serverApps[a.ServerID] = append(serverApps[a.ServerID], a)
+	}
+
+	for serverID, appList := range serverApps {
+		go func(sid int64, list []App) {
+			server, err := s.serverRepo.Get(sid)
+			if err != nil || server == nil {
+				return
+			}
+			client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+			if err != nil {
+				return
+			}
+			defer client.Close()
+			s.collectCaddyTraffic(client, sid, list)
+		}(serverID, appList)
+	}
+}
+
+// collectAppDiskUsage collects disk usage for all running apps via du -sb.
+// Runs on a separate 5-minute ticker (not with every 10s stats tick).
+func (s *Service) collectAppDiskUsage() {
+	apps, err := s.repo.List()
+	if err != nil {
+		return
+	}
+
+	serverApps := make(map[int64][]App)
+	for _, a := range apps {
+		if a.Status != StatusRunning || a.ServerID == 0 {
+			continue
+		}
+		serverApps[a.ServerID] = append(serverApps[a.ServerID], a)
+	}
+
+	for serverID, appList := range serverApps {
+		go func(sid int64, list []App) {
+			server, err := s.serverRepo.Get(sid)
+			if err != nil || server == nil {
+				return
+			}
+			client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+			if err != nil {
+				log.Printf("Disk collector: SSH connect to %q failed: %v", server.Name, err)
+				return
+			}
+			defer client.Close()
+			s.collectDiskUsageForApps(client, list)
+		}(serverID, appList)
+	}
+}
+
+// collectDiskUsageForApps runs du -sb on each app's home directory in a single
+// SSH round-trip, then updates the latest container_stats row with the result.
+func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
+	if len(apps) == 0 {
+		return
+	}
+
+	var dirs []string
+	appIDs := make([]int64, 0, len(apps))
+	for _, a := range apps {
+		dirs = append(dirs, fmt.Sprintf("/opt/dockify/apps/app-%d", a.ID))
+		appIDs = append(appIDs, a.ID)
+	}
+
+	out, err := client.Exec(fmt.Sprintf("du -sb %s 2>/dev/null", strings.Join(dirs, " ")))
+	if err != nil || strings.TrimSpace(out) == "" {
+		return
+	}
+
+	// Parse output: each line is "<bytes>\t<path>"
+	type diskEntry struct {
+		appID int64
+		bytes int64
+	}
+	var entries []diskEntry
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		appID := parseAppDirID(parts[1])
+		if appID <= 0 {
+			continue
+		}
+		bytes, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil || bytes <= 0 {
+			continue
+		}
+		entries = append(entries, diskEntry{appID, bytes})
+	}
+
+	if len(entries) == 0 {
+		return
+	}
+
+	// Update latest container_stats row for each app.
+	for _, e := range entries {
+		latest, err := s.repo.LatestContainerStats(e.appID)
+		if err != nil || latest == nil {
+			continue
+		}
+		s.repo.UpdateDiskUsage(e.appID, latest.CreatedAt, e.bytes)
+	}
+}
+
+func parseAppDirID(path string) int64 {
+	if !strings.HasPrefix(path, "/opt/dockify/apps/app-") {
+		return 0
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(path, "/opt/dockify/apps/app-"), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
 func (s *Service) collectServerStats(serverID int64, apps []App) {
 	server, err := s.serverRepo.Get(serverID)
 	if err != nil || server == nil {
@@ -87,7 +232,6 @@ func (s *Service) collectServerStats(serverID int64, apps []App) {
 	defer client.Close()
 
 	s.collectAllContainerStats(client, serverID, apps)
-	s.collectCaddyTraffic(client, serverID, apps)
 }
 
 // collectAllContainerStats collects stats for every container on a server in
@@ -180,68 +324,14 @@ func (s *Service) collectAllContainerStats(client ssh.Connector, serverID int64,
 		return
 	}
 
-	diskSizes := collectDiskUsage(client, apps, containerApp)
 	for _, cs := range parsed {
-		if du, ok := diskSizes[cs.AppID]; ok {
-			cs.DiskUsageBytes = du
-		}
 		if err := s.repo.InsertContainerStats(cs); err != nil {
 			log.Printf("Stats collector: failed to insert stats for %q: %v", cs.ContainerName, err)
 		}
 	}
 }
 
-// collectDiskUsage runs du -sb on each app's home directory in a single SSH
-// round-trip and returns a map of appID -> total bytes.
-func collectDiskUsage(client ssh.Connector, apps []App, containerApp map[string]int64) map[int64]int64 {
-	// Collect unique app IDs that have running containers.
-	seen := make(map[int64]bool)
-	var dirs []string
-	for _, cs := range containerApp {
-		if !seen[cs] {
-			seen[cs] = true
-			dirs = append(dirs, fmt.Sprintf("/opt/dockify/apps/app-%d", cs))
-		}
-	}
-	if len(dirs) == 0 {
-		return nil
-	}
 
-	out, err := client.Exec(fmt.Sprintf("du -sb %s 2>/dev/null", strings.Join(dirs, " ")))
-	if err != nil || strings.TrimSpace(out) == "" {
-		return nil
-	}
-
-	result := make(map[int64]int64, len(dirs))
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		if len(parts) < 2 {
-			continue
-		}
-		bytes, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil || bytes <= 0 {
-			continue
-		}
-		// Path is /opt/dockify/apps/app-<id>
-		path := parts[1]
-		if !strings.HasPrefix(path, "/opt/dockify/apps/app-") {
-			continue
-		}
-		appIDStr := strings.TrimPrefix(path, "/opt/dockify/apps/app-")
-		appID, err := strconv.ParseInt(appIDStr, 10, 64)
-		if err != nil {
-			continue
-		}
-		if seen[appID] {
-			result[appID] = bytes
-		}
-	}
-	return result
-}
 
 // parseComposeProjectAppID extracts the numeric app id from a compose project
 // name of the form "app-<id>" (the directory name Dockify uses for each app's
@@ -370,16 +460,6 @@ func (s *Service) LiveSnapshot(client ssh.Connector, app *App) (*ContainerStats,
 	agg := sumStats(parsed)
 	if agg == nil {
 		return nil, nil
-	}
-	// Collect disk usage for the app directory.
-	diskDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
-	if out, err := client.Exec(fmt.Sprintf("du -sb %s 2>/dev/null", diskDir)); err == nil {
-		fields := strings.Fields(strings.TrimSpace(out))
-		if len(fields) >= 2 {
-			if bytes, err := strconv.ParseInt(fields[0], 10, 64); err == nil && bytes > 0 {
-				agg.DiskUsageBytes = bytes
-			}
-		}
 	}
 	return agg, nil
 }
