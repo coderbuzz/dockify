@@ -24,6 +24,7 @@ type Connector interface {
 	Exec(cmd string) (string, error)
 	Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error)
 	ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error)
+	ExecStream(ctx context.Context, cmd string) (<-chan string, error)
 	WriteFile(path, content string, mode os.FileMode) error
 	Close() error
 }

@@ -7,7 +7,7 @@
 {{if .Stats}}
 <div class="card" style="margin-top:1em">
   <div class="stats-header">
-    <h3>Resource Usage</h3>
+    <h3>Resource Usage <span id="app-live-indicator" class="live-badge" style="display:none">● LIVE</span></h3>
     <div class="chart-range-btns">
       <button class="btn btn-ghost{{if eq $range "1h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=1h" hx-target="#app-stats-cards" hx-swap="outerHTML">1h</button>
       <button class="btn btn-ghost{{if eq $range "6h"}} btn-active{{end}}" hx-get="apps/{{.AppID}}/stats?range=6h" hx-target="#app-stats-cards" hx-swap="outerHTML">6h</button>
@@ -20,28 +20,28 @@
     <div class="stat-gauge">
       <div class="stat-gauge-header">
         <div class="stat-gauge-label">CPU</div>
-        <div class="stat-gauge-value">{{printf "%.1f" .Stats.CPUPercent}}%</div>
+        <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%</span></div>
       </div>
       <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-cpu" style="width:{{printf "%.1f" .Stats.CPUPercent}}%"></div>
+        <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%"></div>
       </div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-header">
         <div class="stat-gauge-label">Memory</div>
-        <div class="stat-gauge-value">{{printf "%.1f" .Stats.MemPercent}}% <span class="stat-gauge-detail">{{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}</span></div>
+        <div class="stat-gauge-value"><span id="mem-gauge-pct">{{printf "%.1f" (clamp100 .Stats.MemPercent)}}%</span> <span class="stat-gauge-detail" id="mem-gauge-detail">{{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}</span></div>
       </div>
       <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-mem" style="width:{{printf "%.1f" .Stats.MemPercent}}%"></div>
+        <div class="stat-gauge-fill stat-gauge-mem" id="mem-gauge-fill" style="width:{{printf "%.1f" (clamp100 .Stats.MemPercent)}}%"></div>
       </div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">Net I/O</div>
-      <div class="stat-gauge-net">{{formatBytes .Stats.NetIORxBytes}} RX &middot; {{formatBytes .Stats.NetIOTxBytes}} TX</div>
+      <div class="stat-gauge-net"><span id="net-rx">{{formatBytes .Stats.NetIORxBytes}} RX</span> &middot; <span id="net-tx">{{formatBytes .Stats.NetIOTxBytes}} TX</span></div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">Block I/O</div>
-      <div class="stat-gauge-net">{{formatBytes .Stats.BlockIORead}} R &middot; {{formatBytes .Stats.BlockIOWrite}} W</div>
+      <div class="stat-gauge-net"><span id="block-r">{{formatBytes .Stats.BlockIORead}} R</span> &middot; <span id="block-w">{{formatBytes .Stats.BlockIOWrite}} W</span></div>
     </div>
   </div>
 
@@ -50,7 +50,7 @@
   <div class="chart-section">
     <div class="chart-title">CPU</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
       <line x1="0" y1="{{chartThresholdY $cpuMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $cpuMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
@@ -63,7 +63,7 @@
   <div class="chart-section">
     <div class="chart-title">Memory</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax}}" />
       <line x1="0" y1="{{chartThresholdY $memMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $memMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
@@ -77,7 +77,7 @@
   <div class="chart-section">
     <div class="chart-title">Network I/O</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="network-chart-line" data-max="{{$netMax}}" data-points='{{chartPointsJSON .ChartData.network}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.network $width $height $netMax}}" />
     </svg>
   </div>
@@ -86,7 +86,7 @@
 {{else}}
 <div class="card" style="margin-top:1em">
   <h3>Resource Usage</h3>
-  <p style="color:var(--text-muted);font-size:0.85em">Stats not yet available. Data collects every 60 seconds.</p>
+  <p style="color:var(--text-muted);font-size:0.85em">Stats not yet available. Data collects every 10 seconds.</p>
 </div>
 {{end}}
 

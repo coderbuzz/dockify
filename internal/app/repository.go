@@ -594,37 +594,48 @@ func (r *Repository) LatestContainerStats(appID int64) (*ContainerStats, error) 
 	return s, err
 }
 
-func (r *Repository) ContainerStatsHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
-	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
-	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, AVG(cpu_percent) as cpu, AVG(mem_percent) as mem
+// LatestAggregatedStats returns the total resource usage of an app at its most
+// recent collection tick (summed across all of the app's containers). Because
+// created_at is second-precision, all containers collected in one tick share
+// the same timestamp, so summing that tick yields the app total.
+func (r *Repository) LatestAggregatedStats(appID int64) (*ContainerStats, error) {
+	row := r.db.QueryRow(`
+		SELECT
+			SUM(cpu_percent),
+			SUM(mem_usage_bytes),
+			SUM(mem_limit_bytes),
+			SUM(mem_percent),
+			SUM(net_io_rx_bytes),
+			SUM(net_io_tx_bytes),
+			SUM(block_io_read),
+			SUM(block_io_write),
+			SUM(pids)
 		FROM container_stats
-		WHERE app_id = ? AND created_at >= ?
-		GROUP BY bucket ORDER BY bucket ASC
-	`, groupBy)
+		WHERE app_id = ? AND created_at = (
+			SELECT MAX(created_at) FROM container_stats WHERE app_id = ?
+		)
+	`, appID, appID)
 
-	rows, err := r.db.Query(query, appID, since)
-	if err != nil {
+	s := &ContainerStats{AppID: appID}
+	var pids sql.NullInt64
+	if err := row.Scan(
+		&s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent,
+		&s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &pids,
+	); err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var points []ChartPoint
-	for rows.Next() {
-		var bucket string
-		var cpuVal, memVal float64
-		if err := rows.Scan(&bucket, &cpuVal, &memVal); err != nil {
-			return nil, err
-		}
-		points = append(points, ChartPoint{Time: bucket, Value: cpuVal + memVal})
+	if pids.Valid {
+		s.PIDs = int(pids.Int64)
 	}
-	return points, rows.Err()
+	return s, nil
 }
 
 func (r *Repository) ContainerStatsCPUHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
 	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, AVG(cpu_percent)
+		SELECT datetime(%s, 'unixepoch') as bucket, SUM(cpu_percent)
 		FROM container_stats
 		WHERE app_id = ? AND created_at >= ?
 		GROUP BY bucket ORDER BY bucket ASC
@@ -635,7 +646,7 @@ func (r *Repository) ContainerStatsCPUHistory(appID int64, since time.Time, buck
 func (r *Repository) ContainerStatsMemHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
 	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, AVG(mem_percent)
+		SELECT datetime(%s, 'unixepoch') as bucket, SUM(mem_percent)
 		FROM container_stats
 		WHERE app_id = ? AND created_at >= ?
 		GROUP BY bucket ORDER BY bucket ASC
@@ -645,12 +656,16 @@ func (r *Repository) ContainerStatsMemHistory(appID int64, since time.Time, buck
 
 func (r *Repository) ContainerStatsNetHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
 	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	bucketSecs := bucketMinutes * 60
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, AVG(net_io_rx_bytes + net_io_tx_bytes)
+		SELECT datetime(%s, 'unixepoch') as bucket,
+		       (SUM(net_io_rx_bytes + net_io_tx_bytes)
+		        - LAG(SUM(net_io_rx_bytes + net_io_tx_bytes), 1, 0)
+		          OVER (ORDER BY bucket)) / %d.0 AS net_rate
 		FROM container_stats
 		WHERE app_id = ? AND created_at >= ?
 		GROUP BY bucket ORDER BY bucket ASC
-	`, groupBy)
+	`, groupBy, bucketSecs)
 	return r.queryChartPoints(query, appID, since)
 }
 

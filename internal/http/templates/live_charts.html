@@ -1,0 +1,170 @@
+{{define "live_charts"}}
+<script>
+function formatBytes(b) {
+  if (b === undefined || b === null || isNaN(b)) return '-';
+  b = Number(b);
+  if (b < 1024) return Math.round(b) + ' B';
+  var units = ['KiB','MiB','GiB','TiB','PiB'];
+  var i = Math.floor(Math.log(b) / Math.log(1024));
+  if (i >= units.length) i = units.length - 1;
+  return (b / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+// initLiveCharts wires up a live (1s) WebSocket chart + gauge feed for a server
+// or app stats card. Shared by the server and app detail pages to avoid
+// duplicating the chart-drawing / WS logic.
+//
+// opts:
+//   wsUrl            - relative WS path (e.g. 'api/servers/1/stats/live')
+//   metrics          - chart metric keys, e.g. ['cpu','ram','disk'] or ['cpu','memory','network']
+//   gauges           - array of {metric, field, pctId, fillId, [detailId, detailFn]}
+//                      each updates its gauge pct text + bar width (clamped to 100%)
+//                      and appends a live chart point.
+//   lines            - array of {metric, field} for chart-only metrics without a gauge
+//                      (e.g. network throughput). Appends a live chart point per sample.
+//   targetId         - htmx swap target id (e.g. 'server-stats-cards' / 'app-stats-cards')
+//   liveIndicatorId  - id of the "● LIVE" badge to toggle
+//   width/height     - chart dimensions (default 600x100)
+//   maxLivePoints    - rolling live window (default 120)
+//   onData           - optional callback(data) for page-specific label updates
+function initLiveCharts(opts) {
+  var ws = null;
+  var chartData = {};
+  var liveMetrics = {};
+  var width = opts.width || 600;
+  var height = opts.height || 100;
+  var maxLivePoints = opts.maxLivePoints || 120;
+
+  opts.metrics.forEach(function(m) {
+    chartData[m] = [];
+    liveMetrics[m] = [];
+  });
+
+  function connect() {
+    var base = document.querySelector('base').getAttribute('href') || '/';
+    var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var host = window.location.host;
+    ws = new WebSocket(proto + '//' + host + base + opts.wsUrl);
+
+    ws.onopen = function() {
+      var ind = document.getElementById(opts.liveIndicatorId);
+      if (ind) ind.style.display = 'inline';
+    };
+
+    ws.onmessage = function(evt) {
+      var data;
+      try { data = JSON.parse(evt.data); } catch(e) { return; }
+      if (data.error) { console.error('Stats error:', data.error); return; }
+
+      if (data.chart_data) {
+        opts.metrics.forEach(function(m) {
+          chartData[m] = data.chart_data[m] || [];
+          liveMetrics[m] = [];
+          updateChartLine(m);
+        });
+      }
+
+      (opts.gauges || []).forEach(function(g) {
+        if (data[g.field] === undefined) return;
+        var v = data[g.field];
+        var pct = v.toFixed(1) + '%';
+        var pctEl = document.getElementById(g.pctId);
+        if (pctEl) pctEl.textContent = pct;
+        var fillEl = document.getElementById(g.fillId);
+        if (fillEl) fillEl.style.width = Math.min(v, 100) + '%';
+        if (g.detailId && g.detailFn) {
+          var detEl = document.getElementById(g.detailId);
+          if (detEl) detEl.textContent = g.detailFn(data);
+        }
+        addChartPoint(g.metric, v);
+      });
+
+      (opts.lines || []).forEach(function(l) {
+        if (data[l.field] !== undefined) {
+          addChartPoint(l.metric, data[l.field]);
+        }
+      });
+
+      if (typeof opts.onData === 'function') opts.onData(data);
+    };
+
+    ws.onclose = function() {
+      var ind = document.getElementById(opts.liveIndicatorId);
+      if (ind) ind.style.display = 'none';
+    };
+  }
+
+  function disconnect() {
+    if (ws) { ws.close(); ws = null; }
+    var ind = document.getElementById(opts.liveIndicatorId);
+    if (ind) ind.style.display = 'none';
+  }
+
+  function addChartPoint(metric, value) {
+    var now = new Date().toISOString();
+    liveMetrics[metric].push({time: now, value: value});
+    if (liveMetrics[metric].length > maxLivePoints) {
+      liveMetrics[metric] = liveMetrics[metric].slice(-maxLivePoints);
+    }
+    updateChartLine(metric);
+  }
+
+  function updateCharts() {
+    opts.metrics.forEach(function(m) { updateChartLine(m); });
+  }
+
+  function updateChartLine(metric) {
+    var line = document.getElementById(metric + '-chart-line');
+    if (!line) return;
+    var maxVal = parseFloat(line.getAttribute('data-max')) || 100;
+    var combined = chartData[metric].concat(liveMetrics[metric]);
+    if (combined.length === 0) return;
+    line.setAttribute('points', chartPointsToSvg(combined, width, height, maxVal));
+  }
+
+  function chartPointsToSvg(points, w, h, maxVal) {
+    if (points.length === 0 || maxVal <= 0) return '';
+    var parts = [];
+    var step = w / (points.length - 1);
+    if (points.length === 1) step = w;
+    for (var i = 0; i < points.length; i++) {
+      var x = i * step;
+      var y = h - (points[i].value / maxVal) * h;
+      parts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    return parts.join(' ');
+  }
+
+  function readChartDataFromHTML() {
+    opts.metrics.forEach(function(m) {
+      var line = document.getElementById(m + '-chart-line');
+      if (line) {
+        var points = line.getAttribute('data-points');
+        if (points) {
+          try { chartData[m] = JSON.parse(points); } catch(e) { chartData[m] = []; }
+        }
+      }
+    });
+  }
+
+  readChartDataFromHTML();
+  updateCharts();
+
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.target.id === opts.targetId) {
+      readChartDataFromHTML();
+      updateCharts();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        var rangeEl = evt.target.getAttribute('data-range');
+        if (rangeEl) {
+          ws.send(JSON.stringify({range: rangeEl}));
+        }
+      }
+    }
+  });
+
+  connect();
+  return { disconnect: disconnect };
+}
+</script>
+{{end}}

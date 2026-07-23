@@ -23,6 +23,28 @@
       <p style="color:var(--text-muted);font-size:0.85em">Loading stats&hellip;</p>
     </div>
   </div>
+  <script>
+  var appCharts = initLiveCharts({
+    wsUrl: 'api/apps/{{.App.ID}}/stats/live',
+    metrics: ['cpu', 'memory', 'network'],
+    gauges: [
+      {metric:'cpu', field:'cpu', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill'},
+      {metric:'memory', field:'memory', pctId:'mem-gauge-pct', fillId:'mem-gauge-fill',
+       detailId:'mem-gauge-detail',
+       detailFn:function(d){return formatBytes(d.mem_usage_bytes)+' / '+formatBytes(d.mem_limit_bytes);}}
+    ],
+    lines: [{metric:'network', field:'network'}],
+    targetId: 'app-stats-cards',
+    liveIndicatorId: 'app-live-indicator',
+    onData: function(d) {
+      if (d.net_rx !== undefined) { var e=document.getElementById('net-rx'); if(e) e.textContent=formatBytes(d.net_rx)+' RX'; }
+      if (d.net_tx !== undefined) { var e=document.getElementById('net-tx'); if(e) e.textContent=formatBytes(d.net_tx)+' TX'; }
+      if (d.block_r !== undefined) { var e=document.getElementById('block-r'); if(e) e.textContent=formatBytes(d.block_r)+' R'; }
+      if (d.block_w !== undefined) { var e=document.getElementById('block-w'); if(e) e.textContent=formatBytes(d.block_w)+' W'; }
+    }
+  });
+  window.addEventListener('beforeunload', appCharts.disconnect);
+  </script>
   {{end}}
 
   <div class="grid grid-fill">

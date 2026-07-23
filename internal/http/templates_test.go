@@ -21,6 +21,7 @@ func TestTemplatesParse(t *testing.T) {
 		"chartThresholdY": chartThresholdY,
 		"div":             div,
 		"mul":             mul,
+		"clamp100":        clamp100,
 		"nl2br": func(s string) template.HTML {
 			return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 		},

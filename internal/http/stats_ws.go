@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/server"
 	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/go-chi/chi/v5"
@@ -18,11 +19,12 @@ import (
 
 type StatsHandler struct {
 	serverSvc *server.Service
+	appSvc    *app.Service
 	sshKeyDir string
 }
 
-func NewStatsHandler(svc *server.Service, sshKeyDir string) *StatsHandler {
-	return &StatsHandler{serverSvc: svc, sshKeyDir: sshKeyDir}
+func NewStatsHandler(svc *server.Service, appSvc *app.Service, sshKeyDir string) *StatsHandler {
+	return &StatsHandler{serverSvc: svc, appSvc: appSvc, sshKeyDir: sshKeyDir}
 }
 
 func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {

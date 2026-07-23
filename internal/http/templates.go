@@ -144,6 +144,16 @@ func mul(a, b float64) float64 {
 	return a * b
 }
 
+func clamp100(v float64) float64 {
+	if v > 100 {
+		return 100
+	}
+	if v < 0 {
+		return 0
+	}
+	return v
+}
+
 var funcMap = template.FuncMap{
 	"lower":        strings.ToLower,
 	"upper":        strings.ToUpper,
@@ -158,6 +168,7 @@ var funcMap = template.FuncMap{
 	"chartThresholdY": chartThresholdY,
 	"div":          div,
 	"mul":          mul,
+	"clamp100":     clamp100,
 	"nl2br": func(s string) template.HTML {
 		return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 	},

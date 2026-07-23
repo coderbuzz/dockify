@@ -56,6 +56,24 @@ func (m *MockClient) Exec(cmd string) (string, error) {
 	return "", nil
 }
 
+func (m *MockClient) ExecStream(ctx context.Context, cmd string) (<-chan string, error) {
+	outCh := make(chan string, 16)
+	go func() {
+		defer close(outCh)
+		for _, r := range m.responses {
+			if strings.Contains(cmd, r.pattern) {
+				select {
+				case outCh <- r.response:
+				case <-ctx.Done():
+					return
+				}
+				return
+			}
+		}
+	}()
+	return outCh, nil
+}
+
 func (m *MockClient) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error) {
 	outCh := make(chan Output, 64)
 	inCh := make(chan Input, 64)

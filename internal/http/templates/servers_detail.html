@@ -97,178 +97,44 @@
 
   {{if eq .Server.Status "online"}}
   <script>
-  var statsWs = null;
-  var chartData = {cpu: [], ram: [], disk: []};
-  var liveMetrics = {cpu: [], ram: [], disk: []};
-  var maxLivePoints = 120;
-  var chartWidth = 600;
-  var chartHeight = 100;
-
-  function connectLiveStats() {
-    var serverId = {{.Server.ID}};
-    var base = document.querySelector('base').getAttribute('href') || '/';
-    var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var host = window.location.host;
-
-    statsWs = new WebSocket(proto + '//' + host + base + 'api/servers/' + serverId + '/stats/live');
-
-    statsWs.onopen = function() {
-      var indicator = document.getElementById('live-indicator');
-      if (indicator) indicator.style.display = 'inline';
-    };
-
-    statsWs.onmessage = function(evt) {
-      var data;
-      try { data = JSON.parse(evt.data); } catch(e) { return; }
-      if (data.error) { console.error('Stats error:', data.error); return; }
-
-      if (data.chart_data) {
-        chartData.cpu = data.chart_data.cpu || [];
-        chartData.ram = data.chart_data.ram || [];
-        chartData.disk = data.chart_data.disk || [];
-        liveMetrics.cpu = [];
-        liveMetrics.ram = [];
-        liveMetrics.disk = [];
-        updateCharts();
+  var serverCharts = initLiveCharts({
+    wsUrl: 'api/servers/{{.Server.ID}}/stats/live',
+    metrics: ['cpu', 'ram', 'disk'],
+    gauges: [
+      {metric:'cpu', field:'cpu_usage', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill'},
+      {metric:'ram', field:'ram_usage', pctId:'ram-gauge-pct', fillId:'ram-gauge-fill',
+       detailId:'ram-gauge-detail',
+       detailFn:function(d){return Math.round(d.ram_mb*d.ram_usage/100)+' MB';}},
+      {metric:'disk', field:'disk_usage', pctId:'disk-gauge-pct', fillId:'disk-gauge-fill',
+       detailId:'disk-gauge-detail',
+       detailFn:function(d){return Math.round(d.disk_gb*d.disk_usage/100)+' GB';}}
+    ],
+    targetId: 'server-stats-cards',
+    liveIndicatorId: 'live-indicator',
+    onData: function(d) {
+      if (d.cpu_cores) { var e=document.getElementById('cpu-cores'); if(e) e.textContent=d.cpu_cores; }
+      if (d.ram_mb) { var e=document.getElementById('ram-total'); if(e) e.textContent=d.ram_mb+' MB'; }
+      if (d.disk_gb) { var e=document.getElementById('disk-total'); if(e) e.textContent=d.disk_gb+' GB'; }
+      if (d.cpu_usage !== undefined) {
+        var e=document.getElementById('cpu-usage'); if(e) e.textContent=d.cpu_usage.toFixed(1)+'%';
       }
-
-      if (data.cpu_cores) {
-        var el = document.getElementById('cpu-cores');
-        if (el) el.textContent = data.cpu_cores;
-      }
-      if (data.cpu_usage !== undefined) {
-        var pct = data.cpu_usage.toFixed(1) + '%';
-        var el = document.getElementById('cpu-usage');
-        if (el) el.textContent = pct;
-        var gPct = document.getElementById('cpu-gauge-pct');
-        if (gPct) gPct.textContent = pct;
-        var gFill = document.getElementById('cpu-gauge-fill');
-        if (gFill) gFill.style.width = data.cpu_usage + '%';
-        addChartPoint('cpu', data.cpu_usage);
-      }
-      if (data.ram_mb) {
-        var el = document.getElementById('ram-total');
-        if (el) el.textContent = data.ram_mb + ' MB';
-      }
-      if (data.ram_usage !== undefined) {
-        var el = document.getElementById('ram-usage');
-        if (el) {
-          var used = data.ram_mb * data.ram_usage / 100;
-          var free = data.ram_mb - used;
-          el.textContent = data.ram_usage.toFixed(1) + '% (' + Math.round(used) + ' MB used, ' + Math.round(free) + ' MB free)';
-        }
-        if (data.ram_mb) {
-          var rPct = document.getElementById('ram-gauge-pct');
-          if (rPct) rPct.textContent = data.ram_usage.toFixed(1) + '%';
-          var rDet = document.getElementById('ram-gauge-detail');
-          if (rDet) rDet.textContent = Math.round(data.ram_mb * data.ram_usage / 100) + ' MB';
-          var rFill = document.getElementById('ram-gauge-fill');
-          if (rFill) rFill.style.width = data.ram_usage + '%';
-        }
-        addChartPoint('ram', data.ram_usage);
-      }
-      if (data.disk_gb) {
-        var el = document.getElementById('disk-total');
-        if (el) el.textContent = data.disk_gb + ' GB';
-      }
-      if (data.disk_usage !== undefined) {
-        var el = document.getElementById('disk-usage');
-        if (el) {
-          var used = data.disk_gb * data.disk_usage / 100;
-          var free = data.disk_gb - used;
-          el.textContent = data.disk_usage.toFixed(1) + '% (' + Math.round(used) + ' GB used, ' + Math.round(free) + ' GB free)';
-        }
-        if (data.disk_gb) {
-          var dPct = document.getElementById('disk-gauge-pct');
-          if (dPct) dPct.textContent = data.disk_usage.toFixed(1) + '%';
-          var dDet = document.getElementById('disk-gauge-detail');
-          if (dDet) dDet.textContent = Math.round(data.disk_gb * data.disk_usage / 100) + ' GB';
-          var dFill = document.getElementById('disk-gauge-fill');
-          if (dFill) dFill.style.width = data.disk_usage + '%';
-        }
-        addChartPoint('disk', data.disk_usage);
-      }
-    };
-
-    statsWs.onclose = function() {
-      var indicator = document.getElementById('live-indicator');
-      if (indicator) indicator.style.display = 'none';
-    };
-  }
-
-  function disconnectLiveStats() {
-    if (statsWs) { statsWs.close(); statsWs = null; }
-    var indicator = document.getElementById('live-indicator');
-    if (indicator) indicator.style.display = 'none';
-  }
-
-  function addChartPoint(metric, value) {
-    var now = new Date().toISOString();
-    liveMetrics[metric].push({time: now, value: value});
-    if (liveMetrics[metric].length > maxLivePoints) {
-      liveMetrics[metric] = liveMetrics[metric].slice(-maxLivePoints);
-    }
-    updateChartLine(metric);
-  }
-
-  function updateCharts() {
-    ['cpu', 'ram', 'disk'].forEach(function(metric) {
-      updateChartLine(metric);
-    });
-  }
-
-  function updateChartLine(metric) {
-    var line = document.getElementById(metric + '-chart-line');
-    if (!line) return;
-    var maxVal = parseFloat(line.getAttribute('data-max')) || 100;
-    var combined = chartData[metric].concat(liveMetrics[metric]);
-    if (combined.length === 0) return;
-    var points = chartPointsToSvg(combined, chartWidth, chartHeight, maxVal);
-    line.setAttribute('points', points);
-  }
-
-  function chartPointsToSvg(points, width, height, maxVal) {
-    if (points.length === 0 || maxVal <= 0) return '';
-    var parts = [];
-    var step = width / (points.length - 1);
-    if (points.length === 1) step = width;
-    for (var i = 0; i < points.length; i++) {
-      var x = i * step;
-      var y = height - (points[i].value / maxVal) * height;
-      parts.push(x.toFixed(1) + ',' + y.toFixed(1));
-    }
-    return parts.join(' ');
-  }
-
-  function readChartDataFromHTML() {
-    ['cpu', 'ram', 'disk'].forEach(function(metric) {
-      var line = document.getElementById(metric + '-chart-line');
-      if (line) {
-        var points = line.getAttribute('data-points');
-        if (points) {
-          try { chartData[metric] = JSON.parse(points); } catch(e) { chartData[metric] = []; }
+      if (d.ram_usage !== undefined) {
+        var e=document.getElementById('ram-usage');
+        if (e) {
+          var u=d.ram_mb*d.ram_usage/100; var f=d.ram_mb-u;
+          e.textContent=d.ram_usage.toFixed(1)+'% ('+Math.round(u)+' MB used, '+Math.round(f)+' MB free)';
         }
       }
-    });
-  }
-
-  readChartDataFromHTML();
-
-  document.body.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.target.id === 'server-stats-cards') {
-      readChartDataFromHTML();
-      updateCharts();
-      if (statsWs && statsWs.readyState === WebSocket.OPEN) {
-        var rangeEl = evt.target.getAttribute('data-range');
-        if (rangeEl) {
-          statsWs.send(JSON.stringify({range: rangeEl}));
+      if (d.disk_usage !== undefined) {
+        var e=document.getElementById('disk-usage');
+        if (e) {
+          var u=d.disk_gb*d.disk_usage/100; var f=d.disk_gb-u;
+          e.textContent=d.disk_usage.toFixed(1)+'% ('+Math.round(u)+' GB used, '+Math.round(f)+' GB free)';
         }
       }
     }
   });
-
-  connectLiveStats();
-  window.addEventListener('beforeunload', disconnectLiveStats);
+  window.addEventListener('beforeunload', serverCharts.disconnect);
   </script>
   {{end}}
   {{template "scripts" .}}

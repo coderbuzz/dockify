@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -89,6 +90,47 @@ func (c *Client) Exec(cmd string) (string, error) {
 	}
 
 	return stdout.String(), nil
+}
+
+func (c *Client) ExecStream(ctx context.Context, cmd string) (<-chan string, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("new session: %w", err)
+	}
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		session.Close()
+		return nil, fmt.Errorf("stdout pipe: %w", err)
+	}
+
+	if err := session.Start(cmd); err != nil {
+		session.Close()
+		return nil, fmt.Errorf("exec stream %q: %w", cmd, err)
+	}
+
+	outCh := make(chan string, 256)
+	go func() {
+		defer close(outCh)
+		defer session.Close()
+
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+		for scanner.Scan() {
+			select {
+			case outCh <- scanner.Text():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+		session.Close()
+	}()
+
+	return outCh, nil
 }
 
 func (c *Client) WriteFile(path, content string, mode os.FileMode) error {

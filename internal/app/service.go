@@ -694,21 +694,20 @@ type DashboardStats struct {
 }
 
 func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
-	cs, err := s.repo.LatestContainerStats(appID)
+	cs, err := s.repo.LatestAggregatedStats(appID)
 	if err != nil || cs == nil {
 		return nil
 	}
 	return &StatsOverview{
 		CPUPercent:    cs.CPUPercent,
-		MemPercent:     cs.MemPercent,
-		MemUsageBytes:  cs.MemUsageBytes,
-		MemLimitBytes:  cs.MemLimitBytes,
-		NetIORxBytes:   cs.NetIORxBytes,
-		NetIOTxBytes:   cs.NetIOTxBytes,
-		BlockIORead:    cs.BlockIORead,
-		BlockIOWrite:   cs.BlockIOWrite,
-		PIDs:           cs.PIDs,
-		ContainerName:  cs.ContainerName,
+		MemPercent:    cs.MemPercent,
+		MemUsageBytes: cs.MemUsageBytes,
+		MemLimitBytes: cs.MemLimitBytes,
+		NetIORxBytes:  cs.NetIORxBytes,
+		NetIOTxBytes:  cs.NetIOTxBytes,
+		BlockIORead:   cs.BlockIORead,
+		BlockIOWrite:  cs.BlockIOWrite,
+		PIDs:          cs.PIDs,
 	}
 }
 

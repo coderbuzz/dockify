@@ -1,9 +1,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,7 +28,7 @@ func (s *Service) StartStatsCollector() {
 }
 
 func (s *Service) statsLoop() {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	pruneTicker := time.NewTicker(1 * time.Hour)
@@ -77,47 +79,249 @@ func (s *Service) collectServerStats(serverID int64, apps []App) {
 	}
 	defer client.Close()
 
-	s.collectContainerStats(client, serverID, apps)
+	s.collectAllContainerStats(client, serverID, apps)
 	s.collectCaddyTraffic(client, serverID, apps)
 }
 
-func (s *Service) collectContainerStats(client ssh.Connector, serverID int64, apps []App) {
-	for _, app := range apps {
-		serviceName := app.ContainerServiceName()
-		composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
+// collectAllContainerStats collects stats for every container on a server in
+// just two SSH round-trips:
+//  1. `docker ps` lists running containers with their compose project label
+//     (com.docker.compose.project = app-<id>), mapping container -> appID.
+//  2. a single `docker stats --no-stream` for all those containers, returning
+//     one JSON line per container.
+// This replaces the previous per-app/per-container `docker stats` calls, which
+// spawned one SSH session per container every tick.
+func (s *Service) collectAllContainerStats(client ssh.Connector, serverID int64, apps []App) {
+	appByID := make(map[int64]App, len(apps))
+	for _, a := range apps {
+		appByID[a.ID] = a
+	}
 
-		dc := detectDockerCompose(client)
-		containerList, err := client.Exec(fmt.Sprintf("%s -f %s ps --format '{{.Names}}' 2>/dev/null", dc, composePath))
-		if err != nil || strings.TrimSpace(containerList) == "" {
-			containerList, err = client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", dc, composePath))
+	// containerName -> appID
+	containerApp := make(map[string]int64)
+
+	psOut, err := client.Exec(`docker ps --format '{{.Names}}|{{.Label "com.docker.compose.project"}}' 2>/dev/null`)
+	if err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(psOut), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, "|", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			cname := strings.TrimSpace(parts[0])
+			project := strings.TrimSpace(parts[1])
+			if appID := parseComposeProjectAppID(project); appID > 0 {
+				if _, ok := appByID[appID]; ok {
+					containerApp[cname] = appID
+				}
+			}
 		}
-		if err != nil || strings.TrimSpace(containerList) == "" {
+	}
+
+	// Fallback: per-app discovery for containers whose project label is missing.
+	if len(containerApp) == 0 {
+		for _, app := range apps {
+			containers, err := listAppContainers(client, app)
+			if err != nil {
+				continue
+			}
+			for _, c := range containers {
+				containerApp[c] = app.ID
+			}
+		}
+	}
+
+	if len(containerApp) == 0 {
+		return
+	}
+
+	names := make([]string, 0, len(containerApp))
+	for c := range containerApp {
+		names = append(names, c)
+	}
+	sort.Strings(names)
+
+	out, err := client.Exec(fmt.Sprintf("docker stats --no-stream --format '{{json .}}' %s 2>/dev/null", strings.Join(names, " ")))
+	if err != nil || strings.TrimSpace(out) == "" {
+		return
+	}
+
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
+		var stat dockerStat
+		if err := json.Unmarshal([]byte(line), &stat); err != nil {
+			log.Printf("Stats collector: failed to parse docker stats for %q: %v", stat.Name, err)
+			continue
+		}
+		appID, ok := containerApp[stat.Name]
+		if !ok {
+			continue
+		}
+		cs := parseDockerStat(stat, appID, serverID, stat.Name)
+		if cs != nil {
+			if err := s.repo.InsertContainerStats(cs); err != nil {
+				log.Printf("Stats collector: failed to insert stats for %q: %v", stat.Name, err)
+			}
+		}
+	}
+}
 
-		containers := strings.Split(strings.TrimSpace(containerList), "\n")
-		for _, cname := range containers {
-			cname = strings.TrimSpace(cname)
-			if cname == "" {
+// parseComposeProjectAppID extracts the numeric app id from a compose project
+// name of the form "app-<id>" (the directory name Dockify uses for each app's
+// compose file). Returns 0 if it cannot parse.
+func parseComposeProjectAppID(project string) int64 {
+	project = strings.TrimSpace(project)
+	if !strings.HasPrefix(project, "app-") {
+		return 0
+	}
+	n, err := strconv.ParseInt(strings.TrimPrefix(project, "app-"), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// listAppContainers returns the running container names that belong to an app's
+// compose project (e.g. app-<id>-<service>-<n>). It reuses the same discovery
+// logic as the historical collector.
+func listAppContainers(client ssh.Connector, app App) ([]string, error) {
+	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
+	dc := detectDockerCompose(client)
+
+	out, err := client.Exec(fmt.Sprintf("%s -f %s ps --format '{{.Names}}' 2>/dev/null", dc, composePath))
+	if err != nil || strings.TrimSpace(out) == "" {
+		out, err = client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", dc, composePath))
+		if err != nil || strings.TrimSpace(out) == "" {
+			return nil, err
+		}
+	}
+
+	var containers []string
+	for _, c := range strings.Split(strings.TrimSpace(out), "\n") {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			containers = append(containers, c)
+		}
+	}
+	return containers, nil
+}
+
+// sumStats aggregates (sums) a set of per-container stats into a single
+// ContainerStats representing the total resource usage of an app.
+func sumStats(stats []*ContainerStats) *ContainerStats {
+	if len(stats) == 0 {
+		return nil
+	}
+	var sum ContainerStats
+	for _, cs := range stats {
+		sum.AppID = cs.AppID
+		sum.ServerID = cs.ServerID
+		sum.CPUPercent += cs.CPUPercent
+		sum.MemUsageBytes += cs.MemUsageBytes
+		sum.MemLimitBytes += cs.MemLimitBytes
+		sum.MemPercent += cs.MemPercent
+		sum.NetIORxBytes += cs.NetIORxBytes
+		sum.NetIOTxBytes += cs.NetIOTxBytes
+		sum.BlockIORead += cs.BlockIORead
+		sum.BlockIOWrite += cs.BlockIOWrite
+		sum.PIDs += cs.PIDs
+	}
+	return &sum
+}
+
+// LiveSnapshot returns a single aggregated snapshot of an app's containers
+// using a one-shot `docker stats --no-stream` call. Used by the dev-mock live
+// WebSocket path (the mock SSH client only supports one-shot Exec).
+func (s *Service) LiveSnapshot(client ssh.Connector, app *App) (*ContainerStats, error) {
+	if app == nil {
+		return nil, fmt.Errorf("app is nil")
+	}
+	if app.ServerID == 0 {
+		return nil, fmt.Errorf("app %d is not assigned to a server", app.ID)
+	}
+
+	containers, err := listAppContainers(client, *app)
+	if err != nil || len(containers) == 0 {
+		return nil, err
+	}
+
+	var parsed []*ContainerStats
+	for _, cname := range containers {
+		out, err := client.Exec(fmt.Sprintf("docker stats --no-stream --format '{{json .}}' %s 2>/dev/null", cname))
+		if err != nil || strings.TrimSpace(out) == "" {
+			continue
+		}
+		var stat dockerStat
+		if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &stat); err != nil {
+			continue
+		}
+		if cs := parseDockerStat(stat, app.ID, app.ServerID, cname); cs != nil {
+			parsed = append(parsed, cs)
+		}
+	}
+	return sumStats(parsed), nil
+}
+
+// StreamStats continuously reads a streaming `docker stats` session for an app's
+// containers and emits an aggregated snapshot (summed across containers) on
+// each parsed line. It blocks until ctx is cancelled.
+func (s *Service) StreamStats(ctx context.Context, client ssh.Connector, app *App, out chan<- *ContainerStats) error {
+	if app == nil {
+		return fmt.Errorf("app is nil")
+	}
+	if app.ServerID == 0 {
+		return fmt.Errorf("app %d is not assigned to a server", app.ID)
+	}
+
+	containers, err := listAppContainers(client, *app)
+	if err != nil || len(containers) == 0 {
+		return err
+	}
+
+	cmd := fmt.Sprintf("docker stats --format '{{json .}}' %s 2>/dev/null", strings.Join(containers, " "))
+	lines, err := client.ExecStream(ctx, cmd)
+	if err != nil {
+		return err
+	}
+
+	latest := make(map[string]*ContainerStats)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case line, ok := <-lines:
+			if !ok {
+				return nil
+			}
+			line = strings.TrimSpace(line)
+			if line == "" {
 				continue
 			}
-
-			out, err := client.Exec(fmt.Sprintf("docker stats --no-stream --format '{{json .}}' %s 2>/dev/null", cname))
-			if err != nil || strings.TrimSpace(out) == "" {
-				continue
-			}
-
 			var stat dockerStat
-			if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &stat); err != nil {
-				log.Printf("Stats collector: failed to parse docker stats for %q: %v", cname, err)
+			if err := json.Unmarshal([]byte(line), &stat); err != nil {
 				continue
 			}
+			cs := parseDockerStat(stat, app.ID, app.ServerID, stat.Name)
+			if cs == nil {
+				continue
+			}
+			latest[cs.ContainerName] = cs
 
-			_ = serviceName
-			cs := parseDockerStat(stat, app.ID, serverID, cname)
-			if cs != nil {
-				if err := s.repo.InsertContainerStats(cs); err != nil {
-					log.Printf("Stats collector: failed to insert stats for %q: %v", cname, err)
+			var all []*ContainerStats
+			for _, c := range latest {
+				all = append(all, c)
+			}
+			if agg := sumStats(all); agg != nil {
+				select {
+				case out <- agg:
+				case <-ctx.Done():
+					return nil
 				}
 			}
 		}
