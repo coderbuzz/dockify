@@ -568,6 +568,30 @@ sudo chmod +x /usr/local/bin/dockify
 sudo systemctl start dockify
 ```
 
+## Helper Scripts
+
+### Generate Remote Access SSH Key
+
+`scripts/gen-ssh-key.sh` generates a dedicated SSH key on any VM for external,
+general-purpose access — e.g. handing an agentic AI SSH access for remote
+debugging, running shell commands, or cleaning up a compromised VM. It is fully
+independent of Dockify's automation key, so you can revoke or rotate it without
+affecting Dockify.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/gen-ssh-key.sh | bash
+```
+
+The script will:
+
+1. Generate an SSH key pair at `/root/.ssh/remote-access` (ed25519, no passphrase)
+2. Add the public key to `/root/.ssh/authorized_keys`
+3. Output the **private key content** — copy this into your agentic-AI / SSH client config
+
+The key is generic and separate from Dockify's `/root/.ssh/dockify` automation key.
+To revoke access later: `rm /root/.ssh/remote-access*` and remove its line from
+`/root/.ssh/authorized_keys`.
+
 ## Project Structure
 
 ```
