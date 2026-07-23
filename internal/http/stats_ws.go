@@ -74,8 +74,31 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 		log.Printf("stats initial cpu sample error: %v", err)
 	}
 
+	currentRange := "1h"
+	sendChartData(conn, h.serverSvc, id, currentRange)
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	chartTicker := time.NewTicker(30 * time.Second)
+	defer chartTicker.Stop()
+
+	rangeCh := make(chan string, 1)
+	go func() {
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				close(rangeCh)
+				return
+			}
+			var clientMsg map[string]interface{}
+			if err := json.Unmarshal(msg, &clientMsg); err == nil {
+				if r, ok := clientMsg["range"].(string); ok {
+					rangeCh <- r
+				}
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -105,10 +128,39 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+		case <-chartTicker.C:
+			if err := sendChartData(conn, h.serverSvc, id, currentRange); err != nil {
+				return
+			}
+
+		case r, ok := <-rangeCh:
+			if !ok {
+				return
+			}
+			currentRange = r
+			if err := sendChartData(conn, h.serverSvc, id, currentRange); err != nil {
+				return
+			}
+
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func sendChartData(conn *websocket.Conn, svc *server.Service, serverID int64, rangeStr string) error {
+	chartData := svc.GetStatsHistory(serverID, rangeStr)
+	if chartData == nil {
+		return nil
+	}
+	data := map[string]interface{}{
+		"chart_data": chartData,
+	}
+	jsonStr, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return conn.WriteMessage(websocket.TextMessage, jsonStr)
 }
 
 func calculateCPUUsage(prev, curr string) float64 {
