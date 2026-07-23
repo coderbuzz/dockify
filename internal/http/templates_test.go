@@ -17,6 +17,7 @@ func TestTemplatesParse(t *testing.T) {
 		"chartPoints":     chartPoints,
 		"chartMax":        chartMax,
 		"chartMax100":     chartMax100,
+		"chartPointsJSON": chartPointsJSON,
 		"chartThresholdY": chartThresholdY,
 		"div":             div,
 		"mul":             mul,

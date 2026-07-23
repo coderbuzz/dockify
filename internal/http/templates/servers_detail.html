@@ -98,6 +98,11 @@
   {{if eq .Server.Status "online"}}
   <script>
   var statsWs = null;
+  var chartData = {cpu: [], ram: [], disk: []};
+  var liveMetrics = {cpu: [], ram: [], disk: []};
+  var maxLivePoints = 120;
+  var chartWidth = 600;
+  var chartHeight = 100;
 
   function connectLiveStats() {
     var serverId = {{.Server.ID}};
@@ -117,6 +122,16 @@
       try { data = JSON.parse(evt.data); } catch(e) { return; }
       if (data.error) { console.error('Stats error:', data.error); return; }
 
+      if (data.chart_data) {
+        chartData.cpu = data.chart_data.cpu || [];
+        chartData.ram = data.chart_data.ram || [];
+        chartData.disk = data.chart_data.disk || [];
+        liveMetrics.cpu = [];
+        liveMetrics.ram = [];
+        liveMetrics.disk = [];
+        updateCharts();
+      }
+
       if (data.cpu_cores) {
         var el = document.getElementById('cpu-cores');
         if (el) el.textContent = data.cpu_cores;
@@ -124,6 +139,7 @@
       if (data.cpu_usage !== undefined) {
         var el = document.getElementById('cpu-usage');
         if (el) el.textContent = data.cpu_usage.toFixed(1) + '%';
+        addChartPoint('cpu', data.cpu_usage);
       }
       if (data.ram_mb) {
         var el = document.getElementById('ram-total');
@@ -136,6 +152,7 @@
           var free = data.ram_mb - used;
           el.textContent = data.ram_usage.toFixed(1) + '% (' + Math.round(used) + ' MB used, ' + Math.round(free) + ' MB free)';
         }
+        addChartPoint('ram', data.ram_usage);
       }
       if (data.disk_gb) {
         var el = document.getElementById('disk-total');
@@ -148,6 +165,7 @@
           var free = data.disk_gb - used;
           el.textContent = data.disk_usage.toFixed(1) + '% (' + Math.round(used) + ' GB used, ' + Math.round(free) + ' GB free)';
         }
+        addChartPoint('disk', data.disk_usage);
       }
     };
 
@@ -162,6 +180,71 @@
     var indicator = document.getElementById('live-indicator');
     if (indicator) indicator.style.display = 'none';
   }
+
+  function addChartPoint(metric, value) {
+    var now = new Date().toISOString();
+    liveMetrics[metric].push({time: now, value: value});
+    if (liveMetrics[metric].length > maxLivePoints) {
+      liveMetrics[metric] = liveMetrics[metric].slice(-maxLivePoints);
+    }
+    updateChartLine(metric);
+  }
+
+  function updateCharts() {
+    ['cpu', 'ram', 'disk'].forEach(function(metric) {
+      updateChartLine(metric);
+    });
+  }
+
+  function updateChartLine(metric) {
+    var line = document.getElementById(metric + '-chart-line');
+    if (!line) return;
+    var maxVal = parseFloat(line.getAttribute('data-max')) || 100;
+    var combined = chartData[metric].concat(liveMetrics[metric]);
+    if (combined.length === 0) return;
+    var points = chartPointsToSvg(combined, chartWidth, chartHeight, maxVal);
+    line.setAttribute('points', points);
+  }
+
+  function chartPointsToSvg(points, width, height, maxVal) {
+    if (points.length === 0 || maxVal <= 0) return '';
+    var parts = [];
+    var step = width / (points.length - 1);
+    if (points.length === 1) step = width;
+    for (var i = 0; i < points.length; i++) {
+      var x = i * step;
+      var y = height - (points[i].value / maxVal) * height;
+      parts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    return parts.join(' ');
+  }
+
+  function readChartDataFromHTML() {
+    ['cpu', 'ram', 'disk'].forEach(function(metric) {
+      var line = document.getElementById(metric + '-chart-line');
+      if (line) {
+        var points = line.getAttribute('data-points');
+        if (points) {
+          try { chartData[metric] = JSON.parse(points); } catch(e) { chartData[metric] = []; }
+        }
+      }
+    });
+  }
+
+  readChartDataFromHTML();
+
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.target.id === 'server-stats-cards') {
+      readChartDataFromHTML();
+      updateCharts();
+      if (statsWs && statsWs.readyState === WebSocket.OPEN) {
+        var rangeEl = evt.target.getAttribute('data-range');
+        if (rangeEl) {
+          statsWs.send(JSON.stringify({range: rangeEl}));
+        }
+      }
+    }
+  });
 
   connectLiveStats();
   window.addEventListener('beforeunload', disconnectLiveStats);

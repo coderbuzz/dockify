@@ -344,7 +344,7 @@ func NewMonitor(svc *Service) *Monitor {
 }
 
 func (m *Monitor) Run() {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	pruneTicker := time.NewTicker(1 * time.Hour)

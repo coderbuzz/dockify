@@ -2,7 +2,7 @@
 {{$width := 600}}
 {{$height := 100}}
 
-<div id="server-stats-cards">
+<div id="server-stats-cards" data-range="{{$range}}">
 
 <div class="card" style="margin-top:1em">
   <div class="stats-header">
@@ -52,7 +52,7 @@
   <div class="chart-section">
     <div class="chart-title">CPU</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
       <line x1="0" y1="{{chartThresholdY $cpuMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $cpuMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
@@ -65,7 +65,7 @@
   <div class="chart-section">
     <div class="chart-title">RAM</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="ram-chart-line" data-max="{{$ramMax}}" data-points='{{chartPointsJSON .ChartData.ram}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.ram $width $height $ramMax}}" />
       <line x1="0" y1="{{chartThresholdY $ramMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $ramMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
@@ -78,7 +78,7 @@
   <div class="chart-section">
     <div class="chart-title">Disk</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.disk $width $height $diskMax}}" />
       <line x1="0" y1="{{chartThresholdY $diskMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $diskMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />

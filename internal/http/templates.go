@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"embed"
 	"fmt"
 	"html/template"
@@ -124,6 +125,14 @@ func chartThresholdY(maxVal float64, height int) float64 {
 	return y
 }
 
+func chartPointsJSON(points []model.ChartPoint) template.HTMLAttr {
+	b, err := json.Marshal(points)
+	if err != nil {
+		return template.HTMLAttr("[]")
+	}
+	return template.HTMLAttr(string(b))
+}
+
 func div(a, b float64) float64 {
 	if b == 0 {
 		return 0
@@ -145,6 +154,7 @@ var funcMap = template.FuncMap{
 	"chartPoints":  chartPoints,
 	"chartMax":     chartMax,
 	"chartMax100":  chartMax100,
+	"chartPointsJSON": chartPointsJSON,
 	"chartThresholdY": chartThresholdY,
 	"div":          div,
 	"mul":          mul,
