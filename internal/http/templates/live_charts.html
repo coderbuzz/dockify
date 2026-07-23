@@ -156,6 +156,8 @@ function initLiveCharts(opts) {
       readChartDataFromHTML();
       updateCharts();
       if (ws && ws.readyState === WebSocket.OPEN) {
+        var ind = document.getElementById(opts.liveIndicatorId);
+        if (ind) ind.style.display = 'inline';
         var rangeEl = evt.target.getAttribute('data-range');
         if (rangeEl) {
           ws.send(JSON.stringify({range: rangeEl}));
