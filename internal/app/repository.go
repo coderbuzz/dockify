@@ -705,10 +705,13 @@ func (r *Repository) PruneContainerStats(before time.Time) error {
 	return err
 }
 
-func (r *Repository) UpdateDiskUsage(appID int64, createdAt time.Time, bytes int64) error {
+func (r *Repository) UpdateDiskUsage(appID int64, bytes int64) error {
 	_, err := r.db.Exec(
-		`UPDATE container_stats SET disk_usage_bytes = ? WHERE app_id = ? AND created_at = ?`,
-		bytes, appID, createdAt)
+		`UPDATE container_stats SET disk_usage_bytes = ?
+		 WHERE app_id = ? AND created_at = (
+		   SELECT MAX(created_at) FROM container_stats WHERE app_id = ?
+		 )`,
+		bytes, appID, appID)
 	return err
 }
 

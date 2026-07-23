@@ -196,6 +196,9 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 	var prevNetBytes int64
 	var prevNetTime time.Time
 	var diskUsageBytes int64
+	if stats := h.appSvc.GetStatsOverview(id); stats != nil {
+		diskUsageBytes = stats.DiskUsageBytes
+	}
 
 	for {
 		select {

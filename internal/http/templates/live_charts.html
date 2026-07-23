@@ -57,6 +57,10 @@ function initLiveCharts(opts) {
       try { data = JSON.parse(evt.data); } catch(e) { return; }
       if (data.error) { console.error('Stats error:', data.error); return; }
 
+      // Ensure indicator visible while data flows (survives htmx swap)
+      var ind = document.getElementById(opts.liveIndicatorId);
+      if (ind) ind.classList.remove('live-badge--hidden');
+
       if (data.chart_data) {
         opts.metrics.forEach(function(m) {
           chartData[m] = data.chart_data[m] || [];

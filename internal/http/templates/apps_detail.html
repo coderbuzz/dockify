@@ -37,10 +37,8 @@
     targetId: 'app-stats-cards',
     liveIndicatorId: 'app-live-indicator',
     onData: function(d) {
-      if (d.net_rx !== undefined) { var e=document.getElementById('net-rx'); if(e) e.textContent=formatBytes(d.net_rx)+' RX'; }
-      if (d.net_tx !== undefined) { var e=document.getElementById('net-tx'); if(e) e.textContent=formatBytes(d.net_tx)+' TX'; }
-      if (d.block_r !== undefined) { var e=document.getElementById('block-r'); if(e) e.textContent=formatBytes(d.block_r)+' R'; }
-      if (d.block_w !== undefined) { var e=document.getElementById('block-w'); if(e) e.textContent=formatBytes(d.block_w)+' W'; }
+      if (d.net_rx !== undefined && d.net_tx !== undefined) { var e=document.getElementById('net-io'); if(e) e.textContent=formatBytes(d.net_rx)+' / '+formatBytes(d.net_tx); }
+      if (d.block_r !== undefined && d.block_w !== undefined) { var e=document.getElementById('block-io'); if(e) e.textContent=formatBytes(d.block_r)+' / '+formatBytes(d.block_w); }
       if (d.disk_usage_bytes !== undefined) { var e=document.getElementById('disk-usage'); if(e) e.textContent=formatBytes(d.disk_usage_bytes); }
     }
   });

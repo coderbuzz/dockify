@@ -36,16 +36,16 @@
       </div>
     </div>
     <div class="stat-gauge">
+      <div class="stat-gauge-label">Disk</div>
+      <div class="stat-gauge-net"><span id="disk-usage">{{formatBytes .Stats.DiskUsageBytes}}</span></div>
+    </div>
+    <div class="stat-gauge">
       <div class="stat-gauge-label">Net I/O</div>
-      <div class="stat-gauge-net"><span id="net-rx">{{formatBytes .Stats.NetIORxBytes}} RX</span> &middot; <span id="net-tx">{{formatBytes .Stats.NetIOTxBytes}} TX</span></div>
+      <div class="stat-gauge-net"><span id="net-io">{{formatBytes .Stats.NetIORxBytes}} / {{formatBytes .Stats.NetIOTxBytes}}</span></div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">Block I/O</div>
-      <div class="stat-gauge-net"><span id="block-r">{{formatBytes .Stats.BlockIORead}} R</span> &middot; <span id="block-w">{{formatBytes .Stats.BlockIOWrite}} W</span></div>
-    </div>
-    <div class="stat-gauge">
-      <div class="stat-gauge-label">Disk</div>
-      <div class="stat-gauge-net"><span id="disk-usage">{{formatBytes .Stats.DiskUsageBytes}}</span></div>
+      <div class="stat-gauge-net"><span id="block-io">{{formatBytes .Stats.BlockIORead}} / {{formatBytes .Stats.BlockIOWrite}}</span></div>
     </div>
   </div>
 

@@ -199,11 +199,7 @@ func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
 
 	// Update latest container_stats row for each app.
 	for _, e := range entries {
-		latest, err := s.repo.LatestContainerStats(e.appID)
-		if err != nil || latest == nil {
-			continue
-		}
-		s.repo.UpdateDiskUsage(e.appID, latest.CreatedAt, e.bytes)
+		s.repo.UpdateDiskUsage(e.appID, e.bytes)
 	}
 }
 
