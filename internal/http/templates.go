@@ -60,7 +60,7 @@ func freeAmount(total int, pct float64) float64 {
 }
 
 func formatBytes(b int64) string {
-	const unit = 1024
+	const unit = 1000
 	if b < unit {
 		return fmt.Sprintf("%d B", b)
 	}
@@ -69,7 +69,7 @@ func formatBytes(b int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 func chartPoints(points []model.ChartPoint, width, height int, maxVal float64) template.HTMLAttr {

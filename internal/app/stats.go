@@ -198,17 +198,47 @@ func parseComposeProjectAppID(project string) int64 {
 // compose project (e.g. app-<id>-<service>-<n>). It reuses the same discovery
 // logic as the historical collector.
 func listAppContainers(client ssh.Connector, app App) ([]string, error) {
+	containers, err := discoverAppContainers(client, app)
+	if err != nil || len(containers) == 0 {
+		return nil, err
+	}
+	return containers, nil
+}
+
+// discoverAppContainers finds running containers for an app using multiple
+// strategies, prioritized by robustness:
+//  1. docker ps --filter label=com.docker.compose.project=app-<id> (same approach
+//     as the 10s collector in collectAllContainerStats, which has proven to work
+//     across docker versions including those where `docker compose ps --format`
+//     is unsupported).
+//  2. Fallback: docker compose -f <path> ps --format '{{.Names}}' (or ps -q).
+func discoverAppContainers(client ssh.Connector, app App) ([]string, error) {
+	project := fmt.Sprintf("app-%d", app.ID)
+
+	// Strategy 1: docker ps with compose project label filter (robust, matches collector).
+	out, err := client.Exec(fmt.Sprintf(
+		"docker ps --filter label=com.docker.compose.project=%s --format '{{.Names}}' 2>/dev/null", project))
+	if err == nil && strings.TrimSpace(out) != "" {
+		return parseContainerList(out), nil
+	}
+
+	// Strategy 2: fallback to docker compose ps.
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	dc := detectDockerCompose(client)
 
-	out, err := client.Exec(fmt.Sprintf("%s -f %s ps --format '{{.Names}}' 2>/dev/null", dc, composePath))
+	out, err = client.Exec(fmt.Sprintf("%s -f %s ps --format '{{.Names}}' 2>/dev/null", dc, composePath))
 	if err != nil || strings.TrimSpace(out) == "" {
 		out, err = client.Exec(fmt.Sprintf("%s -f %s ps -q 2>/dev/null", dc, composePath))
 		if err != nil || strings.TrimSpace(out) == "" {
+			log.Printf("discoverAppContainers: no containers found for app %d (project=%s)", app.ID, project)
 			return nil, err
 		}
 	}
 
+	return parseContainerList(out), nil
+}
+
+func parseContainerList(out string) []string {
 	var containers []string
 	for _, c := range strings.Split(strings.TrimSpace(out), "\n") {
 		c = strings.TrimSpace(c)
@@ -216,7 +246,7 @@ func listAppContainers(client ssh.Connector, app App) ([]string, error) {
 			containers = append(containers, c)
 		}
 	}
-	return containers, nil
+	return containers
 }
 
 // sumStats aggregates (sums) a set of per-container stats into a single
@@ -255,6 +285,7 @@ func (s *Service) LiveSnapshot(client ssh.Connector, app *App) (*ContainerStats,
 
 	containers, err := listAppContainers(client, *app)
 	if err != nil || len(containers) == 0 {
+		log.Printf("LiveSnapshot: no containers found for app %d: %v", app.ID, err)
 		return nil, err
 	}
 
@@ -288,6 +319,7 @@ func (s *Service) StreamStats(ctx context.Context, client ssh.Connector, app *Ap
 
 	containers, err := listAppContainers(client, *app)
 	if err != nil || len(containers) == 0 {
+		log.Printf("StreamStats: no containers found for app %d: %v", app.ID, err)
 		return err
 	}
 

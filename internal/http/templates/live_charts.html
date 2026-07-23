@@ -3,11 +3,11 @@
 function formatBytes(b) {
   if (b === undefined || b === null || isNaN(b)) return '-';
   b = Number(b);
-  if (b < 1024) return Math.round(b) + ' B';
-  var units = ['KiB','MiB','GiB','TiB','PiB'];
-  var i = Math.floor(Math.log(b) / Math.log(1024));
+  if (b < 1000) return Math.round(b) + ' B';
+  var units = ['kB','MB','GB','TB','PB'];
+  var i = Math.floor(Math.log(b) / Math.log(1000));
   if (i >= units.length) i = units.length - 1;
-  return (b / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+  return (b / Math.pow(1000, i)).toFixed(1) + ' ' + units[i];
 }
 
 // initLiveCharts wires up a live (1s) WebSocket chart + gauge feed for a server

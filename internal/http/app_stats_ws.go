@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/app"
@@ -109,6 +110,51 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 		go func() {
 			if err := h.appSvc.StreamStats(ctx, client, a, snapCh); err != nil {
 				log.Printf("app stats stream error for app %d: %v", id, err)
+			}
+		}()
+
+		// Fallback: if StreamStats doesn't deliver a snapshot within 3 seconds
+		// (e.g. docker stats streaming failed or returned no containers),
+		// fall back to polling LiveSnapshot every 1s so the live feed stays alive.
+		go func() {
+			streamActive := int32(0)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second):
+					if atomic.LoadInt32(&streamActive) == 0 {
+						log.Printf("app stats fallback: no stream data for app %d, starting poll fallback", id)
+						ticker := time.NewTicker(1 * time.Second)
+						defer ticker.Stop()
+						for {
+							select {
+							case <-ctx.Done():
+								return
+							case <-ticker.C:
+								cs, err := h.appSvc.LiveSnapshot(client, a)
+								if err != nil || cs == nil {
+									continue
+								}
+								select {
+								case snapCh <- cs:
+								case <-ctx.Done():
+									return
+								}
+							}
+						}
+					}
+					return
+				case cs := <-snapCh:
+					atomic.StoreInt32(&streamActive, 1)
+					// Re-inject the snapshot for the main loop to consume.
+					select {
+					case snapCh <- cs:
+					case <-ctx.Done():
+						return
+					}
+					return
+				}
 			}
 		}()
 	}
