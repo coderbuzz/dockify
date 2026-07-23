@@ -43,6 +43,10 @@
       <div class="stat-gauge-label">Block I/O</div>
       <div class="stat-gauge-net"><span id="block-r">{{formatBytes .Stats.BlockIORead}} R</span> &middot; <span id="block-w">{{formatBytes .Stats.BlockIOWrite}} W</span></div>
     </div>
+    <div class="stat-gauge">
+      <div class="stat-gauge-label">Disk</div>
+      <div class="stat-gauge-net"><span id="disk-usage">{{formatBytes .Stats.DiskUsageBytes}}</span></div>
+    </div>
   </div>
 
   {{if .ChartData.cpu}}
@@ -79,6 +83,18 @@
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="network-chart-line" data-max="{{$netMax}}" data-points='{{chartPointsJSON .ChartData.network}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.network $width $height $netMax}}" />
+    </svg>
+  </div>
+  {{end}}
+
+  {{if .ChartData.disk}}
+  {{$diskMax := chartMax .ChartData.disk}}
+  {{if eq $diskMax 0.0}}{{$diskMax = 1.0}}{{end}}
+  <div class="chart-section">
+    <div class="chart-title">Disk Usage</div>
+    <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
+      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--secondary)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="{{chartPoints .ChartData.disk $width $height $diskMax}}" />
     </svg>
   </div>
   {{end}}

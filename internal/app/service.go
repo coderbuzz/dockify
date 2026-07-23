@@ -699,15 +699,16 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 		return nil
 	}
 	return &StatsOverview{
-		CPUPercent:    cs.CPUPercent,
-		MemPercent:    cs.MemPercent,
-		MemUsageBytes: cs.MemUsageBytes,
-		MemLimitBytes: cs.MemLimitBytes,
-		NetIORxBytes:  cs.NetIORxBytes,
-		NetIOTxBytes:  cs.NetIOTxBytes,
-		BlockIORead:   cs.BlockIORead,
-		BlockIOWrite:  cs.BlockIOWrite,
-		PIDs:          cs.PIDs,
+		CPUPercent:     cs.CPUPercent,
+		MemPercent:     cs.MemPercent,
+		MemUsageBytes:  cs.MemUsageBytes,
+		MemLimitBytes:  cs.MemLimitBytes,
+		NetIORxBytes:   cs.NetIORxBytes,
+		NetIOTxBytes:   cs.NetIOTxBytes,
+		BlockIORead:    cs.BlockIORead,
+		BlockIOWrite:   cs.BlockIOWrite,
+		PIDs:           cs.PIDs,
+		DiskUsageBytes: cs.DiskUsageBytes,
 	}
 }
 

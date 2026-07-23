@@ -55,6 +55,7 @@ type ContainerStats struct {
 	BlockIORead    int64     `json:"block_io_read"`
 	BlockIOWrite   int64     `json:"block_io_write"`
 	PIDs           int       `json:"pids"`
+	DiskUsageBytes int64     `json:"disk_usage_bytes"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -83,6 +84,7 @@ type StatsOverview struct {
 	BlockIORead    int64   `json:"block_io_read"`
 	BlockIOWrite   int64   `json:"block_io_write"`
 	PIDs           int     `json:"pids"`
+	DiskUsageBytes int64   `json:"disk_usage_bytes"`
 	ContainerName  string  `json:"container_name"`
 }
 

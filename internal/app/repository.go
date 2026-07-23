@@ -576,18 +576,18 @@ func nullInt64(i int64) interface{} {
 
 func (r *Repository) InsertContainerStats(s *ContainerStats) error {
 	_, err := r.db.Exec(`
-		INSERT INTO container_stats (app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, s.AppID, s.ServerID, s.ContainerName, s.CPUPercent, s.MemUsageBytes, s.MemLimitBytes, s.MemPercent, s.NetIORxBytes, s.NetIOTxBytes, s.BlockIORead, s.BlockIOWrite, s.PIDs)
+		INSERT INTO container_stats (app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids, disk_usage_bytes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.AppID, s.ServerID, s.ContainerName, s.CPUPercent, s.MemUsageBytes, s.MemLimitBytes, s.MemPercent, s.NetIORxBytes, s.NetIOTxBytes, s.BlockIORead, s.BlockIOWrite, s.PIDs, s.DiskUsageBytes)
 	return err
 }
 
 func (r *Repository) LatestContainerStats(appID int64) (*ContainerStats, error) {
 	s := &ContainerStats{}
 	err := r.db.QueryRow(`
-		SELECT id, app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids, created_at
+		SELECT id, app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, pids, disk_usage_bytes, created_at
 		FROM container_stats WHERE app_id = ? ORDER BY created_at DESC LIMIT 1
-	`, appID).Scan(&s.ID, &s.AppID, &s.ServerID, &s.ContainerName, &s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent, &s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &s.PIDs, &s.CreatedAt)
+	`, appID).Scan(&s.ID, &s.AppID, &s.ServerID, &s.ContainerName, &s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent, &s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &s.PIDs, &s.DiskUsageBytes, &s.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -609,7 +609,8 @@ func (r *Repository) LatestAggregatedStats(appID int64) (*ContainerStats, error)
 			SUM(net_io_tx_bytes),
 			SUM(block_io_read),
 			SUM(block_io_write),
-			SUM(pids)
+			SUM(pids),
+			MAX(disk_usage_bytes)
 		FROM container_stats
 		WHERE app_id = ? AND created_at = (
 			SELECT MAX(created_at) FROM container_stats WHERE app_id = ?
@@ -620,7 +621,7 @@ func (r *Repository) LatestAggregatedStats(appID int64) (*ContainerStats, error)
 	var pids sql.NullInt64
 	if err := row.Scan(
 		&s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent,
-		&s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &pids,
+		&s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &pids, &s.DiskUsageBytes,
 	); err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -666,6 +667,17 @@ func (r *Repository) ContainerStatsNetHistory(appID int64, since time.Time, buck
 		WHERE app_id = ? AND created_at >= ?
 		GROUP BY bucket ORDER BY bucket ASC
 	`, groupBy, bucketSecs)
+	return r.queryChartPoints(query, appID, since)
+}
+
+func (r *Repository) ContainerStatsDiskHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	query := fmt.Sprintf(`
+		SELECT datetime(%s, 'unixepoch') as bucket, MAX(disk_usage_bytes)
+		FROM container_stats
+		WHERE app_id = ? AND created_at >= ?
+		GROUP BY bucket ORDER BY bucket ASC
+	`, groupBy)
 	return r.queryChartPoints(query, appID, since)
 }
 

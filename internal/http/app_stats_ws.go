@@ -180,6 +180,11 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 	chartTicker := time.NewTicker(30 * time.Second)
 	defer chartTicker.Stop()
 
+	// Disk usage is collected by the background collector every 10s and stored
+	// in the DB. We read it from the DB at the same cadence — no extra SSH call.
+	diskTicker := time.NewTicker(10 * time.Second)
+	defer diskTicker.Stop()
+
 	// Throttle live emission to ~1/sec (matching the server live stats cadence
 	// and the "per detik" requirement). For multi-container apps, docker stats
 	// streams several lines per interval; we keep only the latest aggregate and
@@ -190,6 +195,7 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 	var latestSnap *app.ContainerStats
 	var prevNetBytes int64
 	var prevNetTime time.Time
+	var diskUsageBytes int64
 
 	for {
 		select {
@@ -232,6 +238,7 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 				"net_tx":           cs.NetIOTxBytes,
 				"block_r":          cs.BlockIORead,
 				"block_w":          cs.BlockIOWrite,
+				"disk_usage_bytes": diskUsageBytes,
 				"timestamp":        now.UTC().Format(time.RFC3339),
 			}
 			jsonStr, _ := json.Marshal(data)
@@ -242,6 +249,11 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 		case <-chartTicker.C:
 			if err := sendAppChartData(conn, h.appSvc, id, currentRange); err != nil {
 				return
+			}
+
+		case <-diskTicker.C:
+			if stats := h.appSvc.GetStatsOverview(id); stats != nil {
+				diskUsageBytes = stats.DiskUsageBytes
 			}
 
 		case r, ok := <-rangeCh:

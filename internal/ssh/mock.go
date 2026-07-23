@@ -30,6 +30,7 @@ func NewMockClient() *MockClient {
 			{"NR==2 {gsub(/G/,\"\"); print $2}", "100"},
 			{"NR==2 {gsub(/%/,\"\"); print $5}", "67"},
 			{"head -1 /proc/stat", "23.5"},
+			{"du -sb", "123456789	/opt/dockify/apps/app-16\n987654321	/opt/dockify/apps/app-27"},
 			{"caddy_http_requests_total", mockMetrics()},
 		},
 	}

@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS container_stats (
     block_io_read    INTEGER,
     block_io_write   INTEGER,
     pids             INTEGER,
+    disk_usage_bytes INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_container_stats_app_time ON container_stats(app_id, created_at);

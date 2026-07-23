@@ -83,6 +83,7 @@ func Open(path string) (*sql.DB, error) {
 		block_io_read    INTEGER,
 		block_io_write   INTEGER,
 		pids             INTEGER,
+		disk_usage_bytes INTEGER DEFAULT 0,
 		created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_container_stats_app_time ON container_stats(app_id, created_at)`)
@@ -99,6 +100,9 @@ func Open(path string) (*sql.DB, error) {
 		created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_route_stats_app_time ON route_stats(app_id, created_at)`)
+
+	// Migration: add disk_usage_bytes to container_stats (v0.5.5)
+	db.Exec("ALTER TABLE container_stats ADD COLUMN disk_usage_bytes INTEGER DEFAULT 0")
 
 	// Migration: add server_stats table (v0.13.0)
 	db.Exec(`CREATE TABLE IF NOT EXISTS server_stats (
