@@ -39,6 +39,7 @@ internal/
     scheduler.go                 # Auto-select least-loaded server
     logs.go                      # SSH log streaming
     backup.go                    # Compose file write/read on worker
+    stats.go                     # Stats collector: container stats, Caddy traffic, history
   caddy/client.go                # Caddy Admin API client (route CRUD via SSH tunnel)
   cloudflare/client.go           # Cloudflare DNS API v4 (list, create, upsert records)
   webhook/handler.go             # GitHub + GitLab webhook receiver, HMAC validation
@@ -52,6 +53,7 @@ internal/
     router.go                    # Chi router, all routes, middleware
     auth.go                      # Session auth, login/logout, middleware
     console.go                   # WebSocket upgrade, PTY relay for SSH console
+    stats_ws.go                  # WebSocket real-time resource stats (1s interval)
     renderer.go                  # Template rendering with layout
     templates/                   # HTML templates (all pages, layout, partials)
       layout.html                # Base layout: nav, head, all CSS (single <style> block)
@@ -72,7 +74,7 @@ internal/
       login.html                 # Login page
 scripts/
   install.sh                     # One-liner install (3 modes: Docker Compose / Binary / Binary + Caddy)
-  setup-worker.sh                # Generate SSH key on worker, output private key
+  setup-worker.sh                # Generate SSH key on worker, install Docker, output private key
   update.sh                      # Auto-detect install mode, download & restart latest
   release.sh                     # Version bump + tag helper
 Dockerfile                       # Multi-stage Docker build
@@ -233,6 +235,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | POST | `/api/servers/:id/init` | Initialize worker (Docker + Caddy) |
 | POST | `/api/servers/:id/refresh` | Refresh resource metrics |
 | GET | `/api/servers/:id/console` | WebSocket upgrade → SSH terminal |
+| GET | `/api/servers/:id/stats/live` | WebSocket real-time resource stats (1s interval) |
 
 ### Protected — Server Web UI
 
@@ -328,11 +331,12 @@ When a server is initialized (`POST /api/servers/:id/init`):
 
 1. SSH connect + verify auth
 2. Install Docker via `get.docker.com` (if not present)
-3. Create `dockify` Docker network
-4. Deploy Caddy container (ports 80/443 + Admin API on localhost:2019)
-5. Collect CPU cores (`nproc`), RAM total (`free -m`), disk total (`df -BG`)
-6. Collect CPU usage (`/proc/stat`), RAM usage (`free -m`), disk usage (`df -BG`)
-7. Status → online
+3. Install Docker Compose plugin (if not present)
+4. Create `dockify` Docker network
+5. Deploy Caddy container (ports 80/443 + Admin API on localhost:2019)
+6. Collect CPU cores (`nproc`), RAM total (`/proc/meminfo`), disk total (`df -BG`)
+7. Collect CPU usage (`/proc/stat`), RAM usage (`/proc/meminfo`), disk usage (`df -BG`)
+8. Status → online
 
 Init is idempotent — re-running skips components that already exist (Caddy container, Docker, network).
 
@@ -381,18 +385,26 @@ Resource metrics are refreshed every 60 seconds by the background monitor gorout
 
 ## Resource Monitoring
 
-The `Monitor.Run()` goroutine runs every 60 seconds:
+There are two monitoring paths:
+
+### Background Stats Collector (every 60s)
+
+The `statsLoop()` goroutine runs every 60 seconds:
 
 - Queries all non-pending servers
 - SSH exec to collect:
   - **CPU cores:** `nproc`
-  - **CPU usage:** parse `/proc/stat` — `(user+system) × 100 / (user+system+idle)` — 5s sample interval
-  - **RAM total:** `free -m` → Mem total
-  - **RAM usage:** `free -m` → `(used−buffers−cache) / total × 100`
+  - **CPU usage:** two-sample `/proc/stat` — `(delta_total - delta_idle) / delta_total × 100` — 1s sample interval
+  - **RAM total:** `awk '/MemTotal/{printf "%d", $2/1024}' /proc/meminfo`
+  - **RAM usage:** `awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf "%.1f", 100*(t-a)/t}' /proc/meminfo`
   - **Disk total:** `df -BG /` → Size
   - **Disk usage:** `df -BG /` → Use% as-is
 - Updates server record with metrics + timestamp
 - Human-readable display on resource card (e.g. "3200 MB used, 4800 MB free")
+
+### Real-time WebSocket Stats (1s interval)
+
+`GET /api/servers/:id/stats/live` — WebSocket endpoint that streams live CPU/RAM/disk metrics every 1 second. Uses the same `/proc/stat` and `/proc/meminfo` collection methods as the background collector. Client-side JS reconnects on disconnect.
 
 Server resource card supports HTMX partial refresh (`GET /servers/:id/resources`).
 

@@ -146,7 +146,8 @@ curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setu
 The script will:
 1. Generate an SSH key pair at `/root/.ssh/dockify`
 2. Add the public key to `/root/.ssh/authorized_keys`
-3. Output the **private key content** — copy this
+3. Install Docker + Docker Compose plugin (if not present)
+4. Output the **private key content** — copy this
 
 Then paste the private key into the Dockify Add Server form. No `ssh-copy-id` needed.
 
@@ -180,10 +181,11 @@ ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
 **What "Initialize Worker" does automatically:**
 1. SSH connect + verify
 2. Install Docker via `get.docker.com` (if not present)
-3. Create `dockify` Docker network
-4. Deploy Caddy container (port 80/443 + Admin API on localhost:2019)
-5. Collect CPU, RAM, Disk info
-6. Status → **online**. Ready to deploy apps.
+3. Install Docker Compose plugin (if not present)
+4. Create `dockify` Docker network
+5. Deploy Caddy container (port 80/443 + Admin API on localhost:2019)
+6. Collect CPU, RAM, Disk info
+7. Status → **online**. Ready to deploy apps.
 
 > Initialization is idempotent — re-running it on an already-initialized server skips existing components.
 
@@ -225,9 +227,11 @@ Servers can be added via the web form (name, host, port, user, SSH private key) 
 
 Dockify collects CPU, RAM, and disk usage from all online servers every 60 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
 
-- **CPU** — core count via `nproc`, usage % via `/proc/stat`
-- **RAM** — total and usage via `free -m`, with human-readable "used / free" info
+- **CPU** — core count via `nproc`, usage % via two-sample `/proc/stat` (1s interval)
+- **RAM** — total and usage via `/proc/meminfo` (`MemTotal`/`MemAvailable`), with human-readable "used / free" info
 - **Disk** — total and usage via `df -BG`
+
+Real-time WebSocket stats (`GET /api/servers/:id/stats/live`) stream live metrics every 1 second for the server detail page resource card.
 
 The scheduler uses these metrics to auto-select the least-loaded server (score = CPU% × 0.5 + RAM% × 0.5).
 
@@ -601,7 +605,7 @@ dockify/
 ├── internal/
 │   ├── ssh/           # SSH client, remote exec, worker init, mock client
 │   ├── server/        # Server CRUD, resource monitoring
-│   ├── app/           # App CRUD, deployment, rollback
+│   ├── app/           # App CRUD, deployment, rollback, stats collector
 │   ├── caddy/         # Caddy Admin API client
 │   ├── cloudflare/    # Cloudflare DNS API
 │   ├── webhook/       # Git webhook handler (GitHub + GitLab)
@@ -610,6 +614,9 @@ dockify/
 │   ├── backup/        # Export/import YAML with encrypted secrets
 │   ├── db/            # SQLite layer
 │   └── http/          # HTTP server, handlers, templates (HTMX + custom CSS)
+│     ├── console.go   # WebSocket SSH console
+│     ├── stats_ws.go  # WebSocket real-time resource stats
+│     └── templates/   # HTML templates
 ├── scripts/           # Install, worker setup, update, release scripts
 └── Dockerfile         # Multi-stage Docker build
 ```
