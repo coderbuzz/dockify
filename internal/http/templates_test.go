@@ -8,16 +8,18 @@ import (
 
 func TestTemplatesParse(t *testing.T) {
 	tmpl := template.New("").Funcs(template.FuncMap{
-		"lower":        strings.ToLower,
-		"upper":        strings.ToUpper,
-		"relativeTime": relativeTime,
-		"usedAmount":   usedAmount,
-		"freeAmount":   freeAmount,
-		"formatBytes":  formatBytes,
-		"chartPoints":  chartPoints,
-		"chartMax":     chartMax,
-		"div":          div,
-		"mul":          mul,
+		"lower":           strings.ToLower,
+		"upper":           strings.ToUpper,
+		"relativeTime":    relativeTime,
+		"usedAmount":      usedAmount,
+		"freeAmount":      freeAmount,
+		"formatBytes":     formatBytes,
+		"chartPoints":     chartPoints,
+		"chartMax":        chartMax,
+		"chartMax100":     chartMax100,
+		"chartThresholdY": chartThresholdY,
+		"div":             div,
+		"mul":             mul,
 		"nl2br": func(s string) template.HTML {
 			return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 		},

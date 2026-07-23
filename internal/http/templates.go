@@ -105,6 +105,25 @@ func chartMax(points []model.ChartPoint) float64 {
 	return math.Ceil(maxVal/magnitude) * magnitude
 }
 
+func chartMax100(points []model.ChartPoint) float64 {
+	maxVal := chartMax(points)
+	if maxVal < 100 {
+		return 100
+	}
+	return maxVal
+}
+
+func chartThresholdY(maxVal float64, height int) float64 {
+	if maxVal <= 0 {
+		return float64(height)
+	}
+	y := float64(height) - (100.0/maxVal)*float64(height)
+	if y < 0 {
+		y = 0
+	}
+	return y
+}
+
 func div(a, b float64) float64 {
 	if b == 0 {
 		return 0
@@ -125,6 +144,8 @@ var funcMap = template.FuncMap{
 	"formatBytes":  formatBytes,
 	"chartPoints":  chartPoints,
 	"chartMax":     chartMax,
+	"chartMax100":  chartMax100,
+	"chartThresholdY": chartThresholdY,
 	"div":          div,
 	"mul":          mul,
 	"nl2br": func(s string) template.HTML {

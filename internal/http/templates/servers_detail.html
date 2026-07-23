@@ -94,7 +94,79 @@
     <p style="color:var(--text-muted);font-size:0.85em">No apps on this server.</p>
     {{end}}
   </div>
-</div>
-{{template "scripts" .}}
+
+  {{if eq .Server.Status "online"}}
+  <script>
+  var statsWs = null;
+
+  function connectLiveStats() {
+    var serverId = {{.Server.ID}};
+    var base = document.querySelector('base').getAttribute('href') || '/';
+    var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var host = window.location.host;
+
+    statsWs = new WebSocket(proto + '//' + host + base + 'api/servers/' + serverId + '/stats/live');
+
+    statsWs.onopen = function() {
+      var indicator = document.getElementById('live-indicator');
+      if (indicator) indicator.style.display = 'inline';
+    };
+
+    statsWs.onmessage = function(evt) {
+      var data;
+      try { data = JSON.parse(evt.data); } catch(e) { return; }
+      if (data.error) { console.error('Stats error:', data.error); return; }
+
+      if (data.cpu_cores) {
+        var el = document.getElementById('cpu-cores');
+        if (el) el.textContent = data.cpu_cores;
+      }
+      if (data.cpu_usage !== undefined) {
+        var el = document.getElementById('cpu-usage');
+        if (el) el.textContent = data.cpu_usage.toFixed(1) + '%';
+      }
+      if (data.ram_mb) {
+        var el = document.getElementById('ram-total');
+        if (el) el.textContent = data.ram_mb + ' MB';
+      }
+      if (data.ram_usage !== undefined) {
+        var el = document.getElementById('ram-usage');
+        if (el) {
+          var used = data.ram_mb * data.ram_usage / 100;
+          var free = data.ram_mb - used;
+          el.textContent = data.ram_usage.toFixed(1) + '% (' + Math.round(used) + ' MB used, ' + Math.round(free) + ' MB free)';
+        }
+      }
+      if (data.disk_gb) {
+        var el = document.getElementById('disk-total');
+        if (el) el.textContent = data.disk_gb + ' GB';
+      }
+      if (data.disk_usage !== undefined) {
+        var el = document.getElementById('disk-usage');
+        if (el) {
+          var used = data.disk_gb * data.disk_usage / 100;
+          var free = data.disk_gb - used;
+          el.textContent = data.disk_usage.toFixed(1) + '% (' + Math.round(used) + ' GB used, ' + Math.round(free) + ' GB free)';
+        }
+      }
+    };
+
+    statsWs.onclose = function() {
+      var indicator = document.getElementById('live-indicator');
+      if (indicator) indicator.style.display = 'none';
+    };
+  }
+
+  function disconnectLiveStats() {
+    if (statsWs) { statsWs.close(); statsWs = null; }
+    var indicator = document.getElementById('live-indicator');
+    if (indicator) indicator.style.display = 'none';
+  }
+
+  connectLiveStats();
+  window.addEventListener('beforeunload', disconnectLiveStats);
+  </script>
+  {{end}}
+  {{template "scripts" .}}
 </body>
 </html>

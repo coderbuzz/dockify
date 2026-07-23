@@ -340,7 +340,7 @@ func detectDockerCompose(client ssh.Connector) string {
 }
 
 func (s *Service) GetStatsHistory(appID int64, duration string) map[string]interface{} {
-	now := time.Now()
+	now := time.Now().UTC()
 	var since time.Time
 	var bucketMins int
 
@@ -380,7 +380,7 @@ func (s *Service) GetStatsHistory(appID int64, duration string) map[string]inter
 }
 
 func (s *Service) GetTrafficHistory(appID int64, duration string) map[string]interface{} {
-	now := time.Now()
+	now := time.Now().UTC()
 	var since time.Time
 	var bucketMins int
 

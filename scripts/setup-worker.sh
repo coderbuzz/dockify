@@ -5,6 +5,33 @@ echo "=== Dockify Worker Setup ==="
 echo "Run this script on the worker VM to prepare it for Dockify."
 echo ""
 
+# Install Docker
+if command -v docker &>/dev/null; then
+  echo "[OK] Docker already installed: $(docker --version)"
+else
+  echo "[INFO] Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+  echo "[OK] Docker installed"
+fi
+
+# Install docker compose plugin
+if docker compose version &>/dev/null 2>&1; then
+  echo "[OK] Docker Compose plugin already installed: $(docker compose version 2>/dev/null | head -1)"
+else
+  echo "[INFO] Installing Docker Compose plugin..."
+  mkdir -p /usr/local/lib/docker/cli-plugins
+  curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  echo "[OK] Docker Compose plugin installed"
+fi
+
+# Start Docker service
+if command -v systemctl &>/dev/null; then
+  systemctl enable docker 2>/dev/null || true
+  systemctl start docker 2>/dev/null || true
+fi
+
 # Generate SSH key for Dockify
 KEY_PATH="/root/.ssh/dockify"
 if [ -f "$KEY_PATH" ]; then
@@ -26,13 +53,6 @@ else
   echo "[OK] Public key added to authorized_keys"
 fi
 
-# Ensure Docker is installed (optional, Dockify init will do this too)
-if command -v docker &>/dev/null; then
-  echo "[OK] Docker already installed"
-else
-  echo "[INFO] Docker not installed. Dockify will install it automatically on init."
-fi
-
 echo ""
 echo "============================================"
 echo "  Worker setup complete"
@@ -51,4 +71,4 @@ echo "  Host:       $(curl -fsSL ifconfig.me 2>/dev/null || hostname -I | awk '{
 echo "  User:       root"
 echo "  SSH Key:    <paste the private key above>"
 echo ""
-echo "After adding, click 'Initialize Worker' to install Docker + Caddy."
+echo "After adding, click 'Initialize Worker' to install Caddy."

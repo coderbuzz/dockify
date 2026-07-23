@@ -46,25 +46,27 @@
   </div>
 
   {{if .ChartData.cpu}}
-  {{$cpuMax := chartMax .ChartData.cpu}}
-  {{if eq $cpuMax 0.0}}{{$cpuMax = 1.0}}{{end}}
+  {{$cpuMax := chartMax100 .ChartData.cpu}}
   <div class="chart-section">
     <div class="chart-title">CPU</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
+      <line x1="0" y1="{{chartThresholdY $cpuMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $cpuMax $height}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
 
   {{if .ChartData.memory}}
-  {{$memMax := chartMax .ChartData.memory}}
-  {{if eq $memMax 0.0}}{{$memMax = 1.0}}{{end}}
+  {{$memMax := chartMax100 .ChartData.memory}}
   <div class="chart-section">
     <div class="chart-title">Memory</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax}}" />
+      <line x1="0" y1="{{chartThresholdY $memMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $memMax $height}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}

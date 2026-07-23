@@ -752,9 +752,9 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 	var _ = time.Now
 
 func DockerComposeCmd(c ssh.Connector) string {
-	out, err := c.Exec("command -v docker-compose 2>/dev/null || echo docker compose")
-	if err != nil {
+	out, err := c.Exec("docker compose version 2>/dev/null")
+	if err == nil && strings.TrimSpace(out) != "" {
 		return "docker compose"
 	}
-	return strings.TrimSpace(out)
+	return "docker-compose"
 }

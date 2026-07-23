@@ -111,6 +111,12 @@ func (s *Service) InitWorker(id int64) error {
 		return fmt.Errorf("install docker: %w", err)
 	}
 
+	log.Printf("Installing Docker Compose plugin on %s...", server.Name)
+	_, err = client.Exec(`docker compose version 2>/dev/null || (mkdir -p /usr/local/lib/docker/cli-plugins && curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose)`)
+	if err != nil {
+		log.Printf("Warning: failed to install docker compose plugin on %s: %v", server.Name, err)
+	}
+
 	log.Printf("Creating dockify network on %s...", server.Name)
 	_, err = client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
 	if err != nil {
@@ -236,7 +242,7 @@ func (s *Service) StartMonitor() {
 }
 
 func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]interface{} {
-	now := time.Now()
+	now := time.Now().UTC()
 	var since time.Time
 	var bucketMins int
 
@@ -280,7 +286,7 @@ func parseCPUCount(c ssh.Connector) (int, error) {
 }
 
 func parseRAM(c ssh.Connector) (int, error) {
-	out, err := c.Exec("free -m | awk '/Mem:/ {print $2}'")
+	out, err := c.Exec("awk '/MemTotal/{printf \"%d\", $2/1024}' /proc/meminfo")
 	if err != nil {
 		return 0, err
 	}
@@ -300,7 +306,7 @@ func parseDisk(c ssh.Connector) (int, error) {
 }
 
 func parseCPUUsage(c ssh.Connector) (float64, error) {
-	out, err := c.Exec("top -bn2 -d 2 | awk '/^%Cpu/{c++; if(c==2){printf \"%.1f\",100-$8; exit}}'")
+	out, err := c.Exec(`s=$(head -1 /proc/stat); sleep 1; e=$(head -1 /proc/stat); awk -v s="$s" -v e="$e" 'BEGIN{n=split(s,a); split(e,b); t1=a[2]+a[3]+a[4]+a[5]; t2=b[2]+b[3]+b[4]+b[5]; dt=t2-t1; di=b[5]-a[5]; if(dt>0) printf "%.1f", 100*(dt-di)/dt}'`)
 	if err != nil {
 		return 0, err
 	}
@@ -310,7 +316,7 @@ func parseCPUUsage(c ssh.Connector) (float64, error) {
 }
 
 func parseRAMUsage(c ssh.Connector) (float64, error) {
-	out, err := c.Exec("free -m | awk '/Mem:/ {printf \"%.1f\", $3/$2 * 100.0}'")
+	out, err := c.Exec("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f\", 100*(t-a)/t}' /proc/meminfo")
 	if err != nil {
 		return 0, err
 	}

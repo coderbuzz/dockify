@@ -48,37 +48,40 @@
   {{end}}
 
   {{if .ChartData.cpu}}
-  {{$cpuMax := chartMax .ChartData.cpu}}
-  {{if eq $cpuMax 0.0}}{{$cpuMax = 1.0}}{{end}}
+  {{$cpuMax := chartMax100 .ChartData.cpu}}
   <div class="chart-section">
     <div class="chart-title">CPU</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
+      <line x1="0" y1="{{chartThresholdY $cpuMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $cpuMax $height}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
 
   {{if .ChartData.ram}}
-  {{$ramMax := chartMax .ChartData.ram}}
-  {{if eq $ramMax 0.0}}{{$ramMax = 1.0}}{{end}}
+  {{$ramMax := chartMax100 .ChartData.ram}}
   <div class="chart-section">
     <div class="chart-title">RAM</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.ram $width $height $ramMax}}" />
+      <line x1="0" y1="{{chartThresholdY $ramMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $ramMax $height}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
 
   {{if .ChartData.disk}}
-  {{$diskMax := chartMax .ChartData.disk}}
-  {{if eq $diskMax 0.0}}{{$diskMax = 1.0}}{{end}}
+  {{$diskMax := chartMax100 .ChartData.disk}}
   <div class="chart-section">
     <div class="chart-title">Disk</div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.disk $width $height $diskMax}}" />
+      <line x1="0" y1="{{chartThresholdY $diskMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $diskMax $height}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}

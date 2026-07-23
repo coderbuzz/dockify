@@ -7,25 +7,30 @@ import (
 	"time"
 )
 
+type mockResponse struct {
+	pattern  string
+	response string
+}
+
 type MockClient struct {
-	responses map[string]string
+	responses []mockResponse
 }
 
 func NewMockClient() *MockClient {
 	return &MockClient{
-		responses: map[string]string{
-			"uptime":                    "10:00:00 up 30 days,  0 users,  load average: 0.08, 0.03, 0.01",
-			"nproc":                     "4",
-			"Mem:":                      "16000",
-			"NR==2 {gsub(/G/,\"\"); print $2}": "100",
-			"top -bn2":                  "23.5",
-			"$3/$2 * 100":               "45.2",
-			"gsub(/%/,\"\"); print $5}": "67",
-			"docker":                     "Docker version 28.0.4, build b8034c0",
-			"docker compose version":    "Docker Compose version v2.24.0",
-			"docker stats":             `{"BlockIO":"1.5MB / 0B","CPUPerc":"12.34%","Container":"abc12345","ID":"abc12345","MemPerc":"8.20%","MemUsage":"256MiB / 3.125GiB","Name":"app","NetIO":"45.6MB / 12.3MB","PIDs":"3"}`,
-			"docker compose ps":        "app\n",
-			"caddy_http_requests_total": mockMetrics(),
+		responses: []mockResponse{
+			{"docker stats", `{"BlockIO":"1.5MB / 0B","CPUPerc":"12.34%","Container":"abc12345","ID":"abc12345","MemPerc":"8.20%","MemUsage":"256MiB / 3.125GiB","Name":"app","NetIO":"45.6MB / 12.3MB","PIDs":"3"}`},
+			{"docker compose version", "Docker Compose version v2.24.0"},
+			{"docker compose", "app\n"},
+			{"docker", "Docker version 28.0.4, build b8034c0"},
+			{"uptime", "10:00:00 up 30 days,  0 users,  load average: 0.08, 0.03, 0.01"},
+			{"nproc", "4"},
+			{"MemTotal/{printf", "16000"},
+			{"100*(t-a)/t", "45.2"},
+			{"NR==2 {gsub(/G/,\"\"); print $2}", "100"},
+			{"NR==2 {gsub(/%/,\"\"); print $5}", "67"},
+			{"head -1 /proc/stat", "23.5"},
+			{"caddy_http_requests_total", mockMetrics()},
 		},
 	}
 }
@@ -43,9 +48,9 @@ caddy_http_request_duration_seconds_sum{host="app.example.com"} 423.56
 }
 
 func (m *MockClient) Exec(cmd string) (string, error) {
-	for pattern, response := range m.responses {
-		if strings.Contains(cmd, pattern) {
-			return response, nil
+	for _, r := range m.responses {
+		if strings.Contains(cmd, r.pattern) {
+			return r.response, nil
 		}
 	}
 	return "", nil
