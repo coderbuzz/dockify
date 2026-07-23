@@ -5,9 +5,10 @@ function formatBytes(b) {
   b = Number(b);
   if (b < 1000) return Math.round(b) + ' B';
   var units = ['kB','MB','GB','TB','PB'];
-  var i = Math.floor(Math.log(b) / Math.log(1000));
+  var exp = Math.floor(Math.log(b) / Math.log(1000));
+  var i = exp - 1;
   if (i >= units.length) i = units.length - 1;
-  return (b / Math.pow(1000, i)).toFixed(1) + ' ' + units[i];
+  return (b / Math.pow(1000, exp)).toFixed(1) + ' ' + units[i];
 }
 
 // initLiveCharts wires up a live (1s) WebSocket chart + gauge feed for a server
