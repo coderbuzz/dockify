@@ -18,7 +18,7 @@
   {{if eq .Server.Status "online"}}
   <div hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
     <div class="card" style="margin-bottom:1em">
-      <h3>Resource History</h3>
+      <h3>Resource Usage</h3>
       <p style="color:var(--text-muted);font-size:0.85em">Loading charts&hellip;</p>
     </div>
   </div>
