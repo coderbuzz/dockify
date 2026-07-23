@@ -124,7 +124,7 @@ func (s *Service) InitWorker(id int64) error {
 	}
 
 	caddyRunning, _ := client.Exec("docker ps -q --filter name=^/caddy$")
-	baseConfig := `{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"]}}}}}`
+	baseConfig := `{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"],"metrics":{}}}}}}`
 	if strings.TrimSpace(caddyRunning) == "" {
 		log.Printf("Deploying Caddy on %s...", server.Name)
 		caddyRun := fmt.Sprintf(`docker pull caddy:latest 2>/dev/null
