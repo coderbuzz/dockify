@@ -137,8 +137,13 @@
         if (el) el.textContent = data.cpu_cores;
       }
       if (data.cpu_usage !== undefined) {
+        var pct = data.cpu_usage.toFixed(1) + '%';
         var el = document.getElementById('cpu-usage');
-        if (el) el.textContent = data.cpu_usage.toFixed(1) + '%';
+        if (el) el.textContent = pct;
+        var gPct = document.getElementById('cpu-gauge-pct');
+        if (gPct) gPct.textContent = pct;
+        var gFill = document.getElementById('cpu-gauge-fill');
+        if (gFill) gFill.style.width = data.cpu_usage + '%';
         addChartPoint('cpu', data.cpu_usage);
       }
       if (data.ram_mb) {
@@ -152,6 +157,14 @@
           var free = data.ram_mb - used;
           el.textContent = data.ram_usage.toFixed(1) + '% (' + Math.round(used) + ' MB used, ' + Math.round(free) + ' MB free)';
         }
+        if (data.ram_mb) {
+          var rPct = document.getElementById('ram-gauge-pct');
+          if (rPct) rPct.textContent = data.ram_usage.toFixed(1) + '%';
+          var rDet = document.getElementById('ram-gauge-detail');
+          if (rDet) rDet.textContent = Math.round(data.ram_mb * data.ram_usage / 100) + ' MB';
+          var rFill = document.getElementById('ram-gauge-fill');
+          if (rFill) rFill.style.width = data.ram_usage + '%';
+        }
         addChartPoint('ram', data.ram_usage);
       }
       if (data.disk_gb) {
@@ -164,6 +177,14 @@
           var used = data.disk_gb * data.disk_usage / 100;
           var free = data.disk_gb - used;
           el.textContent = data.disk_usage.toFixed(1) + '% (' + Math.round(used) + ' GB used, ' + Math.round(free) + ' GB free)';
+        }
+        if (data.disk_gb) {
+          var dPct = document.getElementById('disk-gauge-pct');
+          if (dPct) dPct.textContent = data.disk_usage.toFixed(1) + '%';
+          var dDet = document.getElementById('disk-gauge-detail');
+          if (dDet) dDet.textContent = Math.round(data.disk_gb * data.disk_usage / 100) + ' GB';
+          var dFill = document.getElementById('disk-gauge-fill');
+          if (dFill) dFill.style.width = data.disk_usage + '%';
         }
         addChartPoint('disk', data.disk_usage);
       }

@@ -20,28 +20,28 @@
     <div class="stat-gauge">
       <div class="stat-gauge-header">
         <div class="stat-gauge-label">CPU</div>
-        <div class="stat-gauge-value">{{printf "%.1f" .Server.CPUUsage}}%</div>
+        <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{printf "%.1f" .Server.CPUUsage}}%</span></div>
       </div>
       <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-cpu" style="width:{{printf "%.1f" .Server.CPUUsage}}%"></div>
+        <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{printf "%.1f" .Server.CPUUsage}}%"></div>
       </div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-header">
         <div class="stat-gauge-label">RAM</div>
-        <div class="stat-gauge-value">{{printf "%.1f" .Server.RAMUsage}}% <span class="stat-gauge-detail">{{.Server.RAMMB}} MB</span></div>
+        <div class="stat-gauge-value"><span id="ram-gauge-pct">{{printf "%.1f" .Server.RAMUsage}}%</span> <span class="stat-gauge-detail" id="ram-gauge-detail">{{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB</span></div>
       </div>
       <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-mem" style="width:{{printf "%.1f" .Server.RAMUsage}}%"></div>
+        <div class="stat-gauge-fill stat-gauge-mem" id="ram-gauge-fill" style="width:{{printf "%.1f" .Server.RAMUsage}}%"></div>
       </div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-header">
         <div class="stat-gauge-label">Disk</div>
-        <div class="stat-gauge-value">{{printf "%.1f" .Server.DiskUsage}}% <span class="stat-gauge-detail">{{.Server.DiskGB}} GB</span></div>
+        <div class="stat-gauge-value"><span id="disk-gauge-pct">{{printf "%.1f" .Server.DiskUsage}}%</span> <span class="stat-gauge-detail" id="disk-gauge-detail">{{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB</span></div>
       </div>
       <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-disk" style="width:{{printf "%.1f" .Server.DiskUsage}}%"></div>
+        <div class="stat-gauge-fill stat-gauge-disk" id="disk-gauge-fill" style="width:{{printf "%.1f" .Server.DiskUsage}}%"></div>
       </div>
     </div>
   </div>
