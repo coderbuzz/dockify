@@ -10,7 +10,7 @@
     <div class="chart-title"><span>CPU</span> <span class="chart-title-val chart-title-val--cpu" id="server-cpu-chart-val">{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}%{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
-        points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
+        points="{{chartPoints .ChartData.cpu $width $height $cpuMax $range}}" />
       <line x1="0" y1="{{chartThresholdY $cpuMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $cpuMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
@@ -23,7 +23,7 @@
     <div class="chart-title"><span>RAM</span> <span class="chart-title-val chart-title-val--mem" id="server-ram-chart-val">{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}% {{if .Server.RAMMB}}({{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB){{end}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="ram-chart-line" data-max="{{$ramMax}}" data-points='{{chartPointsJSON .ChartData.ram}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
-        points="{{chartPoints .ChartData.ram $width $height $ramMax}}" />
+        points="{{chartPoints .ChartData.ram $width $height $ramMax $range}}" />
       <line x1="0" y1="{{chartThresholdY $ramMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $ramMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
@@ -36,7 +36,7 @@
     <div class="chart-title"><span>Disk</span> <span class="chart-title-val chart-title-val--disk" id="server-disk-chart-val">{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}% {{if .Server.DiskGB}}({{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB){{end}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
-        points="{{chartPoints .ChartData.disk $width $height $diskMax}}" />
+        points="{{chartPoints .ChartData.disk $width $height $diskMax $range}}" />
       <line x1="0" y1="{{chartThresholdY $diskMax $height}}" x2="{{$width}}" y2="{{chartThresholdY $diskMax $height}}"
         stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>

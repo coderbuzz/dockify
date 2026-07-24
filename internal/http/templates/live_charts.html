@@ -35,11 +35,30 @@ function initLiveCharts(opts) {
   var width = opts.width || 600;
   var height = opts.height || 100;
   var maxLivePoints = opts.maxLivePoints || 120;
+  var rangeDurations = {'1h':3600000,'6h':21600000,'24h':86400000,'7d':604800000};
+  var currentRangeMs = 3600000;
 
   opts.metrics.forEach(function(m) {
     chartData[m] = [];
     liveMetrics[m] = [];
   });
+
+  function readRangeFromTarget() {
+    var t = document.getElementById(opts.targetId);
+    if (t) {
+      var r = t.getAttribute('data-range');
+      if (r && rangeDurations[r]) return rangeDurations[r];
+    }
+    return 3600000;
+  }
+  currentRangeMs = readRangeFromTarget();
+
+  function parseTime(s) {
+    if (!s) return NaN;
+    if (s.indexOf('T') < 0) return Date.parse(s.replace(' ', 'T') + 'Z');
+    return Date.parse(s);
+  }
+  function timeWindowStart() { return Date.now() - currentRangeMs; }
 
   function connect() {
     var base = document.querySelector('base').getAttribute('href') || '/';
@@ -136,12 +155,15 @@ function initLiveCharts(opts) {
 
   function chartPointsToSvg(points, w, h, maxVal) {
     if (points.length === 0 || maxVal <= 0) return '';
+    var start = timeWindowStart();
     var parts = [];
-    var step = w / (points.length - 1);
-    if (points.length === 1) step = w;
     for (var i = 0; i < points.length; i++) {
-      var x = i * step;
-      var y = h - (points[i].value / maxVal) * h;
+      var p = points[i];
+      var tMs = parseTime(p.time);
+      if (isNaN(tMs)) continue;
+      var x = w * (tMs - start) / currentRangeMs;
+      if (x < 0 || x > w) continue;
+      var y = h - (p.value / maxVal) * h;
       parts.push(x.toFixed(1) + ',' + y.toFixed(1));
     }
     return parts.join(' ');
@@ -164,12 +186,15 @@ function initLiveCharts(opts) {
 
   document.body.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.target.id === opts.targetId) {
+      var rangeEl = evt.target.getAttribute('data-range');
+      if (rangeEl && rangeDurations[rangeEl]) {
+        currentRangeMs = rangeDurations[rangeEl];
+      }
       readChartDataFromHTML();
       updateCharts();
       if (ws && ws.readyState === WebSocket.OPEN) {
         var ind = document.getElementById(opts.liveIndicatorId);
         if (ind) ind.classList.remove('live-badge--hidden');
-        var rangeEl = evt.target.getAttribute('data-range');
         if (rangeEl) {
           ws.send(JSON.stringify({range: rangeEl}));
         }
