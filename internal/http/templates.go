@@ -72,21 +72,55 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-func chartPoints(points []model.ChartPoint, width, height int, maxVal float64) template.HTMLAttr {
+func chartPoints(points []model.ChartPoint, width, height int, maxVal float64, rangeStr string) template.HTMLAttr {
 	if len(points) == 0 || maxVal <= 0 {
 		return ""
 	}
-	parts := make([]string, len(points))
-	step := float64(width) / float64(len(points)-1)
-	if len(points) == 1 {
-		step = float64(width)
-	}
-	for i, p := range points {
-		x := float64(i) * step
+	now := time.Now().UTC()
+	dur := rangeDuration(rangeStr)
+	start := now.Add(-dur)
+	layout := "2006-01-02 15:04:05"
+	var parts []string
+	for _, p := range points {
+		t, err := time.Parse(layout, p.Time)
+		if err != nil {
+			if t, err = time.Parse(time.RFC3339, p.Time); err != nil {
+				continue
+			}
+		}
+		if t.Before(start) {
+			continue
+		}
+		x := float64(width) * float64(t.Sub(start)) / float64(dur)
+		if x < 0 {
+			x = 0
+		} else if x > float64(width) {
+			x = float64(width)
+		}
 		y := float64(height) - (p.Value/maxVal)*float64(height)
-		parts[i] = fmt.Sprintf("%.1f,%.1f", x, y)
+		parts = append(parts, fmt.Sprintf("%.1f,%.1f", x, y))
+	}
+	if len(parts) == 0 {
+		return ""
 	}
 	return template.HTMLAttr(strings.Join(parts, " "))
+}
+
+func rangeDuration(rangeStr string) time.Duration {
+	switch rangeStr {
+	case "realtime":
+		return 2 * time.Minute
+	case "1h":
+		return time.Hour
+	case "6h":
+		return 6 * time.Hour
+	case "24h":
+		return 24 * time.Hour
+	case "7d":
+		return 7 * 24 * time.Hour
+	default:
+		return 2 * time.Minute
+	}
 }
 
 func chartMax(points []model.ChartPoint) float64 {

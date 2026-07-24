@@ -743,6 +743,9 @@ func (s *Service) GetStatsHistory(appID int64, duration string) map[string]inter
 	var bucketMins int
 
 	switch duration {
+	case "realtime":
+		since = now.Add(-2 * time.Minute)
+		bucketMins = 1
 	case "1h":
 		since = now.Add(-1 * time.Hour)
 		bucketMins = 1
@@ -756,7 +759,7 @@ func (s *Service) GetStatsHistory(appID int64, duration string) map[string]inter
 		since = now.Add(-7 * 24 * time.Hour)
 		bucketMins = 60
 	default:
-		since = now.Add(-1 * time.Hour)
+		since = now.Add(-2 * time.Minute)
 		bucketMins = 1
 	}
 
@@ -785,6 +788,9 @@ func (s *Service) GetTrafficHistory(appID int64, duration string) map[string]int
 	var bucketMins int
 
 	switch duration {
+	case "realtime":
+		since = now.Add(-2 * time.Minute)
+		bucketMins = 1
 	case "1h":
 		since = now.Add(-1 * time.Hour)
 		bucketMins = 1
@@ -798,7 +804,7 @@ func (s *Service) GetTrafficHistory(appID int64, duration string) map[string]int
 		since = now.Add(-7 * 24 * time.Hour)
 		bucketMins = 60
 	default:
-		since = now.Add(-1 * time.Hour)
+		since = now.Add(-2 * time.Minute)
 		bucketMins = 1
 	}
 

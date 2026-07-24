@@ -247,6 +247,9 @@ func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]in
 	var bucketMins int
 
 	switch duration {
+	case "realtime":
+		since = now.Add(-2 * time.Minute)
+		bucketMins = 1
 	case "1h":
 		since = now.Add(-1 * time.Hour)
 		bucketMins = 1
@@ -260,7 +263,7 @@ func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]in
 		since = now.Add(-7 * 24 * time.Hour)
 		bucketMins = 60
 	default:
-		since = now.Add(-1 * time.Hour)
+		since = now.Add(-2 * time.Minute)
 		bucketMins = 1
 	}
 

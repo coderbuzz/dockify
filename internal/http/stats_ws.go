@@ -76,7 +76,7 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 		log.Printf("stats initial cpu sample error: %v", err)
 	}
 
-	currentRange := "1h"
+	currentRange := "realtime"
 	sendChartData(conn, h.serverSvc, id, currentRange)
 
 	ticker := time.NewTicker(1 * time.Second)
