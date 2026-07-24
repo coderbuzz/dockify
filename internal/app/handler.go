@@ -946,6 +946,8 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		}
 	}
 
+	overview := h.service.GetStatsOverview(id)
+
 	render(w, r, http.StatusOK, "apps_detail.html", map[string]interface{}{
 		"Title":            app.Name,
 		"App":              app,
@@ -959,6 +961,7 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 		"DomainCount":      len(domains),
 		"ExtraDomainCount": len(domains) - 1,
 		"ServiceName":      app.ContainerServiceName(),
+		"AppStats":         overview,
 	})
 }
 

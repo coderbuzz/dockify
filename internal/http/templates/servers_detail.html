@@ -26,10 +26,38 @@
         <button class="btn btn-ghost" data-range="7d" hx-get="servers/{{.Server.ID}}/stats?range=7d" hx-target="#server-stats-body" hx-swap="outerHTML">7d</button>
       </div>
     </div>
-  </div>
-  <div id="server-stats-body" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
-    <div class="card" style="margin-bottom:1em">
-      <p style="color:var(--text-muted);font-size:0.85em">Loading charts&hellip;</p>
+    <div class="stats-gauges">
+      <div class="stat-gauge">
+        <div class="stat-gauge-header">
+          <div class="stat-gauge-label">CPU</div>
+          <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0.0{{end}}%</span></div>
+        </div>
+        <div class="stat-gauge-bar">
+          <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0{{end}}%"></div>
+        </div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-header">
+          <div class="stat-gauge-label">RAM</div>
+          <div class="stat-gauge-value"><span id="ram-gauge-pct">{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="ram-gauge-detail">{{if and .Server.RAMMB .Server.RAMUsage}}{{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB{{else}}-{{end}}</span></div>
+        </div>
+        <div class="stat-gauge-bar">
+          <div class="stat-gauge-fill stat-gauge-mem" id="ram-gauge-fill" style="width:{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0{{end}}%"></div>
+        </div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-header">
+          <div class="stat-gauge-label">Disk</div>
+          <div class="stat-gauge-value"><span id="disk-gauge-pct">{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="disk-gauge-detail">{{if and .Server.DiskGB .Server.DiskUsage}}{{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB{{else}}-{{end}}</span></div>
+        </div>
+        <div class="stat-gauge-bar">
+          <div class="stat-gauge-fill stat-gauge-disk" id="disk-gauge-fill" style="width:{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0{{end}}%"></div>
+        </div>
+      </div>
+    </div>
+    <hr class="stats-divider">
+    <div id="server-stats-body" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+      <p style="color:var(--text-muted);font-size:0.85em;margin-top:1em">Loading charts&hellip;</p>
     </div>
   </div>
   {{end}}
@@ -111,13 +139,15 @@
     wsUrl: 'api/servers/{{.Server.ID}}/stats/live',
     metrics: ['cpu', 'ram', 'disk'],
     gauges: [
-      {metric:'cpu', field:'cpu_usage', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill'},
+      {metric:'cpu', field:'cpu_usage', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill', chartValId:'server-cpu-chart-val'},
       {metric:'ram', field:'ram_usage', pctId:'ram-gauge-pct', fillId:'ram-gauge-fill',
        detailId:'ram-gauge-detail',
-       detailFn:function(d){return Math.round(d.ram_mb*d.ram_usage/100)+' MB';}},
+       detailFn:function(d){return d.ram_mb ? Math.round(d.ram_mb*d.ram_usage/100)+' MB' : '';},
+       chartValId:'server-ram-chart-val'},
       {metric:'disk', field:'disk_usage', pctId:'disk-gauge-pct', fillId:'disk-gauge-fill',
        detailId:'disk-gauge-detail',
-       detailFn:function(d){return Math.round(d.disk_gb*d.disk_usage/100)+' GB';}}
+       detailFn:function(d){return d.disk_gb ? Math.round(d.disk_gb*d.disk_usage/100)+' GB' : '';},
+       chartValId:'server-disk-chart-val'}
     ],
     targetId: 'server-stats-body',
     liveIndicatorId: 'live-indicator',

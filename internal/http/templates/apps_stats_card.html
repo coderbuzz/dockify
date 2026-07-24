@@ -2,47 +2,13 @@
 {{$width := 600}}
 {{$height := 100}}
 
-<div id="app-stats-body" data-range="{{$range}}">
+<div id="app-stats-body" data-range="{{$range}}" style="margin-top:1em">
 
 {{if .Stats}}
-<div class="card" style="margin-top:1em">
-  <div class="stats-gauges">
-    <div class="stat-gauge">
-      <div class="stat-gauge-header">
-        <div class="stat-gauge-label">CPU</div>
-        <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%</span></div>
-      </div>
-      <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%"></div>
-      </div>
-    </div>
-    <div class="stat-gauge">
-      <div class="stat-gauge-header">
-        <div class="stat-gauge-label">Memory</div>
-        <div class="stat-gauge-value"><span id="mem-gauge-pct">{{printf "%.1f" (clamp100 .Stats.MemPercent)}}%</span> <span class="stat-gauge-detail" id="mem-gauge-detail">{{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}</span></div>
-      </div>
-      <div class="stat-gauge-bar">
-        <div class="stat-gauge-fill stat-gauge-mem" id="mem-gauge-fill" style="width:{{printf "%.1f" (clamp100 .Stats.MemPercent)}}%"></div>
-      </div>
-    </div>
-    <div class="stat-gauge">
-      <div class="stat-gauge-label">Disk</div>
-      <div class="stat-gauge-net"><span id="disk-usage">{{formatBytes .Stats.DiskUsageBytes}}</span></div>
-    </div>
-    <div class="stat-gauge">
-      <div class="stat-gauge-label">Net I/O</div>
-      <div class="stat-gauge-net"><span id="net-io">{{formatBytes .Stats.NetIORxBytes}} / {{formatBytes .Stats.NetIOTxBytes}}</span></div>
-    </div>
-    <div class="stat-gauge">
-      <div class="stat-gauge-label">Block I/O</div>
-      <div class="stat-gauge-net"><span id="block-io">{{formatBytes .Stats.BlockIORead}} / {{formatBytes .Stats.BlockIOWrite}}</span></div>
-    </div>
-  </div>
-
   {{if .ChartData.cpu}}
   {{$cpuMax := chartMax100 .ChartData.cpu}}
   <div class="chart-section">
-    <div class="chart-title">CPU</div>
+    <div class="chart-title"><span>CPU</span> <span class="chart-title-val chart-title-val--cpu" id="cpu-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax}}" />
@@ -55,7 +21,7 @@
   {{if .ChartData.memory}}
   {{$memMax := chartMax100 .ChartData.memory}}
   <div class="chart-section">
-    <div class="chart-title">Memory</div>
+    <div class="chart-title"><span>Memory</span> <span class="chart-title-val chart-title-val--mem" id="mem-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 .Stats.MemPercent)}}% ({{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}){{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax}}" />
@@ -69,7 +35,7 @@
   {{$netMax := chartMax .ChartData.network}}
   {{if eq $netMax 0.0}}{{$netMax = 1.0}}{{end}}
   <div class="chart-section">
-    <div class="chart-title">Network I/O</div>
+    <div class="chart-title"><span>Network I/O</span> <span class="chart-title-val chart-title-val--net" id="net-chart-val">{{if .Stats}}{{formatBytes .Stats.NetIORxBytes}} / {{formatBytes .Stats.NetIOTxBytes}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="network-chart-line" data-max="{{$netMax}}" data-points='{{chartPointsJSON .ChartData.network}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.network $width $height $netMax}}" />
@@ -81,18 +47,15 @@
   {{$diskMax := chartMax .ChartData.disk}}
   {{if eq $diskMax 0.0}}{{$diskMax = 1.0}}{{end}}
   <div class="chart-section">
-    <div class="chart-title">Disk Usage</div>
+    <div class="chart-title"><span>Disk Usage</span> <span class="chart-title-val chart-title-val--disk" id="disk-chart-val">{{if .Stats}}{{formatBytes .Stats.DiskUsageBytes}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--secondary)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.disk $width $height $diskMax}}" />
     </svg>
   </div>
   {{end}}
-</div>
 {{else}}
-<div class="card" style="margin-top:1em">
   <p style="color:var(--text-muted);font-size:0.85em">Stats not yet available. Data collects every 10 seconds.</p>
-</div>
 {{end}}
 
 {{if .Traffic}}
@@ -129,7 +92,7 @@
   {{$rpsMax := chartMax .TrafficData.rps}}
   {{if eq $rpsMax 0.0}}{{$rpsMax = 1.0}}{{end}}
   <div class="chart-section">
-    <div class="chart-title">Requests / sec</div>
+    <div class="chart-title"><span>Requests / sec</span> <span class="chart-title-val chart-title-val--net" id="rps-chart-val">{{printf "%.1f" .Traffic.RequestsRPS}} req/s</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .TrafficData.rps $width $height $rpsMax}}" />

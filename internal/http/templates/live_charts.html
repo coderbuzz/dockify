@@ -81,6 +81,13 @@ function initLiveCharts(opts) {
           var detEl = document.getElementById(g.detailId);
           if (detEl) detEl.textContent = g.detailFn(data);
         }
+        if (g.chartValId) {
+          var cvalEl = document.getElementById(g.chartValId);
+          if (cvalEl) {
+            var det = (g.detailId && g.detailFn) ? g.detailFn(data) : '';
+            cvalEl.textContent = det ? (pct + ' (' + det + ')') : pct;
+          }
+        }
         addChartPoint(g.metric, v);
       });
 
