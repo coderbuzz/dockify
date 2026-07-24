@@ -27,10 +27,41 @@
         <button class="btn btn-ghost" data-range="7d" hx-get="apps/{{.App.ID}}/stats?range=7d" hx-target="#app-stats-body" hx-swap="outerHTML">7d</button>
       </div>
     </div>
-  </div>
-  <div id="app-stats-body" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
-    <div class="card" style="margin-bottom:1em">
-      <p style="color:var(--text-muted);font-size:0.85em">Loading stats&hellip;</p>
+    <div class="stats-gauges stats-gauges--resources">
+      <div class="stat-gauge">
+        <div class="stat-gauge-header">
+          <div class="stat-gauge-label">CPU</div>
+          <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0.0{{end}}%</span></div>
+        </div>
+        <div class="stat-gauge-bar">
+          <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0{{end}}%"></div>
+        </div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-header">
+          <div class="stat-gauge-label">Memory</div>
+          <div class="stat-gauge-value"><span id="mem-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="mem-gauge-detail">{{if .AppStats}}{{formatBytes .AppStats.MemUsageBytes}} / {{formatBytes .AppStats.MemLimitBytes}}{{else}}- / -{{end}}</span></div>
+        </div>
+        <div class="stat-gauge-bar">
+          <div class="stat-gauge-fill stat-gauge-mem" id="mem-gauge-fill" style="width:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0{{end}}%"></div>
+        </div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-label">Disk</div>
+        <div class="stat-gauge-net"><span id="disk-usage">{{if .AppStats}}{{formatBytes .AppStats.DiskUsageBytes}}{{else}}-{{end}}</span></div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-label">Net I/O</div>
+        <div class="stat-gauge-net"><span id="net-io">{{if .AppStats}}{{formatBytes .AppStats.NetIORxBytes}} / {{formatBytes .AppStats.NetIOTxBytes}}{{else}}- / -{{end}}</span></div>
+      </div>
+      <div class="stat-gauge">
+        <div class="stat-gauge-label">Block I/O</div>
+        <div class="stat-gauge-net"><span id="block-io">{{if .AppStats}}{{formatBytes .AppStats.BlockIORead}} / {{formatBytes .AppStats.BlockIOWrite}}{{else}}- / -{{end}}</span></div>
+      </div>
+    </div>
+    <hr class="stats-divider">
+    <div id="app-stats-body" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+      <p style="color:var(--text-muted);font-size:0.85em;margin-top:1em">Loading stats&hellip;</p>
     </div>
   </div>
   <script>
@@ -38,18 +69,25 @@
     wsUrl: 'api/apps/{{.App.ID}}/stats/live',
     metrics: ['cpu', 'memory', 'network', 'disk'],
     gauges: [
-      {metric:'cpu', field:'cpu', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill'},
+      {metric:'cpu', field:'cpu', pctId:'cpu-gauge-pct', fillId:'cpu-gauge-fill', chartValId:'cpu-chart-val'},
       {metric:'memory', field:'memory', pctId:'mem-gauge-pct', fillId:'mem-gauge-fill',
        detailId:'mem-gauge-detail',
-       detailFn:function(d){return formatBytes(d.mem_usage_bytes)+' / '+formatBytes(d.mem_limit_bytes);}}
+       detailFn:function(d){return formatBytes(d.mem_usage_bytes)+' / '+formatBytes(d.mem_limit_bytes);},
+       chartValId:'mem-chart-val'}
     ],
     lines: [{metric:'network', field:'network'}, {metric:'disk', field:'disk_usage_bytes'}],
     targetId: 'app-stats-body',
     liveIndicatorId: 'app-live-indicator',
     onData: function(d) {
-      if (d.net_rx !== undefined && d.net_tx !== undefined) { var e=document.getElementById('net-io'); if(e) e.textContent=formatBytes(d.net_rx)+' / '+formatBytes(d.net_tx); }
+      if (d.net_rx !== undefined && d.net_tx !== undefined) {
+        var e=document.getElementById('net-io'); if(e) e.textContent=formatBytes(d.net_rx)+' / '+formatBytes(d.net_tx);
+        var e2=document.getElementById('net-chart-val'); if(e2) e2.textContent=formatBytes(d.net_rx)+' / '+formatBytes(d.net_tx);
+      }
       if (d.block_r !== undefined && d.block_w !== undefined) { var e=document.getElementById('block-io'); if(e) e.textContent=formatBytes(d.block_r)+' / '+formatBytes(d.block_w); }
-      if (d.disk_usage_bytes !== undefined) { var e=document.getElementById('disk-usage'); if(e) e.textContent=formatBytes(d.disk_usage_bytes); }
+      if (d.disk_usage_bytes !== undefined) {
+        var e=document.getElementById('disk-usage'); if(e) e.textContent=formatBytes(d.disk_usage_bytes);
+        var e2=document.getElementById('disk-chart-val'); if(e2) e2.textContent=formatBytes(d.disk_usage_bytes);
+      }
     }
   });
   window.addEventListener('beforeunload', appCharts.disconnect);
