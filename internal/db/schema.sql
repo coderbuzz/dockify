@@ -111,11 +111,18 @@ CREATE TABLE IF NOT EXISTS container_stats (
     net_io_tx_bytes  INTEGER,
     block_io_read    INTEGER,
     block_io_write   INTEGER,
-    pids             INTEGER,
-    disk_usage_bytes INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_container_stats_app_time ON container_stats(app_id, created_at);
+
+CREATE TABLE IF NOT EXISTS app_disk_stats (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id           INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    server_id        INTEGER REFERENCES servers(id),
+    disk_usage_bytes INTEGER DEFAULT 0,
+    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_app_disk_stats_app_time ON app_disk_stats(app_id, created_at);
 
 CREATE TABLE IF NOT EXISTS route_stats (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

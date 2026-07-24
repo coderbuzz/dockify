@@ -38,27 +38,27 @@ type envVarInput struct {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name        string        `json:"name"`
-		ServerID    int64         `json:"server_id"`
-		Domain      string        `json:"domain"`
-		Domains     []string      `json:"domains"`
-		Port        int           `json:"port"`
-		Compose     string        `json:"compose"`
-		Image       string        `json:"image"`
-		EnvVars     []envVarInput `json:"env_vars"`
-		Volumes     string        `json:"volumes"`
-		GitRepo     string        `json:"git_repo"`
-		GitBranch   string        `json:"git_branch"`
-		AuthUser    string        `json:"auth_user"`
-		AuthPass    string        `json:"auth_pass"`
-		MemoryLimit string        `json:"memory_limit"`
-		CPULimit    string        `json:"cpu_limit"`
-		LogMaxSize  string        `json:"log_max_size"`
-		LogMaxFile  string        `json:"log_max_file"`
-		Command     string        `json:"command"`
-		Ports       string        `json:"ports"`
-		UlimitsNofile string       `json:"ulimits_nofile"`
-		Draft       bool          `json:"draft"`
+		Name          string        `json:"name"`
+		ServerID      int64         `json:"server_id"`
+		Domain        string        `json:"domain"`
+		Domains       []string      `json:"domains"`
+		Port          int           `json:"port"`
+		Compose       string        `json:"compose"`
+		Image         string        `json:"image"`
+		EnvVars       []envVarInput `json:"env_vars"`
+		Volumes       string        `json:"volumes"`
+		GitRepo       string        `json:"git_repo"`
+		GitBranch     string        `json:"git_branch"`
+		AuthUser      string        `json:"auth_user"`
+		AuthPass      string        `json:"auth_pass"`
+		MemoryLimit   string        `json:"memory_limit"`
+		CPULimit      string        `json:"cpu_limit"`
+		LogMaxSize    string        `json:"log_max_size"`
+		LogMaxFile    string        `json:"log_max_file"`
+		Command       string        `json:"command"`
+		Ports         string        `json:"ports"`
+		UlimitsNofile string        `json:"ulimits_nofile"`
+		Draft         bool          `json:"draft"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -101,22 +101,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		composeMode = "simple"
 	}
 	app := &App{
-		Name:        input.Name,
-		ServerID:    input.ServerID,
-		Domain:      input.Domain,
-		Port:        input.Port,
-		Compose:     compose,
-		GitRepo:     input.GitRepo,
-		GitBranch:   input.GitBranch,
-		AuthUser:    input.AuthUser,
-		AuthPass:    input.AuthPass,
-		ComposeMode: composeMode,
-		MemoryLimit: input.MemoryLimit,
-		CPULimit:    input.CPULimit,
-		LogMaxSize:  input.LogMaxSize,
-		LogMaxFile:  input.LogMaxFile,
-		Command:     input.Command,
-		Ports:       input.Ports,
+		Name:          input.Name,
+		ServerID:      input.ServerID,
+		Domain:        input.Domain,
+		Port:          input.Port,
+		Compose:       compose,
+		GitRepo:       input.GitRepo,
+		GitBranch:     input.GitBranch,
+		AuthUser:      input.AuthUser,
+		AuthPass:      input.AuthPass,
+		ComposeMode:   composeMode,
+		MemoryLimit:   input.MemoryLimit,
+		CPULimit:      input.CPULimit,
+		LogMaxSize:    input.LogMaxSize,
+		LogMaxFile:    input.LogMaxFile,
+		Command:       input.Command,
+		Ports:         input.Ports,
 		UlimitsNofile: input.UlimitsNofile,
 	}
 	if input.Draft {
@@ -525,23 +525,23 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 	}
 
 	app := &App{
-		Name:              strings.TrimSpace(r.FormValue("name")),
-		ServerID:          serverID,
-		Domain:            primaryDomain,
-		Port:              port,
-		Compose:           compose,
-		GitRepo:           strings.TrimSpace(r.FormValue("git_repo")),
-		GitBranch:         gitBranch,
-		AuthUser:          strings.TrimSpace(r.FormValue("auth_user")),
-		AuthPass:          strings.TrimSpace(r.FormValue("auth_pass")),
-		ComposeMode:       composeMode,
-		MemoryLimit:       memoryLimit,
-		CPULimit:          cpuLimit,
-		LogMaxSize:        logMaxSize,
-		LogMaxFile:        logMaxFile,
-		Command:           command,
-		Ports:             ports,
-		UlimitsNofile:     ulimitsNofile,
+		Name:          strings.TrimSpace(r.FormValue("name")),
+		ServerID:      serverID,
+		Domain:        primaryDomain,
+		Port:          port,
+		Compose:       compose,
+		GitRepo:       strings.TrimSpace(r.FormValue("git_repo")),
+		GitBranch:     gitBranch,
+		AuthUser:      strings.TrimSpace(r.FormValue("auth_user")),
+		AuthPass:      strings.TrimSpace(r.FormValue("auth_pass")),
+		ComposeMode:   composeMode,
+		MemoryLimit:   memoryLimit,
+		CPULimit:      cpuLimit,
+		LogMaxSize:    logMaxSize,
+		LogMaxFile:    logMaxFile,
+		Command:       command,
+		Ports:         ports,
+		UlimitsNofile: ulimitsNofile,
 	}
 
 	isDraft := r.FormValue("draft") == "1"
@@ -567,21 +567,21 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 
 	formCtx := func(servers interface{}, errMsg string) map[string]interface{} {
 		return map[string]interface{}{
-			"Title":       "Deploy App",
-			"Servers":     servers,
-			"App":         app,
-			"SecretsJSON": template.JS(envJSON),
-			"Image":       image,
-			"Volumes":     volumes,
-			"Domains":     domains,
-			"MemLimit":    memoryLimit,
-			"CpuLimit":    cpuLimit,
-			"LogMaxSize":  logMaxSize,
-			"LogMaxFile":  logMaxFile,
-			"Command":     command,
-			"Ports":       ports,
+			"Title":         "Deploy App",
+			"Servers":       servers,
+			"App":           app,
+			"SecretsJSON":   template.JS(envJSON),
+			"Image":         image,
+			"Volumes":       volumes,
+			"Domains":       domains,
+			"MemLimit":      memoryLimit,
+			"CpuLimit":      cpuLimit,
+			"LogMaxSize":    logMaxSize,
+			"LogMaxFile":    logMaxFile,
+			"Command":       command,
+			"Ports":         ports,
 			"UlimitsNofile": ulimitsNofile,
-			"Error":       errMsg,
+			"Error":         errMsg,
 		}
 	}
 
@@ -664,22 +664,22 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 	secretsJSON, _ := json.Marshal(secrets)
 
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
-		"Title":       "Edit " + app.Name,
-		"Servers":     servers,
-		"App":         app,
-		"Secrets":     secrets,
-		"SecretsJSON": template.JS(secretsJSON),
-		"Files":       files,
-		"IsEdit":      true,
-		"Image":       image,
-		"Volumes":     volumes,
-		"Domains":     domainList,
-		"MemLimit":    sf.MemoryLimit,
-		"CpuLimit":    sf.CPULimit,
-		"LogMaxSize":  sf.LogMaxSize,
-		"LogMaxFile":  sf.LogMaxFile,
-		"Command":     sf.Command,
-		"Ports":       sf.Ports,
+		"Title":         "Edit " + app.Name,
+		"Servers":       servers,
+		"App":           app,
+		"Secrets":       secrets,
+		"SecretsJSON":   template.JS(secretsJSON),
+		"Files":         files,
+		"IsEdit":        true,
+		"Image":         image,
+		"Volumes":       volumes,
+		"Domains":       domainList,
+		"MemLimit":      sf.MemoryLimit,
+		"CpuLimit":      sf.CPULimit,
+		"LogMaxSize":    sf.LogMaxSize,
+		"LogMaxFile":    sf.LogMaxFile,
+		"Command":       sf.Command,
+		"Ports":         sf.Ports,
 		"UlimitsNofile": sf.UlimitsNofile,
 	})
 }
@@ -789,22 +789,22 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 
 	editCtx := func(servers interface{}, errMsg string) map[string]interface{} {
 		return map[string]interface{}{
-			"Title":       "Edit " + app.Name,
-			"Servers":     servers,
-			"App":         app,
-			"SecretsJSON": template.JS(envJSON),
-			"Image":       image,
-			"Volumes":     volumes,
-			"Domains":     domains,
-			"MemLimit":    memoryLimit,
-			"CpuLimit":    cpuLimit,
-			"LogMaxSize":  logMaxSize,
-			"LogMaxFile":  logMaxFile,
-			"Command":     command,
-			"Ports":       ports,
+			"Title":         "Edit " + app.Name,
+			"Servers":       servers,
+			"App":           app,
+			"SecretsJSON":   template.JS(envJSON),
+			"Image":         image,
+			"Volumes":       volumes,
+			"Domains":       domains,
+			"MemLimit":      memoryLimit,
+			"CpuLimit":      cpuLimit,
+			"LogMaxSize":    logMaxSize,
+			"LogMaxFile":    logMaxFile,
+			"Command":       command,
+			"Ports":         ports,
 			"UlimitsNofile": ulimitsNofile,
-			"IsEdit":      true,
-			"Error":       errMsg,
+			"IsEdit":        true,
+			"Error":         errMsg,
 		}
 	}
 
@@ -1124,16 +1124,16 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"available":      true,
-		"cpu_percent":    overview.CPUPercent,
-		"mem_percent":    overview.MemPercent,
-		"mem_usage_bytes": overview.MemUsageBytes,
-		"mem_limit_bytes": overview.MemLimitBytes,
-		"net_io_rx_bytes": overview.NetIORxBytes,
-		"net_io_tx_bytes": overview.NetIOTxBytes,
+		"available":        true,
+		"cpu_percent":      overview.CPUPercent,
+		"mem_percent":      overview.MemPercent,
+		"mem_usage_bytes":  overview.MemUsageBytes,
+		"mem_limit_bytes":  overview.MemLimitBytes,
+		"net_io_rx_bytes":  overview.NetIORxBytes,
+		"net_io_tx_bytes":  overview.NetIOTxBytes,
 		"block_io_read":  overview.BlockIORead,
 		"block_io_write": overview.BlockIOWrite,
-		"pids":           overview.PIDs,
+		"disk_usage_bytes": overview.DiskUsageBytes,
 		"container_name": overview.ContainerName,
 	})
 }
@@ -1155,13 +1155,13 @@ func (h *Handler) Traffic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"available":       true,
-		"requests_rps":    overview.RequestsRPS,
-		"total_requests":  overview.TotalRequests,
-		"status_2xx":      overview.Status2xx,
-		"status_3xx":      overview.Status3xx,
-		"status_4xx":      overview.Status4xx,
-		"status_5xx":      overview.Status5xx,
+		"available":      true,
+		"requests_rps":   overview.RequestsRPS,
+		"total_requests": overview.TotalRequests,
+		"status_2xx":     overview.Status2xx,
+		"status_3xx":     overview.Status3xx,
+		"status_4xx":     overview.Status4xx,
+		"status_5xx":     overview.Status5xx,
 	})
 }
 

@@ -2,19 +2,9 @@
 {{$width := 600}}
 {{$height := 100}}
 
-<div id="server-stats-cards" data-range="{{$range}}">
+<div id="server-stats-body" data-range="{{$range}}">
 
 <div class="card" style="margin-top:1em">
-  <div class="stats-header">
-    <h3>Resource Usage <span id="live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
-    <div class="chart-range-btns">
-      <button class="btn btn-ghost{{if eq $range "1h"}} btn-active{{end}}" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-target="#server-stats-cards" hx-swap="outerHTML">1h</button>
-      <button class="btn btn-ghost{{if eq $range "6h"}} btn-active{{end}}" hx-get="servers/{{.Server.ID}}/stats?range=6h" hx-target="#server-stats-cards" hx-swap="outerHTML">6h</button>
-      <button class="btn btn-ghost{{if eq $range "24h"}} btn-active{{end}}" hx-get="servers/{{.Server.ID}}/stats?range=24h" hx-target="#server-stats-cards" hx-swap="outerHTML">24h</button>
-      <button class="btn btn-ghost{{if eq $range "7d"}} btn-active{{end}}" hx-get="servers/{{.Server.ID}}/stats?range=7d" hx-target="#server-stats-cards" hx-swap="outerHTML">7d</button>
-    </div>
-  </div>
-
   {{if .Server.CPUCores}}
   <div class="stats-gauges">
     <div class="stat-gauge">

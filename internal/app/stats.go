@@ -26,12 +26,14 @@ type dockerStat struct {
 	MemPerc  string `json:"MemPerc"`
 	NetIO    string `json:"NetIO"`
 	BlockIO  string `json:"BlockIO"`
-	PIDs     string `json:"PIDs"`
 	Name     string `json:"Name"`
 }
 
 func (s *Service) StartStatsCollector() {
 	go s.statsLoop()
+	// Collect disk usage once at startup so the value appears without waiting
+	// for the first 5-minute tick.
+	go s.collectAppDiskUsage()
 }
 
 func (s *Service) statsLoop() {
@@ -149,17 +151,17 @@ func (s *Service) collectAppDiskUsage() {
 }
 
 // collectDiskUsageForApps runs du -sb on each app's home directory in a single
-// SSH round-trip, then updates the latest container_stats row with the result.
+// SSH round-trip, then appends a sample to the app_disk_stats table.
 func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
 	if len(apps) == 0 {
 		return
 	}
 
+	serverByApp := make(map[int64]int64, len(apps))
 	var dirs []string
-	appIDs := make([]int64, 0, len(apps))
 	for _, a := range apps {
 		dirs = append(dirs, fmt.Sprintf("/opt/dockify/apps/app-%d", a.ID))
-		appIDs = append(appIDs, a.ID)
+		serverByApp[a.ID] = a.ServerID
 	}
 
 	out, err := client.Exec(fmt.Sprintf("du -sb %s 2>/dev/null", strings.Join(dirs, " ")))
@@ -197,9 +199,9 @@ func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
 		return
 	}
 
-	// Update latest container_stats row for each app.
+	// Append a disk sample for each app.
 	for _, e := range entries {
-		s.repo.UpdateDiskUsage(e.appID, e.bytes)
+		s.repo.InsertAppDiskUsage(e.appID, serverByApp[e.appID], e.bytes)
 	}
 }
 
@@ -417,7 +419,6 @@ func sumStats(stats []*ContainerStats) *ContainerStats {
 		sum.NetIOTxBytes += cs.NetIOTxBytes
 		sum.BlockIORead += cs.BlockIORead
 		sum.BlockIOWrite += cs.BlockIOWrite
-		sum.PIDs += cs.PIDs
 	}
 	return &sum
 }
@@ -533,9 +534,6 @@ func parseDockerStat(stat dockerStat, appID, serverID int64, containerName strin
 	cs.MemUsageBytes, cs.MemLimitBytes = parseMemUsage(stat.MemUsage)
 	cs.NetIORxBytes, cs.NetIOTxBytes = parseNetIO(stat.NetIO)
 	cs.BlockIORead, cs.BlockIOWrite = parseBlockIO(stat.BlockIO)
-	if pids, err := strconv.Atoi(strings.TrimSpace(stat.PIDs)); err == nil {
-		cs.PIDs = pids
-	}
 
 	return cs
 }
@@ -726,6 +724,9 @@ func (s *Service) pruneOldStats() {
 	if err := s.repo.PruneRouteStats(cutoff); err != nil {
 		log.Printf("Stats collector: failed to prune route stats: %v", err)
 	}
+	if err := s.repo.PruneAppDiskStats(cutoff); err != nil {
+		log.Printf("Stats collector: failed to prune app disk stats: %v", err)
+	}
 }
 
 func detectDockerCompose(client ssh.Connector) string {
@@ -762,7 +763,7 @@ func (s *Service) GetStatsHistory(appID int64, duration string) map[string]inter
 	cpu, _ := s.repo.ContainerStatsCPUHistory(appID, since, bucketMins)
 	mem, _ := s.repo.ContainerStatsMemHistory(appID, since, bucketMins)
 	net, _ := s.repo.ContainerStatsNetHistory(appID, since, bucketMins)
-	disk, _ := s.repo.ContainerStatsDiskHistory(appID, since, bucketMins)
+	disk, _ := s.repo.AppDiskUsageHistory(appID, since, bucketMins)
 
 	labels := make([]string, len(cpu))
 	for i, p := range cpu {
