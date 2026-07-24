@@ -338,13 +338,14 @@ pre {
 html.dark .console-container { background: #0d0d0d; }
 html:not(.dark) .console-container { background: #1a1a1a; }
 
-.stats-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5em; }
+.stats-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.9em; padding-bottom:0.6em; border-bottom:1px solid var(--border); }
 .stats-header h3 { margin:0; }
 .chart-range-btns { display:flex; gap:0.3em; flex-wrap:wrap; }
 .chart-range-btns .btn { font-size:0.75em; padding:0.25em 0.6em; }
 .chart-range-btns .btn-active { background:var(--bg-elevated); border-color:var(--accent); color:var(--text); }
 
 .stats-gauges { display:grid; grid-template-columns:repeat(5,1fr); gap:0.5em 1.5em; margin-bottom:0.75em; }
+.stats-gauges--resources { grid-template-columns:0.7fr 1.65fr 0.65fr 1.1fr 1.1fr; }
 @media (max-width:600px) { .stats-gauges { grid-template-columns:1fr 1fr; } }
 .stat-gauge { min-width:0; }
 .stat-gauge-label { font-size:0.65em; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
