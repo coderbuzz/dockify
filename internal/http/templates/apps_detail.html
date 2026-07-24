@@ -21,7 +21,8 @@
     <div class="stats-header">
       <h3>Resource Usage <span id="app-live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
       <div class="chart-range-btns">
-        <button class="btn btn-ghost btn-active" data-range="1h" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-target="#app-stats-body" hx-swap="outerHTML">1h</button>
+        <button class="btn btn-ghost btn-active" data-range="realtime" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-target="#app-stats-body" hx-swap="outerHTML">Realtime</button>
+        <button class="btn btn-ghost" data-range="1h" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-target="#app-stats-body" hx-swap="outerHTML">1h</button>
         <button class="btn btn-ghost" data-range="6h" hx-get="apps/{{.App.ID}}/stats?range=6h" hx-target="#app-stats-body" hx-swap="outerHTML">6h</button>
         <button class="btn btn-ghost" data-range="24h" hx-get="apps/{{.App.ID}}/stats?range=24h" hx-target="#app-stats-body" hx-swap="outerHTML">24h</button>
         <button class="btn btn-ghost" data-range="7d" hx-get="apps/{{.App.ID}}/stats?range=7d" hx-target="#app-stats-body" hx-swap="outerHTML">7d</button>
@@ -60,7 +61,7 @@
       </div>
     </div>
     <hr class="stats-divider">
-    <div id="app-stats-body" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+    <div id="app-stats-body" data-range="realtime" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
       <p style="color:var(--text-muted);font-size:0.85em;margin-top:1em">Loading stats&hellip;</p>
     </div>
   </div>

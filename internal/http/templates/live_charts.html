@@ -35,12 +35,16 @@ function initLiveCharts(opts) {
   var width = opts.width || 600;
   var height = opts.height || 100;
   var maxLivePoints = opts.maxLivePoints || 120;
-  var rangeDurations = {'1h':3600000,'6h':21600000,'24h':86400000,'7d':604800000};
-  var currentRangeMs = 3600000;
+  var rangeDurations = {'realtime':120000,'1h':3600000,'6h':21600000,'24h':86400000,'7d':604800000};
+  var rangeAppendMs = {'realtime':1000,'1h':5000,'6h':30000,'24h':60000,'7d':300000};
+  var currentRangeMs = 120000;
+  var currentAppendMs = 1000;
+  var lastAppendAt = {};
 
   opts.metrics.forEach(function(m) {
     chartData[m] = [];
     liveMetrics[m] = [];
+    lastAppendAt[m] = 0;
   });
 
   function readRangeFromTarget() {
@@ -49,9 +53,18 @@ function initLiveCharts(opts) {
       var r = t.getAttribute('data-range');
       if (r && rangeDurations[r]) return rangeDurations[r];
     }
-    return 3600000;
+    return 120000;
+  }
+  function readAppendFromTarget() {
+    var t = document.getElementById(opts.targetId);
+    if (t) {
+      var r = t.getAttribute('data-range');
+      if (r && rangeAppendMs[r]) return rangeAppendMs[r];
+    }
+    return 1000;
   }
   currentRangeMs = readRangeFromTarget();
+  currentAppendMs = readAppendFromTarget();
 
   function parseTime(s) {
     if (!s) return NaN;
@@ -107,12 +120,12 @@ function initLiveCharts(opts) {
             cvalEl.textContent = det ? (pct + ' (' + det + ')') : pct;
           }
         }
-        addChartPoint(g.metric, v);
+        maybeAppend(g.metric, v);
       });
 
       (opts.lines || []).forEach(function(l) {
         if (data[l.field] !== undefined) {
-          addChartPoint(l.metric, data[l.field]);
+          maybeAppend(l.metric, data[l.field]);
         }
       });
 
@@ -129,6 +142,13 @@ function initLiveCharts(opts) {
     if (ws) { ws.close(); ws = null; }
     var ind = document.getElementById(opts.liveIndicatorId);
     if (ind) ind.classList.add('live-badge--hidden');
+  }
+
+  function maybeAppend(metric, value) {
+    var now = Date.now();
+    if (now - (lastAppendAt[metric] || 0) < currentAppendMs) return;
+    lastAppendAt[metric] = now;
+    addChartPoint(metric, value);
   }
 
   function addChartPoint(metric, value) {
@@ -190,6 +210,10 @@ function initLiveCharts(opts) {
       if (rangeEl && rangeDurations[rangeEl]) {
         currentRangeMs = rangeDurations[rangeEl];
       }
+      if (rangeEl && rangeAppendMs[rangeEl]) {
+        currentAppendMs = rangeAppendMs[rangeEl];
+      }
+      opts.metrics.forEach(function(m) { lastAppendAt[m] = 0; });
       readChartDataFromHTML();
       updateCharts();
       if (ws && ws.readyState === WebSocket.OPEN) {

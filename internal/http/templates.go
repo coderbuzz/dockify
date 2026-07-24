@@ -108,6 +108,8 @@ func chartPoints(points []model.ChartPoint, width, height int, maxVal float64, r
 
 func rangeDuration(rangeStr string) time.Duration {
 	switch rangeStr {
+	case "realtime":
+		return 2 * time.Minute
 	case "1h":
 		return time.Hour
 	case "6h":
@@ -117,7 +119,7 @@ func rangeDuration(rangeStr string) time.Duration {
 	case "7d":
 		return 7 * 24 * time.Hour
 	default:
-		return time.Hour
+		return 2 * time.Minute
 	}
 }
 

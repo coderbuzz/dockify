@@ -78,7 +78,7 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 		defer client.Close()
 	}
 
-	currentRange := "1h"
+	currentRange := "realtime"
 	sendAppChartData(conn, h.appSvc, id, currentRange)
 
 	// Snapshot channel fed by the streaming collector (real mode) or the mock
