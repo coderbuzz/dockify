@@ -23,7 +23,7 @@ function formatBytes(b) {
 //                      and appends a live chart point.
 //   lines            - array of {metric, field} for chart-only metrics without a gauge
 //                      (e.g. network throughput). Appends a live chart point per sample.
-//   targetId         - htmx swap target id (e.g. 'server-stats-cards' / 'app-stats-cards')
+//   targetId         - htmx swap target id (e.g. 'server-stats-body' / 'app-stats-body')
 //   liveIndicatorId  - id of the "● LIVE" badge to toggle
 //   width/height     - chart dimensions (default 600x100)
 //   maxLivePoints    - rolling live window (default 120)
@@ -173,5 +173,15 @@ function initLiveCharts(opts) {
   connect();
   return { disconnect: disconnect };
 }
+
+// Range buttons live in a static header (outside the htmx-swapped body), so the
+// server can't re-apply the btn-active class on swap. Keep it in sync here.
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest && e.target.closest('.chart-range-btns .btn');
+  if (!btn) return;
+  var siblings = btn.parentNode.children;
+  for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('btn-active');
+  btn.classList.add('btn-active');
+});
 </script>
 {{end}}

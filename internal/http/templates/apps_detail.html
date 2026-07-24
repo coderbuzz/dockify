@@ -17,9 +17,19 @@
   </hgroup>
 
   {{if eq .App.Status "running"}}
-  <div hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card" style="margin-top:1em">
+    <div class="stats-header">
+      <h3>Resource Usage <span id="app-live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
+      <div class="chart-range-btns">
+        <button class="btn btn-ghost btn-active" data-range="1h" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-target="#app-stats-body" hx-swap="outerHTML">1h</button>
+        <button class="btn btn-ghost" data-range="6h" hx-get="apps/{{.App.ID}}/stats?range=6h" hx-target="#app-stats-body" hx-swap="outerHTML">6h</button>
+        <button class="btn btn-ghost" data-range="24h" hx-get="apps/{{.App.ID}}/stats?range=24h" hx-target="#app-stats-body" hx-swap="outerHTML">24h</button>
+        <button class="btn btn-ghost" data-range="7d" hx-get="apps/{{.App.ID}}/stats?range=7d" hx-target="#app-stats-body" hx-swap="outerHTML">7d</button>
+      </div>
+    </div>
+  </div>
+  <div id="app-stats-body" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-trigger="load" hx-swap="outerHTML">
     <div class="card" style="margin-bottom:1em">
-      <h3>Resource Usage</h3>
       <p style="color:var(--text-muted);font-size:0.85em">Loading stats&hellip;</p>
     </div>
   </div>
@@ -34,7 +44,7 @@
        detailFn:function(d){return formatBytes(d.mem_usage_bytes)+' / '+formatBytes(d.mem_limit_bytes);}}
     ],
     lines: [{metric:'network', field:'network'}, {metric:'disk', field:'disk_usage_bytes'}],
-    targetId: 'app-stats-cards',
+    targetId: 'app-stats-body',
     liveIndicatorId: 'app-live-indicator',
     onData: function(d) {
       if (d.net_rx !== undefined && d.net_tx !== undefined) { var e=document.getElementById('net-io'); if(e) e.textContent=formatBytes(d.net_rx)+' / '+formatBytes(d.net_tx); }

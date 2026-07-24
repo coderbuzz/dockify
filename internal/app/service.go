@@ -698,6 +698,8 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 	if err != nil || cs == nil {
 		return nil
 	}
+	// Disk usage lives in its own low-frequency table (collected every 5 min).
+	diskBytes, _ := s.repo.LatestAppDiskUsage(appID)
 	return &StatsOverview{
 		CPUPercent:     cs.CPUPercent,
 		MemPercent:     cs.MemPercent,
@@ -707,8 +709,7 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 		NetIOTxBytes:   cs.NetIOTxBytes,
 		BlockIORead:    cs.BlockIORead,
 		BlockIOWrite:   cs.BlockIOWrite,
-		PIDs:           cs.PIDs,
-		DiskUsageBytes: cs.DiskUsageBytes,
+		DiskUsageBytes: diskBytes,
 	}
 }
 

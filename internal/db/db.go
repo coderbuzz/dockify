@@ -82,8 +82,6 @@ func Open(path string) (*sql.DB, error) {
 		net_io_tx_bytes  INTEGER,
 		block_io_read    INTEGER,
 		block_io_write   INTEGER,
-		pids             INTEGER,
-		disk_usage_bytes INTEGER DEFAULT 0,
 		created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_container_stats_app_time ON container_stats(app_id, created_at)`)
@@ -101,9 +99,6 @@ func Open(path string) (*sql.DB, error) {
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_route_stats_app_time ON route_stats(app_id, created_at)`)
 
-	// Migration: add disk_usage_bytes to container_stats (v0.5.5)
-	db.Exec("ALTER TABLE container_stats ADD COLUMN disk_usage_bytes INTEGER DEFAULT 0")
-
 	// Migration: add server_stats table (v0.13.0)
 	db.Exec(`CREATE TABLE IF NOT EXISTS server_stats (
 		id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,6 +112,23 @@ func Open(path string) (*sql.DB, error) {
 		created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_server_stats_time ON server_stats(server_id, created_at)`)
+
+	// Migration: move app disk usage to its own low-frequency table (v0.6.0).
+	// Disk usage is collected every 5 minutes (not every 10s like container_stats),
+	// so it lives in a separate table to avoid polluting the high-frequency stats.
+	db.Exec(`CREATE TABLE IF NOT EXISTS app_disk_stats (
+		id               INTEGER PRIMARY KEY AUTOINCREMENT,
+		app_id           INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+		server_id        INTEGER REFERENCES servers(id),
+		disk_usage_bytes INTEGER DEFAULT 0,
+		created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_app_disk_stats_app_time ON app_disk_stats(app_id, created_at)`)
+	// Drop the now-unused disk_usage_bytes column from container_stats (errors
+	// silently on DBs where it was already removed / never existed).
+	db.Exec("ALTER TABLE container_stats DROP COLUMN disk_usage_bytes")
+	// Drop the pids column — not shown in the UI and not worth collecting.
+	db.Exec("ALTER TABLE container_stats DROP COLUMN pids")
 
 	return db, nil
 }
