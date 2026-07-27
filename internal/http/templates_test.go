@@ -118,10 +118,23 @@ func TestTemplatesRender(t *testing.T) {
 			"BlockIORead":    int64(0),
 			"BlockIOWrite":   int64(0),
 		},
-		"Error":     "something went wrong",
-		"Message":   "import complete",
-		"Log":       "line1\nline2",
-		"WebhookSecret": "abc123",
+		"ServerGroups": []interface{}{
+			map[string]interface{}{
+				"ServerID":   int64(1),
+				"ServerName": "worker-1",
+				"Host":       "1.2.3.4",
+				"Status":     "online",
+				"Apps": []map[string]interface{}{
+					{
+						"ID":     int64(1),
+						"Name":   "web-app",
+						"Domain": "web.example.com",
+						"Port":   8080,
+						"Status": "running",
+					},
+				},
+			},
+		},
 	}
 
 	pageTemplates := []string{
@@ -149,7 +162,23 @@ func TestTemplatesRender(t *testing.T) {
 				t.Skipf("template %q not found", name)
 				return
 			}
-			err := tpl.Execute(new(strings.Builder), data)
+			// Copy data map per template test to allow page-specific overrides if needed
+			pageData := make(map[string]interface{})
+			for k, v := range data {
+				pageData[k] = v
+			}
+			if name == "apps.html" {
+				pageData["AppStats"] = map[int64]interface{}{
+					int64(1): map[string]interface{}{
+						"CPUPercent":     12.5,
+						"MemPercent":     45.0,
+						"MemUsageBytes":  int64(104857600),
+						"MemLimitBytes":  int64(1073741824),
+						"DiskUsageBytes": int64(524288000),
+					},
+				}
+			}
+			err := tpl.Execute(new(strings.Builder), pageData)
 			if err != nil {
 				t.Errorf("template %q render failed: %v", name, err)
 			}

@@ -123,6 +123,7 @@ func (a *serverLister) List() ([]app.ServerInfo, error) {
 		infos[i] = app.ServerInfo{
 			ID:     s.ID,
 			Name:   s.Name,
+			Host:   s.Host,
 			Status: s.Status,
 		}
 	}

@@ -713,6 +713,37 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 	}
 }
 
+// StatsOverviewByApp returns the latest per-app resource snapshot for all apps
+// in two batched queries (container stats + disk), keyed by app ID. Apps with no
+// collected stats are absent. Never returns nil (always a non-nil, possibly empty map).
+func (s *Service) StatsOverviewByApp() map[int64]*StatsOverview {
+	out := make(map[int64]*StatsOverview)
+	if stats, err := s.repo.LatestStatsByApp(); err == nil {
+		for appID, cs := range stats {
+			out[appID] = &StatsOverview{
+				CPUPercent:    cs.CPUPercent,
+				MemPercent:    cs.MemPercent,
+				MemUsageBytes: cs.MemUsageBytes,
+				MemLimitBytes: cs.MemLimitBytes,
+				NetIORxBytes:  cs.NetIORxBytes,
+				NetIOTxBytes:  cs.NetIOTxBytes,
+				BlockIORead:   cs.BlockIORead,
+				BlockIOWrite:  cs.BlockIOWrite,
+			}
+		}
+	}
+	if disk, err := s.repo.LatestDiskByApp(); err == nil {
+		for appID, b := range disk {
+			if ov, ok := out[appID]; ok {
+				ov.DiskUsageBytes = b
+			} else {
+				out[appID] = &StatsOverview{DiskUsageBytes: b}
+			}
+		}
+	}
+	return out
+}
+
 func (s *Service) GetTrafficOverview(appID int64) *TrafficOverview {
 	rs, err := s.repo.LatestRouteStats(appID)
 	if err != nil || rs == nil {
