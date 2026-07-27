@@ -20,11 +20,11 @@
     <div class="stats-header">
       <h3>Resource Usage <span id="live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
       <div class="chart-range-btns">
-        <button class="btn btn-ghost btn-active" data-range="realtime" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-target="#server-stats-body" hx-swap="outerHTML">2m</button>
-        <button class="btn btn-ghost" data-range="1h" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-target="#server-stats-body" hx-swap="outerHTML">1h</button>
-        <button class="btn btn-ghost" data-range="6h" hx-get="servers/{{.Server.ID}}/stats?range=6h" hx-target="#server-stats-body" hx-swap="outerHTML">6h</button>
-        <button class="btn btn-ghost" data-range="24h" hx-get="servers/{{.Server.ID}}/stats?range=24h" hx-target="#server-stats-body" hx-swap="outerHTML">24h</button>
-        <button class="btn btn-ghost" data-range="7d" hx-get="servers/{{.Server.ID}}/stats?range=7d" hx-target="#server-stats-body" hx-swap="outerHTML">7d</button>
+        <button class="btn btn-ghost btn-active" data-range="realtime" title="Realtime 2-minute live stream" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-target="#server-stats-body" hx-swap="outerHTML">Realtime</button>
+        <button class="btn btn-ghost" data-range="1h" title="1 Hour history" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-target="#server-stats-body" hx-swap="outerHTML">1h</button>
+        <button class="btn btn-ghost" data-range="6h" title="6 Hours history" hx-get="servers/{{.Server.ID}}/stats?range=6h" hx-target="#server-stats-body" hx-swap="outerHTML">6h</button>
+        <button class="btn btn-ghost" data-range="24h" title="24 Hours history" hx-get="servers/{{.Server.ID}}/stats?range=24h" hx-target="#server-stats-body" hx-swap="outerHTML">24h</button>
+        <button class="btn btn-ghost" data-range="7d" title="7 Days history" hx-get="servers/{{.Server.ID}}/stats?range=7d" hx-target="#server-stats-body" hx-swap="outerHTML">7d</button>
       </div>
     </div>
     <div class="stats-gauges stats-gauges--resources">

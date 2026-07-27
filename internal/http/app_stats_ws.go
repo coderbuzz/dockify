@@ -85,6 +85,8 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 	// ticker (mock mode).
 	snapCh := make(chan *app.ContainerStats, 16)
 
+	var lastSnapReceived int32
+
 	if GetDevMock(r) {
 		go func() {
 			ticker := time.NewTicker(1 * time.Second)
@@ -117,43 +119,30 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 		// (e.g. docker stats streaming failed or returned no containers),
 		// fall back to polling LiveSnapshot every 1s so the live feed stays alive.
 		go func() {
-			streamActive := int32(0)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(3 * time.Second):
-					if atomic.LoadInt32(&streamActive) == 0 {
-						log.Printf("app stats fallback: no stream data for app %d, starting poll fallback", id)
-						ticker := time.NewTicker(1 * time.Second)
-						defer ticker.Stop()
-						for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(3 * time.Second):
+				if atomic.LoadInt32(&lastSnapReceived) == 0 {
+					log.Printf("app stats fallback: no stream data for app %d, starting poll fallback", id)
+					ticker := time.NewTicker(1 * time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+							cs, err := h.appSvc.LiveSnapshot(client, a)
+							if err != nil || cs == nil {
+								continue
+							}
 							select {
+							case snapCh <- cs:
 							case <-ctx.Done():
 								return
-							case <-ticker.C:
-								cs, err := h.appSvc.LiveSnapshot(client, a)
-								if err != nil || cs == nil {
-									continue
-								}
-								select {
-								case snapCh <- cs:
-								case <-ctx.Done():
-									return
-								}
 							}
 						}
 					}
-					return
-				case cs := <-snapCh:
-					atomic.StoreInt32(&streamActive, 1)
-					// Re-inject the snapshot for the main loop to consume.
-					select {
-					case snapCh <- cs:
-					case <-ctx.Done():
-						return
-					}
-					return
 				}
 			}
 		}()
@@ -206,6 +195,7 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 			if !ok {
 				return
 			}
+			atomic.StoreInt32(&lastSnapReceived, 1)
 			latestSnap = cs
 
 		case <-liveTicker.C:
@@ -222,8 +212,9 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 			if !prevNetTime.IsZero() {
 				elapsed := now.Sub(prevNetTime).Seconds()
 				if elapsed > 0 {
-					netRate = float64(curNet-prevNetBytes) / elapsed
-					if netRate < 0 {
+					if curNet >= prevNetBytes {
+						netRate = float64(curNet-prevNetBytes) / elapsed
+					} else {
 						netRate = 0
 					}
 				}
