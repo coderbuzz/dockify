@@ -8,10 +8,10 @@
   <tbody>
     {{range .Servers}}
     <tr data-name="{{.Name}}" data-host="{{.Host}}" data-user="{{.User}}">
-      <td style="white-space:nowrap"><a href="servers/{{.ID}}">{{.Name}}</a></td>
-      <td>{{.Host}}:{{.Port}}</td>
+      <td style="white-space:nowrap; font-weight: 600;"><a href="servers/{{.ID}}">{{.Name}}</a></td>
+      <td class="mono">{{.Host}}:{{.Port}}</td>
       <td>{{.User}}</td>
-      <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+      <td><span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span></td>
       <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
       <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} ({{printf "%.1f" .DiskUsage}}%){{end}}{{else}}-{{end}}</td>

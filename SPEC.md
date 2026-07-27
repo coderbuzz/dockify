@@ -406,32 +406,37 @@ The `statsLoop()` goroutine runs every 60 seconds:
 
 `GET /api/servers/:id/stats/live` — WebSocket endpoint that streams live CPU/RAM/disk metrics every 1 second. Uses the same `/proc/stat` and `/proc/meminfo` collection methods as the background collector. Client-side JS reconnects on disconnect.
 
-Server resource card supports HTMX partial refresh (`GET /servers/:id/resources`).
-
 ## UI Style Guide
 
-All styles are in `internal/http/templates/layout.html` as a single `<style>` block. No CSS framework — fully custom.
+All styles live in `internal/http/templates/layout.html` as a single `<style>` block. No external CSS framework — fully custom Vanilla CSS.
 
 ### Typography
-- **Font stack:** `"Berkeley Mono", "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", monospace`
-- **Base size:** 15px, line-height: 1.5
+- **Primary UI Font Stack:** `'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` (body, headers, navigation, buttons, labels)
+- **Monospace Font Stack:** `'JetBrains Mono', 'Fira Code', ui-monospace, 'SF Mono', 'Cascadia Code', monospace` (IPs, ports, domains, badges, terminal, logs, secrets, code)
+- **Base size:** 14px, line-height: 1.5
 - **Headings:** weight 600; h1 = 1.35em, h2 = 1.1em
 
-### Color System
+### Color System & Design Tokens
 
 | Token | Light (`:root`) | Dark (`html.dark`) | Usage |
 |---|---|---|---|
-| `--bg` | `#f5f5f5` | `#0d0d0d` | Page background |
-| `--bg-elevated` | `#fff` | `#141414` | Raised surface |
-| `--bg-card` | `#fff` | `#1a1a1a` | Card background |
-| `--border` | `#d4d4d4` | `#2a2a2a` | Borders |
-| `--text` | `#1a1a1a` | `#cfcecd` | Body text |
-| `--text-muted` | `#666` | `#888` | Secondary text |
-| `--link` | `#2563eb` | `#8ab4f8` | Links |
-| `--green` | `#2d7a3a` | `#3d8b4a` | Success / online / running |
-| `--red` | `#9a2a2a` | `#b33a3a` | Error / offline / failed |
-| `--yellow` | `#8a7420` | `#b8942e` | Warning / pending |
-| `--orange` | `#8a6020` | `#b8702e` | Info / deploying |
+| `--bg` | `#f8fafc` | `#090d16` | App background |
+| `--bg-elevated` | `#ffffff` | `#0f172a` | Raised surface |
+| `--bg-card` | `#ffffff` | `#1e293b` | Card background |
+| `--border` | `#e2e8f0` | `rgba(255, 255, 255, 0.08)` | Subtle borders |
+| `--border-hover` | `#cbd5e1` | `rgba(255, 255, 255, 0.18)` | Interactive borders |
+| `--text` | `#0f172a` | `#f8fafc` | Primary text |
+| `--text-muted` | `#475569` | `#94a3b8` | Muted secondary text |
+| `--text-dim` | `#94a3b8` | `#64748b` | Dimmed tertiary text |
+| `--accent` | `#4f46e5` | `#6366f1` | Primary brand accent (Indigo) |
+| `--accent-hover` | `#4338ca` | `#818cf8` | Hover accent |
+| `--green` | `#10b981` | `#34d399` | Success / online / running |
+| `--red` | `#ef4444` | `#f87171` | Error / offline / failed |
+| `--yellow` | `#f59e0b` | `#fbbf24` | Warning / pending |
+| `--orange` | `#f97316` | `#fb923c` | Info / deploying |
+| `--blue` | `#3b82f6` | `#60a5fa` | Links / neutral interactive |
+| `--shadow-sm` | `0 1px 2px 0 rgba(0, 0, 0, 0.05)` | `0 1px 2px 0 rgba(0, 0, 0, 0.3)` | Subtle card elevation |
+| `--shadow-md` | `0 4px 6px -1px rgba(0,0,0,0.07)` | `0 4px 6px -1px rgba(0,0,0,0.4)` | Card hover / dropdown elevation |
 
 ### Dark/Light Mode
 - Default: light mode (`<html>` without class)
@@ -441,45 +446,25 @@ All styles are in `internal/http/templates/layout.html` as a single `<style>` bl
 
 ### Component Patterns
 
-**Nav:** `<div class="top-nav">` — `.logo` (bold), `.nav-links` (flex). Compact, bottom border separator.
+**Nav:** `<div class="top-nav">` — `.logo` (bold), `.nav-links` (flex). Sticky top bar with glassmorphism backdrop (`backdrop-filter: blur(12px)`). Includes a responsive mobile drawer navigation for viewports under 680px.
 
-**Cards:** `<div class="card">` — `border: 1px solid var(--border)`, `border-radius: 6px`, `background: var(--bg-card)`. Card title: `<h3>` with uppercase, muted, letter-spaced.
+**Cards:** `<div class="card">` — `border: 1px solid var(--border)`, `border-radius: 8px`, `background: var(--bg-card)`, `box-shadow: var(--shadow-sm)`. Includes smooth hover micro-transitions (`transform: translateY(-1px)`).
 
 **Buttons:** `<button class="btn">` or `<a class="btn">`
-- `btn-primary` — filled accent, white text
-- `btn-ghost` — transparent, muted text
-- `btn-red` — red text, red border on hover (danger actions)
+- `btn-primary` — filled indigo accent, white text
+- `btn-ghost` — transparent, muted text with hover transition
+- `btn-red` — red text, subtle red border hover
+- `btn-danger` — filled red background for destructive actions
 
-**Tables:** `<table>` — `<thead>` (uppercase th), row hover: subtle background.
+**Tables:** `<table>` — `<thead>` (uppercase th, letter-spacing), rounded container wrapping, row hover highlights.
 
-**Forms:** `<form method="POST" action="relative-path">` — never `hx-boost` for forms.
-- Labels wrap inputs: `<label>Text<input></label>`
-- Grid layout: `<div class="grid">` for 2-column form rows
-- Form grid adds 0.7em margin-bottom automatically
-- Inline labels inside grids: `margin-bottom: 0`
-- Legend: uppercase, muted, no border-bottom
-- Radio: `display: inline-flex; align-items: center` on `<label>`, `input[type=radio]` has `margin: 0 .7em 0 0`
-- Error messages: `<div class="card" style="color: var(--red)">`
+**Badges:** `<span class="badge badge-{status}">` — Status pill badges with optional pulsing indicator dot (`<span class="badge-dot"></span>`) for live online/running/deploying states.
 
-**Badges:** `<span class="badge badge-{status}">`
-- Server statuses: `online`, `offline`, `pending`, `error`, `initializing`
-- App statuses: `running`, `stopped`, `created`, `deploying`, `failed`, `success`
-
-**Breadcrumb:** `<div class="breadcrumb">` — links separated by `/`.
-
-**Empty states:** `<div class="empty-state">` — centered text + primary CTA button.
-
-**Logs viewer:** `<div class="log-container">` — `.log-toolbar` (tail 50/200/500 buttons) + `.log-content` (`<pre>` monospace). Lazy-load via HTMX (`hx-get` / `hx-target` / `hx-swap`).
-
-**Stats dashboard:** `.stat` cards in `.grid` — number in `<h2>`, label in `<small>`.
-
-**Confirm dialogs:** Destructive actions (undeploy, delete server, rollback) use `onclick="return confirm(...)"`.
+**Logs & Terminal:** Terminal and log container styled with dark glass topbar, macOS-style window controls, and crisp monospace log streaming.
 
 ### CSS Conventions
-- Single `<style>` block in `layout.html` — no external CSS file
-- Class naming: lowercase with hyphens (e.g. `.nav-links`, `.btn-primary`)
-- CSS custom properties for all colors, no hardcoded values
-- Responsive: single `@media (max-width: 600px)` breakpoint — grid collapses to 1 column
+- CSS custom properties for all design tokens (no hardcoded color values)
+- Fully responsive across desktop, tablet, and mobile viewports
 
 ## Security Considerations
 

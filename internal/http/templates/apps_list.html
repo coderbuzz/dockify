@@ -6,8 +6,8 @@
   <h3 style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
     {{if .ServerID}}<a href="servers/{{.ServerID}}" style="text-decoration:none">{{.ServerName}}</a>{{else}}{{.ServerName}}{{end}}
     {{if .Host}}<small style="color:var(--text-dim);font-weight:400;margin-left:0.3em">{{.Host}}</small>{{end}}
-    {{if .Status}}<span class="badge badge-{{.Status}}" style="font-size:0.7rem">{{.Status}}</span>{{end}}
-    <small style="color:var(--muted);font-weight:400">— {{len .Apps}} app(s)</small>
+    {{if .Status}}<span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span>{{end}}
+    <small style="color:var(--text-muted);font-weight:400">— {{len .Apps}} app(s)</small>
   </h3>
     <div class="table-wrap"><table style="font-size:0.85em">
       <thead>
@@ -31,8 +31,8 @@
             data-memory="{{with $st := index $.AppStats .ID}}{{$st.MemUsageBytes}}{{end}}"
             data-disk="{{with $st := index $.AppStats .ID}}{{$st.DiskUsageBytes}}{{end}}"
             data-port="{{.Port}}">
-          <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
-          <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+          <td style="white-space:nowrap; font-weight: 600;"><a href="apps/{{.ID}}">{{.Name}}</a></td>
+          <td><span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span></td>
           <td>{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
           <td>{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
           <td>{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>
