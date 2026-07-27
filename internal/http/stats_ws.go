@@ -110,11 +110,14 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			cpuUsage := calculateCPUUsage(prevStat, currStat)
+			cpuUsage := clamp100(calculateCPUUsage(prevStat, currStat))
 			prevStat = currStat
 
 			ramUsage, _ := parseRAMUsageLive(client)
+			ramUsage = clamp100(ramUsage)
+
 			diskUsage, _ := parseDiskUsageLive(client)
+			diskUsage = clamp100(diskUsage)
 
 			data := map[string]interface{}{
 				"cpu_usage":  cpuUsage,

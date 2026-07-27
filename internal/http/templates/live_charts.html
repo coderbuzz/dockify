@@ -95,8 +95,19 @@ function initLiveCharts(opts) {
 
       if (data.chart_data) {
         opts.metrics.forEach(function(m) {
-          chartData[m] = data.chart_data[m] || [];
-          liveMetrics[m] = [];
+          var newChart = data.chart_data[m] || [];
+          var latestChartTimeMs = 0;
+          for (var i = 0; i < newChart.length; i++) {
+            var t = parseTime(newChart[i].time);
+            if (!isNaN(t) && t > latestChartTimeMs) latestChartTimeMs = t;
+          }
+          chartData[m] = newChart;
+          if (latestChartTimeMs > 0 && liveMetrics[m]) {
+            liveMetrics[m] = liveMetrics[m].filter(function(p) {
+              var t = parseTime(p.time);
+              return isNaN(t) || t > latestChartTimeMs;
+            });
+          }
           updateChartLine(m);
         });
       }
@@ -167,9 +178,28 @@ function initLiveCharts(opts) {
   function updateChartLine(metric) {
     var line = document.getElementById(metric + '-chart-line');
     if (!line) return;
-    var maxVal = parseFloat(line.getAttribute('data-max')) || 100;
+    var baseMax = parseFloat(line.getAttribute('data-max')) || 100;
     var combined = chartData[metric].concat(liveMetrics[metric]);
     if (combined.length === 0) return;
+
+    var start = timeWindowStart();
+    var peakVal = 0;
+    for (var i = 0; i < combined.length; i++) {
+      var p = combined[i];
+      var tMs = parseTime(p.time);
+      if (!isNaN(tMs) && tMs >= start && p.value > peakVal) {
+        peakVal = p.value;
+      }
+    }
+
+    var maxVal = baseMax;
+    if (metric === 'cpu' || metric === 'ram' || metric === 'memory') {
+      maxVal = Math.max(baseMax, peakVal > 100 ? peakVal * 1.1 : 100);
+    } else {
+      maxVal = Math.max(baseMax, peakVal > 0 ? peakVal * 1.1 : 1.0);
+    }
+
+    line.setAttribute('data-max', maxVal);
     line.setAttribute('points', chartPointsToSvg(combined, width, height, maxVal));
   }
 

@@ -737,18 +737,32 @@ func (r *Repository) ContainerStatsMemHistory(appID int64, since time.Time, buck
 }
 
 func (r *Repository) ContainerStatsNetHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
-	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
 	bucketSecs := bucketMinutes * 60
+	sinceLookback := since.Add(-time.Duration(bucketSecs) * time.Second)
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketSecs, bucketSecs)
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket,
-		       (SUM(net_io_rx_bytes + net_io_tx_bytes)
-		        - LAG(SUM(net_io_rx_bytes + net_io_tx_bytes), 1, 0)
-		          OVER (ORDER BY bucket)) / %d.0 AS net_rate
-		FROM container_stats
-		WHERE app_id = ? AND created_at >= ?
-		GROUP BY bucket ORDER BY bucket ASC
+		WITH b AS (
+			SELECT datetime(%s, 'unixepoch') as bucket,
+			       SUM(net_io_rx_bytes + net_io_tx_bytes) as total_bytes
+			FROM container_stats
+			WHERE app_id = ? AND created_at >= ?
+			GROUP BY bucket
+		),
+		rates AS (
+			SELECT bucket,
+			       total_bytes - LAG(total_bytes) OVER (ORDER BY bucket ASC) as delta_bytes
+			FROM b
+		)
+		SELECT bucket,
+		       CASE
+		         WHEN delta_bytes IS NULL OR delta_bytes < 0 THEN 0.0
+		         ELSE delta_bytes / %d.0
+		       END as net_rate
+		FROM rates
+		WHERE bucket >= ?
+		ORDER BY bucket ASC
 	`, groupBy, bucketSecs)
-	return r.queryChartPoints(query, appID, since)
+	return r.queryChartPoints(query, appID, sinceLookback, since)
 }
 
 // AppDiskUsageHistory returns disk usage over time from the low-frequency
