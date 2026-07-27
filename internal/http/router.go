@@ -227,7 +227,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 			serverInfos := make([]app.ServerInfo, len(servers))
 			for i, sv := range servers {
-				serverInfos[i] = app.ServerInfo{ID: sv.ID, Name: sv.Name, Status: sv.Status}
+				serverInfos[i] = app.ServerInfo{ID: sv.ID, Name: sv.Name, Host: sv.Host, Status: sv.Status}
 			}
 			groups := app.GroupAppsByServer(apps, serverInfos)
 

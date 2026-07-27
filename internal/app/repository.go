@@ -627,6 +627,47 @@ func (r *Repository) LatestAggregatedStats(appID int64) (*ContainerStats, error)
 	return s, nil
 }
 
+// LatestStatsByApp returns the latest aggregated container stats per app
+// (summed across all of an app's containers at the most recent collection tick),
+// keyed by app ID. Apps with no collected stats are absent. Two queries total.
+func (r *Repository) LatestStatsByApp() (map[int64]*ContainerStats, error) {
+	rows, err := r.db.Query(`
+		SELECT cs.app_id,
+		       SUM(cs.cpu_percent), SUM(cs.mem_usage_bytes), SUM(cs.mem_limit_bytes), SUM(cs.mem_percent),
+		       SUM(cs.net_io_rx_bytes), SUM(cs.net_io_tx_bytes), SUM(cs.block_io_read), SUM(cs.block_io_write)
+		FROM container_stats cs
+		JOIN (
+			SELECT app_id, MAX(created_at) AS max_ts FROM container_stats GROUP BY app_id
+		) m ON m.app_id = cs.app_id AND m.max_ts = cs.created_at
+		GROUP BY cs.app_id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]*ContainerStats)
+	for rows.Next() {
+		var appID int64
+		var cpu, memPct sql.NullFloat64
+		var memUse, memLimit, netRx, netTx, blkR, blkW sql.NullInt64
+		if err := rows.Scan(&appID, &cpu, &memUse, &memLimit, &memPct, &netRx, &netTx, &blkR, &blkW); err != nil {
+			return nil, err
+		}
+		out[appID] = &ContainerStats{
+			AppID:         appID,
+			CPUPercent:    cpu.Float64,
+			MemPercent:    memPct.Float64,
+			MemUsageBytes: memUse.Int64,
+			MemLimitBytes: memLimit.Int64,
+			NetIORxBytes:  netRx.Int64,
+			NetIOTxBytes:  netTx.Int64,
+			BlockIORead:   blkR.Int64,
+			BlockIOWrite:  blkW.Int64,
+		}
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) ContainerStatsCPUHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
 	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
 	query := fmt.Sprintf(`
@@ -722,6 +763,32 @@ func (r *Repository) LatestAppDiskUsage(appID int64) (int64, error) {
 		return 0, nil
 	}
 	return bytes, err
+}
+
+// LatestDiskByApp returns the latest disk-usage sample per app, keyed by app ID,
+// as bytes. Apps with no disk sample are absent.
+func (r *Repository) LatestDiskByApp() (map[int64]int64, error) {
+	rows, err := r.db.Query(`
+		SELECT d.app_id, d.disk_usage_bytes
+		FROM app_disk_stats d
+		JOIN (
+			SELECT app_id, MAX(created_at) AS max_ts FROM app_disk_stats GROUP BY app_id
+		) m ON m.app_id = d.app_id AND m.max_ts = d.created_at
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]int64)
+	for rows.Next() {
+		var appID int64
+		var b sql.NullInt64
+		if err := rows.Scan(&appID, &b); err != nil {
+			return nil, err
+		}
+		out[appID] = b.Int64
+	}
+	return out, rows.Err()
 }
 
 func (r *Repository) PruneAppDiskStats(before time.Time) error {

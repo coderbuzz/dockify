@@ -169,3 +169,58 @@ func TestRepo_Deployment(t *testing.T) {
 		t.Error("expected compose snapshot to be stored")
 	}
 }
+
+func TestRepo_LatestBatchedStats(t *testing.T) {
+	repo, srvRepo := setupRepo(t)
+	srvID := createTestServer(t, srvRepo)
+
+	a1 := &App{Name: "app-1", Domain: "a1.com", Port: 80, ServerID: srvID, Compose: "x"}
+	a2 := &App{Name: "app-2", Domain: "a2.com", Port: 81, ServerID: srvID, Compose: "x"}
+	repo.Create(a1)
+	repo.Create(a2)
+
+	// Insert container stats for app-1 and app-2
+	err1 := repo.InsertContainerStats(&ContainerStats{
+		AppID: a1.ID, ServerID: srvID, ContainerName: "web1",
+		CPUPercent: 25.5, MemUsageBytes: 1024 * 1024 * 50, MemLimitBytes: 1024 * 1024 * 100, MemPercent: 50.0,
+	})
+	err2 := repo.InsertContainerStats(&ContainerStats{
+		AppID: a2.ID, ServerID: srvID, ContainerName: "web2",
+		CPUPercent: 12.0, MemUsageBytes: 1024 * 1024 * 30, MemLimitBytes: 1024 * 1024 * 100, MemPercent: 30.0,
+	})
+	if err1 != nil || err2 != nil {
+		t.Fatalf("insert container stats failed: %v, %v", err1, err2)
+	}
+
+	// Insert disk stats
+	if err := repo.InsertAppDiskUsage(a1.ID, srvID, 500000); err != nil {
+		t.Fatalf("insert disk stats failed: %v", err)
+	}
+
+	// Test LatestStatsByApp
+	statsMap, err := repo.LatestStatsByApp()
+	if err != nil {
+		t.Fatalf("LatestStatsByApp failed: %v", err)
+	}
+	if len(statsMap) != 2 {
+		t.Fatalf("expected 2 app stats entries, got %d", len(statsMap))
+	}
+	if statsMap[a1.ID].CPUPercent != 25.5 {
+		t.Errorf("expected CPU 25.5 for a1, got %f", statsMap[a1.ID].CPUPercent)
+	}
+	if statsMap[a2.ID].CPUPercent != 12.0 {
+		t.Errorf("expected CPU 12.0 for a2, got %f", statsMap[a2.ID].CPUPercent)
+	}
+
+	// Test LatestDiskByApp
+	diskMap, err := repo.LatestDiskByApp()
+	if err != nil {
+		t.Fatalf("LatestDiskByApp failed: %v", err)
+	}
+	if diskMap[a1.ID] != 500000 {
+		t.Errorf("expected 500000 disk usage for a1, got %d", diskMap[a1.ID])
+	}
+	if _, ok := diskMap[a2.ID]; ok {
+		t.Errorf("expected no disk entry for a2")
+	}
+}

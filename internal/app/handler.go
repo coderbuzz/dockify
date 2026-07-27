@@ -373,6 +373,7 @@ func (h *Handler) Logs(w http.ResponseWriter, r *http.Request) {
 type ServerGroup struct {
 	ServerID   int64
 	ServerName string
+	Host       string
 	Status     string
 	Apps       []App
 }
@@ -397,6 +398,7 @@ func GroupAppsByServer(apps []App, servers []ServerInfo) []ServerGroup {
 			groupMap[app.ServerID] = &ServerGroup{
 				ServerID:   svrInfo.ID,
 				ServerName: svrInfo.Name,
+				Host:       svrInfo.Host,
 				Status:     svrInfo.Status,
 			}
 			g = groupMap[app.ServerID]
@@ -434,6 +436,7 @@ type ServerRepo interface {
 type ServerInfo struct {
 	ID     int64
 	Name   string
+	Host   string
 	Status string
 }
 
@@ -449,11 +452,13 @@ func (h *WebHandler) AppListPage(w http.ResponseWriter, r *http.Request, render 
 
 	servers, _ := h.serverRepo.List()
 	groups := GroupAppsByServer(apps, servers)
+	appStats := h.service.StatsOverviewByApp()
 
 	render(w, r, http.StatusOK, "apps.html", map[string]interface{}{
 		"Title":        "Apps",
 		"Apps":         apps,
 		"ServerGroups": groups,
+		"AppStats":     appStats,
 		"Flash":        r.URL.Query().Get("flash"),
 	})
 }
