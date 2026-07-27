@@ -224,3 +224,43 @@ func TestRepo_LatestBatchedStats(t *testing.T) {
 		t.Errorf("expected no disk entry for a2")
 	}
 }
+
+func TestRepo_LatestBatchedStats_RefinementAvgAndMax(t *testing.T) {
+	repo, srvRepo := setupRepo(t)
+	srvID := createTestServer(t, srvRepo)
+
+	a := &App{Name: "avg-max-app", Domain: "avgmax.com", Port: 80, ServerID: srvID, Compose: "x"}
+	repo.Create(a)
+
+	// Tick 1 (5 minutes ago): CPU 10%, Mem 100MB
+	repo.InsertContainerStats(&ContainerStats{
+		AppID: a.ID, ServerID: srvID, ContainerName: "web",
+		CPUPercent: 10.0, MemUsageBytes: 100, MemLimitBytes: 1000, MemPercent: 10.0,
+	})
+	repo.db.Exec(`UPDATE container_stats SET created_at = DATETIME('now', '-5 minutes') WHERE app_id = ?`, a.ID)
+
+	// Tick 2 (now): CPU 30%, Mem 500MB
+	repo.InsertContainerStats(&ContainerStats{
+		AppID: a.ID, ServerID: srvID, ContainerName: "web",
+		CPUPercent: 30.0, MemUsageBytes: 500, MemLimitBytes: 1000, MemPercent: 50.0,
+	})
+
+	statsMap, err := repo.LatestStatsByApp()
+	if err != nil {
+		t.Fatalf("LatestStatsByApp failed: %v", err)
+	}
+	st, ok := statsMap[a.ID]
+	if !ok {
+		t.Fatalf("expected stats for app %d", a.ID)
+	}
+
+	// 15m CPU moving average: (10 + 30) / 2 = 20.0%
+	if st.CPUPercent != 20.0 {
+		t.Errorf("expected 15m CPU AVG 20.0, got %f", st.CPUPercent)
+	}
+
+	// 1h Peak Memory: MAX(100, 500) = 500
+	if st.MemUsageBytes != 500 {
+		t.Errorf("expected 1h Peak Memory 500, got %d", st.MemUsageBytes)
+	}
+}
