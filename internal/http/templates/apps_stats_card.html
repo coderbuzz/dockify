@@ -9,12 +9,12 @@
   {{$cpuMax := chartMax100 .ChartData.cpu}}
   {{$cpuThreshY := chartThresholdY $cpuMax $height}}
   <div class="chart-section">
-    <div class="chart-title"><span>CPU</span> <span class="chart-title-val chart-title-val--cpu" id="cpu-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 .Stats.CPUPercent)}}%{{else}}-{{end}}</span></div>
+    <div class="chart-title"><span>CPU</span> <span class="chart-title-val chart-title-val--cpu" id="cpu-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 (latestChartVal .ChartData.cpu .Stats.CPUPercent))}}%{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax $range}}" />
-      <line id="cpu-threshold-line" x1="0" y1="{{if ge $cpuThreshY 0.0}}{{$cpuThreshY}}{{else}}0{{end}}" x2="{{$width}}" y2="{{if ge $cpuThreshY 0.0}}{{$cpuThreshY}}{{else}}0{{end}}"
-        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" {{if lt $cpuThreshY 0.0}}style="display:none"{{end}} />
+      <line id="cpu-threshold-line" x1="0" y1="{{$cpuThreshY}}" x2="{{$width}}" y2="{{$cpuThreshY}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
@@ -23,12 +23,12 @@
   {{$memMax := chartMax100 .ChartData.memory}}
   {{$memThreshY := chartThresholdY $memMax $height}}
   <div class="chart-section">
-    <div class="chart-title"><span>Memory</span> <span class="chart-title-val chart-title-val--mem" id="mem-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 .Stats.MemPercent)}}% ({{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}){{else}}-{{end}}</span></div>
+    <div class="chart-title"><span>Memory</span> <span class="chart-title-val chart-title-val--mem" id="mem-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 (latestChartVal .ChartData.memory .Stats.MemPercent))}}% ({{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}){{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
       <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax $range}}" />
-      <line id="memory-threshold-line" x1="0" y1="{{if ge $memThreshY 0.0}}{{$memThreshY}}{{else}}0{{end}}" x2="{{$width}}" y2="{{if ge $memThreshY 0.0}}{{$memThreshY}}{{else}}0{{end}}"
-        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" {{if lt $memThreshY 0.0}}style="display:none"{{end}} />
+      <line id="memory-threshold-line" x1="0" y1="{{$memThreshY}}" x2="{{$width}}" y2="{{$memThreshY}}"
+        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
