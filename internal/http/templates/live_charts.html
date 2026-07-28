@@ -203,11 +203,11 @@ function initLiveCharts(opts) {
 
     var threshLine = document.getElementById(metric + '-threshold-line');
     if (threshLine) {
-      if (maxVal > 100 || maxVal <= 0) {
+      if (maxVal <= 0) {
         threshLine.style.display = 'none';
       } else {
         threshLine.style.display = '';
-        var y = height - (100.0 / maxVal) * height;
+        var y = height - (80.0 / maxVal) * height;
         if (y < 0) y = 0;
         threshLine.setAttribute('y1', y);
         threshLine.setAttribute('y2', y);

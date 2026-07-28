@@ -4,6 +4,8 @@ import (
 	"html/template"
 	"strings"
 	"testing"
+
+	"github.com/coderbuzz/dockify/internal/model"
 )
 
 func TestTemplatesParse(t *testing.T) {
@@ -19,6 +21,7 @@ func TestTemplatesParse(t *testing.T) {
 		"chartMax100":     chartMax100,
 		"chartPointsJSON": chartPointsJSON,
 		"chartThresholdY": chartThresholdY,
+		"latestChartVal":  latestChartVal,
 		"div":             div,
 		"mul":             mul,
 		"clamp100":        clamp100,
@@ -193,11 +196,10 @@ func TestChartThresholdY(t *testing.T) {
 		height   int
 		expected float64
 	}{
-		{"100 maxVal", 100.0, 100, 0.0},
-		{"50 maxVal", 50.0, 100, -1.0}, // maxVal <= 100, but 100/50 > 1 => clamped/negative
-		{"multi-core 400 maxVal", 400.0, 100, -1.0},
-		{"multi-core 200 maxVal", 200.0, 100, -1.0},
-		{"zero maxVal", 0.0, 100, -1.0},
+		{"100 maxVal (80% threshold)", 100.0, 100, 20.0},
+		{"200 maxVal (80% threshold)", 200.0, 100, 60.0},
+		{"400 maxVal (80% threshold)", 400.0, 100, 80.0},
+		{"zero maxVal", 0.0, 100, 100.0},
 	}
 
 	for _, tt := range tests {
@@ -207,5 +209,18 @@ func TestChartThresholdY(t *testing.T) {
 				t.Errorf("chartThresholdY(%v, %v) = %v; want %v", tt.maxVal, tt.height, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestLatestChartVal(t *testing.T) {
+	pts := []model.ChartPoint{
+		{Time: "2026-01-01 00:00:00", Value: 10.0},
+		{Time: "2026-01-01 00:01:00", Value: 45.5},
+	}
+	if got := latestChartVal(pts, 99.0); got != 45.5 {
+		t.Errorf("expected 45.5, got %v", got)
+	}
+	if got := latestChartVal(nil, 99.0); got != 99.0 {
+		t.Errorf("expected fallback 99.0, got %v", got)
 	}
 }

@@ -149,10 +149,21 @@ func chartMax100(points []model.ChartPoint) float64 {
 }
 
 func chartThresholdY(maxVal float64, height int) float64 {
-	if maxVal != 100 {
-		return -1
+	if maxVal <= 0 {
+		return float64(height)
 	}
-	return 0
+	y := float64(height) - (80.0/maxVal)*float64(height)
+	if y < 0 {
+		y = 0
+	}
+	return math.Round(y*100) / 100
+}
+
+func latestChartVal(points []model.ChartPoint, fallback float64) float64 {
+	if len(points) > 0 {
+		return points[len(points)-1].Value
+	}
+	return fallback
 }
 
 func chartPointsJSON(points []model.ChartPoint) template.HTMLAttr {
@@ -185,20 +196,21 @@ func clamp100(v float64) float64 {
 }
 
 var funcMap = template.FuncMap{
-	"lower":        strings.ToLower,
-	"upper":        strings.ToUpper,
-	"relativeTime": relativeTime,
-	"usedAmount":   usedAmount,
-	"freeAmount":   freeAmount,
-	"formatBytes":  formatBytes,
-	"chartPoints":  chartPoints,
-	"chartMax":     chartMax,
-	"chartMax100":  chartMax100,
+	"lower":           strings.ToLower,
+	"upper":           strings.ToUpper,
+	"relativeTime":    relativeTime,
+	"usedAmount":      usedAmount,
+	"freeAmount":      freeAmount,
+	"formatBytes":     formatBytes,
+	"chartPoints":     chartPoints,
+	"chartMax":        chartMax,
+	"chartMax100":     chartMax100,
 	"chartPointsJSON": chartPointsJSON,
 	"chartThresholdY": chartThresholdY,
-	"div":          div,
-	"mul":          mul,
-	"clamp100":     clamp100,
+	"latestChartVal":  latestChartVal,
+	"div":             div,
+	"mul":             mul,
+	"clamp100":        clamp100,
 	"nl2br": func(s string) template.HTML {
 		return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
 	},
