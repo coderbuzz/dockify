@@ -196,9 +196,8 @@ func TestChartThresholdY(t *testing.T) {
 		height   int
 		expected float64
 	}{
-		{"100 maxVal (80% threshold)", 100.0, 100, 20.0},
-		{"200 maxVal (80% threshold)", 200.0, 100, 60.0},
-		{"400 maxVal (80% threshold)", 400.0, 100, 80.0},
+		{"100 maxVal (100% threshold)", 100.0, 100, 0.0},
+		{"200 maxVal (100% threshold)", 200.0, 100, 50.0},
 		{"zero maxVal", 0.0, 100, 100.0},
 	}
 

@@ -152,7 +152,7 @@ func chartThresholdY(maxVal float64, height int) float64 {
 	if maxVal <= 0 {
 		return float64(height)
 	}
-	y := float64(height) - (80.0/maxVal)*float64(height)
+	y := float64(height) - (100.0/maxVal)*float64(height)
 	if y < 0 {
 		y = 0
 	}
