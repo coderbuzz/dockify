@@ -112,10 +112,13 @@ func (s *Service) InitWorker(id int64) error {
 	}
 
 	log.Printf("Installing Docker Compose plugin on %s...", server.Name)
-	_, err = client.Exec(`docker compose version 2>/dev/null || (mkdir -p /usr/local/lib/docker/cli-plugins && curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose)`)
+	_, err = client.Exec(`docker compose version 2>/dev/null || (sudo mkdir -p /usr/local/lib/docker/cli-plugins && sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose)`)
 	if err != nil {
 		log.Printf("Warning: failed to install docker compose plugin on %s: %v", server.Name, err)
 	}
+
+	log.Printf("Preparing /opt/dockify directories on %s...", server.Name)
+	_, _ = client.Exec("sudo mkdir -p /opt/dockify/apps /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/apps /opt/dockify/caddy 2>/dev/null")
 
 	log.Printf("Creating dockify network on %s...", server.Name)
 	_, err = client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")

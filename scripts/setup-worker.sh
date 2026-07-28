@@ -73,7 +73,7 @@ echo "  SSH Key:    <paste the private key above>"
 echo ""
 echo "After adding, click 'Initialize Worker' to install Caddy."
 
-# Add active non-root user to docker group
+# Add active non-root user to docker group and setup /opt/dockify permissions
 ACTIVE_USER="${SUDO_USER:-$USER}"
 if [ "$ACTIVE_USER" != "root" ]; then
   echo ""
@@ -81,4 +81,11 @@ if [ "$ACTIVE_USER" != "root" ]; then
   sudo usermod -aG docker "$ACTIVE_USER"
   echo "[OK] User $ACTIVE_USER added to docker group"
 fi
+
+echo ""
+echo "[INFO] Preparing /opt/dockify directory..."
+sudo mkdir -p /opt/dockify/apps /opt/dockify/caddy
+sudo chown -R "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify
+echo "[OK] /opt/dockify prepared with ownership for $ACTIVE_USER"
+
 
