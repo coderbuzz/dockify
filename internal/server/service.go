@@ -150,16 +150,20 @@ docker run -d \
   --restart unless-stopped \
   caddy:latest caddy run --config /data/config.json
 sleep 2
-if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}' 2>/dev/null; then
-  docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
-  echo "METRICS_ENABLED"
+if docker ps -q --filter name=^/caddy$ --filter status=running | grep -q .; then
+  if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}' 2>/dev/null; then
+    docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
+    echo "METRICS_ENABLED"
+  else
+    echo "METRICS_UNAVAILABLE"
+  fi
 else
-  echo "METRICS_UNAVAILABLE"
+  echo "CADDY_FAILED"
 fi`, baseConfig)
 		out, err := client.Exec(caddyRun)
-		if err != nil {
+		if err != nil || strings.Contains(out, "CADDY_FAILED") {
 			s.repo.UpdateStatus(id, StatusError)
-			return fmt.Errorf("deploy caddy: %w", err)
+			return fmt.Errorf("deploy caddy: container failed to start")
 		}
 		if strings.Contains(out, "METRICS_ENABLED") {
 			log.Printf("Worker %q: Caddy metrics enabled", server.Name)
