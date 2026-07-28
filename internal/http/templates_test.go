@@ -185,3 +185,27 @@ func TestTemplatesRender(t *testing.T) {
 		})
 	}
 }
+
+func TestChartThresholdY(t *testing.T) {
+	tests := []struct {
+		name     string
+		maxVal   float64
+		height   int
+		expected float64
+	}{
+		{"100 maxVal", 100.0, 100, 0.0},
+		{"50 maxVal", 50.0, 100, -1.0}, // maxVal <= 100, but 100/50 > 1 => clamped/negative
+		{"multi-core 400 maxVal", 400.0, 100, -1.0},
+		{"multi-core 200 maxVal", 200.0, 100, -1.0},
+		{"zero maxVal", 0.0, 100, -1.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := chartThresholdY(tt.maxVal, tt.height)
+			if got != tt.expected {
+				t.Errorf("chartThresholdY(%v, %v) = %v; want %v", tt.maxVal, tt.height, got, tt.expected)
+			}
+		})
+	}
+}
