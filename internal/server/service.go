@@ -146,9 +146,9 @@ docker run -d \
   -p 443:443 \
   -p 127.0.0.1:2019:2019 \
   -v caddy_data:/data \
-  -v /opt/dockify/caddy/config.json:/data/config.json \
+  -v /opt/dockify/caddy:/etc/caddy \
   --restart unless-stopped \
-  caddy:latest caddy run --config /data/config.json
+  caddy:latest caddy run --config /etc/caddy/config.json
 sleep 2
 if docker ps -q --filter name=^/caddy$ --filter status=running | grep -q .; then
   if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}' 2>/dev/null; then
@@ -190,9 +190,9 @@ if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config
     -p 443:443 \
     -p 127.0.0.1:2019:2019 \
     -v caddy_data:/data \
-    -v /opt/dockify/caddy/config.json:/data/config.json \
+    -v /opt/dockify/caddy:/etc/caddy \
     --restart unless-stopped \
-    caddy:latest caddy run --config /data/config.json
+    caddy:latest caddy run --config /etc/caddy/config.json
   echo "METRICS_ENABLED"
 else
   echo "METRICS_UNAVAILABLE"
