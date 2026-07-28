@@ -715,22 +715,40 @@ func (r *Repository) LatestStatsByApp() (map[int64]*ContainerStats, error) {
 }
 
 func (r *Repository) ContainerStatsCPUHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
-	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	bucketSecs := bucketMinutes * 60
+	if bucketSecs <= 0 {
+		bucketSecs = 60
+	}
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketSecs, bucketSecs)
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, SUM(cpu_percent)
-		FROM container_stats
-		WHERE app_id = ? AND created_at >= ?
+		WITH ticks AS (
+			SELECT app_id, created_at, SUM(cpu_percent) AS tick_cpu
+			FROM container_stats
+			WHERE app_id = ? AND created_at >= ?
+			GROUP BY app_id, created_at
+		)
+		SELECT datetime(%s, 'unixepoch') AS bucket, AVG(tick_cpu)
+		FROM ticks
 		GROUP BY bucket ORDER BY bucket ASC
 	`, groupBy)
 	return r.queryChartPoints(query, appID, since)
 }
 
 func (r *Repository) ContainerStatsMemHistory(appID int64, since time.Time, bucketMinutes int) ([]ChartPoint, error) {
-	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketMinutes*60, bucketMinutes*60)
+	bucketSecs := bucketMinutes * 60
+	if bucketSecs <= 0 {
+		bucketSecs = 60
+	}
+	groupBy := fmt.Sprintf("(strftime('%%s', created_at) / %d) * %d", bucketSecs, bucketSecs)
 	query := fmt.Sprintf(`
-		SELECT datetime(%s, 'unixepoch') as bucket, SUM(mem_percent)
-		FROM container_stats
-		WHERE app_id = ? AND created_at >= ?
+		WITH ticks AS (
+			SELECT app_id, created_at, SUM(mem_percent) AS tick_mem
+			FROM container_stats
+			WHERE app_id = ? AND created_at >= ?
+			GROUP BY app_id, created_at
+		)
+		SELECT datetime(%s, 'unixepoch') AS bucket, AVG(tick_mem)
+		FROM ticks
 		GROUP BY bucket ORDER BY bucket ASC
 	`, groupBy)
 	return r.queryChartPoints(query, appID, since)

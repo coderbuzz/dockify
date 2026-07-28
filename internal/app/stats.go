@@ -529,8 +529,8 @@ func parseDockerStat(stat dockerStat, appID, serverID int64, containerName strin
 		ContainerName: containerName,
 	}
 
-	cs.CPUPercent = parsePercent(stat.CPUPerc)
-	cs.MemPercent = parsePercent(stat.MemPerc)
+	cs.CPUPercent = clamp100Val(parsePercent(stat.CPUPerc))
+	cs.MemPercent = clamp100Val(parsePercent(stat.MemPerc))
 	cs.MemUsageBytes, cs.MemLimitBytes = parseMemUsage(stat.MemUsage)
 	cs.NetIORxBytes, cs.NetIOTxBytes = parseNetIO(stat.NetIO)
 	cs.BlockIORead, cs.BlockIOWrite = parseBlockIO(stat.BlockIO)
@@ -541,6 +541,16 @@ func parseDockerStat(stat dockerStat, appID, serverID int64, containerName strin
 func parsePercent(s string) float64 {
 	s = strings.TrimSuffix(strings.TrimSpace(s), "%")
 	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}
+
+func clamp100Val(v float64) float64 {
+	if v > 100 {
+		return 100
+	}
+	if v < 0 {
+		return 0
+	}
 	return v
 }
 
