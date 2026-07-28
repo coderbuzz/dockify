@@ -131,8 +131,13 @@ func (s *Service) InitWorker(id int64) error {
 	if strings.TrimSpace(caddyRunning) == "" {
 		log.Printf("Deploying Caddy on %s...", server.Name)
 		caddyRun := fmt.Sprintf(`docker pull caddy:latest 2>/dev/null
-mkdir -p /opt/dockify/caddy
-echo '%s' > /opt/dockify/caddy/config.json
+if [ -d /opt/dockify/caddy/config.json ]; then
+  sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
+fi
+sudo mkdir -p /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/caddy
+if [ ! -f /opt/dockify/caddy/config.json ]; then
+  echo '%s' > /opt/dockify/caddy/config.json
+fi
 docker rm -f caddy 2>/dev/null
 docker run -d \
   --name caddy \
@@ -164,9 +169,12 @@ fi`, baseConfig)
 	} else {
 		log.Printf("Caddy already running on %s, checking config...", server.Name)
 		migrateCmd := `docker pull caddy:latest 2>/dev/null
-mkdir -p /opt/dockify/caddy
+if [ -d /opt/dockify/caddy/config.json ]; then
+  sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
+fi
+sudo mkdir -p /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/caddy
 if [ ! -f /opt/dockify/caddy/config.json ]; then
-  docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
+  docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json 2>/dev/null || echo '{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"],"metrics":{}}}}}}' > /opt/dockify/caddy/config.json
 fi
 if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}' 2>/dev/null; then
   docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json
