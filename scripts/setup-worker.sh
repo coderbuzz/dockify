@@ -19,37 +19,37 @@ if docker compose version &>/dev/null 2>&1; then
   echo "[OK] Docker Compose plugin already installed: $(docker compose version 2>/dev/null | head -1)"
 else
   echo "[INFO] Installing Docker Compose plugin..."
-  mkdir -p /usr/local/lib/docker/cli-plugins
-  curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+  sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
     -o /usr/local/lib/docker/cli-plugins/docker-compose
-  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   echo "[OK] Docker Compose plugin installed"
 fi
 
 # Start Docker service
 if command -v systemctl &>/dev/null; then
-  systemctl enable docker 2>/dev/null || true
-  systemctl start docker 2>/dev/null || true
+  sudo systemctl enable docker 2>/dev/null || true
+  sudo systemctl start docker 2>/dev/null || true
 fi
 
 # Generate SSH key for Dockify
-KEY_PATH="/root/.ssh/dockify"
+KEY_PATH="$HOME/.ssh/dockify"
 if [ -f "$KEY_PATH" ]; then
   echo "[SKIP] SSH key already exists at $KEY_PATH"
 else
-  mkdir -p /root/.ssh
-  chmod 700 /root/.ssh
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
   ssh-keygen -t ed25519 -f "$KEY_PATH" -N "" -C "dockify@$(hostname)" -q
   echo "[OK] SSH key generated at $KEY_PATH"
 fi
 
 # Authorize itself (public key -> authorized_keys)
 PUBKEY=$(cat "$KEY_PATH.pub")
-if [ -f /root/.ssh/authorized_keys ] && grep -qF "$PUBKEY" /root/.ssh/authorized_keys 2>/dev/null; then
+if [ -f "$HOME/.ssh/authorized_keys" ] && grep -qF "$PUBKEY" "$HOME/.ssh/authorized_keys" 2>/dev/null; then
   echo "[SKIP] Public key already in authorized_keys"
 else
-  echo "$PUBKEY" >> /root/.ssh/authorized_keys
-  chmod 600 /root/.ssh/authorized_keys
+  echo "$PUBKEY" >> "$HOME/.ssh/authorized_keys"
+  chmod 600 "$HOME/.ssh/authorized_keys"
   echo "[OK] Public key added to authorized_keys"
 fi
 
@@ -68,7 +68,17 @@ echo ""
 echo "Then in Dockify UI -> Servers -> Add Server, fill:"
 echo "  Name:       <any label, e.g. worker-01>"
 echo "  Host:       $(curl -fsSL ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
-echo "  User:       root"
+echo "  User:       ${USER:-root}"
 echo "  SSH Key:    <paste the private key above>"
 echo ""
 echo "After adding, click 'Initialize Worker' to install Caddy."
+
+# Add active non-root user to docker group
+ACTIVE_USER="${SUDO_USER:-$USER}"
+if [ "$ACTIVE_USER" != "root" ]; then
+  echo ""
+  echo "[INFO] Adding $ACTIVE_USER to docker group..."
+  sudo usermod -aG docker "$ACTIVE_USER"
+  echo "[OK] User $ACTIVE_USER added to docker group"
+fi
+
