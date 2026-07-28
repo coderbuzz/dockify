@@ -149,14 +149,10 @@ func chartMax100(points []model.ChartPoint) float64 {
 }
 
 func chartThresholdY(maxVal float64, height int) float64 {
-	if maxVal <= 0 {
-		return float64(height)
+	if maxVal != 100 {
+		return -1
 	}
-	y := float64(height) - (100.0/maxVal)*float64(height)
-	if y < 0 {
-		y = 0
-	}
-	return y
+	return 0
 }
 
 func chartPointsJSON(points []model.ChartPoint) template.HTMLAttr {
