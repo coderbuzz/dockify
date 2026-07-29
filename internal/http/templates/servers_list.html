@@ -11,7 +11,6 @@
       <th data-sort="cpu" data-type="number" style="cursor:pointer;user-select:none">CPU <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
       <th data-sort="ram" data-type="number" style="cursor:pointer;user-select:none">RAM <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
       <th data-sort="disk" data-type="number" style="cursor:pointer;user-select:none">Disk <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -30,12 +29,6 @@
       <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .CPUUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .CPUUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .CPUUsage}}%</span>{{end}}{{else}}-{{end}}</td>
       <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .RAMUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .RAMUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .RAMUsage}}%</span>{{end}}{{else}}-{{end}}</td>
       <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .DiskUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .DiskUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .DiskUsage}}%</span>{{end}}{{else}}-{{end}}</td>
-      <td style="width:1%;white-space:nowrap">
-        <form method="POST" action="servers/{{.ID}}/delete" style="display:inline"
-              onsubmit="return confirm('Delete {{.Name}}? This cannot be undone.')">
-          <button type="submit" class="btn btn-ghost btn-red">Delete</button>
-        </form>
-      </td>
     </tr>
     {{end}}
   </tbody>
