@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -842,12 +843,28 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 				}
 			}
 		}
+
+		moveFiles := r.FormValue("move_files") == "1" || r.FormValue("move_files") == "true" || r.FormValue("move_files") == "on"
+		purgeOld := r.FormValue("purge_old") == "1" || r.FormValue("purge_old") == "true" || r.FormValue("purge_old") == "on"
+
+		if moveFiles {
+			if err := h.service.CopyAppFiles(id, oldServerID, serverID); err != nil {
+				log.Printf("EditApp %q: CopyAppFiles error: %v", app.Name, err)
+			}
+		}
+
 		h.service.DeleteRoutes(app.ID)
-		go h.service.CleanupFromServer(id, oldServerID)
-		flashMsg = url.QueryEscape(fmt.Sprintf(
-			"App moved from %s to %s. Containers stopped on %s, but app folder remains — check and delete manually if no longer needed.",
-			oldServerName, newServerName, oldServerName,
-		))
+		go h.service.CleanupFromServer(id, oldServerID, purgeOld)
+
+		if moveFiles && purgeOld {
+			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Files streamed to new server and previous server purged.", oldServerName, newServerName))
+		} else if moveFiles {
+			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Files streamed to new server. Containers stopped on %s.", oldServerName, newServerName, oldServerName))
+		} else if purgeOld {
+			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Previous server %s purged.", oldServerName, newServerName, oldServerName))
+		} else {
+			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Containers stopped on %s.", oldServerName, newServerName, oldServerName))
+		}
 	}
 
 	saveFormEnvVars(r, h.service, id)

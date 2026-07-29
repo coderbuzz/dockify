@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -55,6 +56,13 @@ func (m *MockClient) Exec(cmd string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func (m *MockClient) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
+	if stdin != nil && stdout != nil {
+		_, _ = io.Copy(stdout, stdin)
+	}
+	return nil
 }
 
 func (m *MockClient) ExecStream(ctx context.Context, cmd string) (<-chan string, error) {

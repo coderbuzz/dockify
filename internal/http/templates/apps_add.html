@@ -216,6 +216,36 @@
   </div>
 </div>
 
+<div id="move-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeMoveModal()">
+  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+    <h3 style="margin:0 0 0.6em 0">Pindahkan App ke Server Baru</h3>
+    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 1em 0">Anda mengubah server untuk aplikasi ini. Silahkan pilih opsi pemindahan data di bawah ini:</p>
+    
+    <div style="display:flex;flex-direction:column;gap:0.8em;margin-bottom:1.2em">
+      <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
+        <input type="checkbox" id="chk-move-files" checked style="margin-top:0.2em">
+        <div>
+          <strong>Move app files ke server baru</strong>
+          <div style="font-size:0.8em;color:var(--text-dim)">Salin secara langsung (real-time stream) seluruh file aplikasi dari server lama ke server baru.</div>
+        </div>
+      </label>
+
+      <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
+        <input type="checkbox" id="chk-purge-old" checked style="margin-top:0.2em">
+        <div>
+          <strong>Purge app files and volumes from previous server</strong>
+          <div style="font-size:0.8em;color:var(--text-dim)">Hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama.</div>
+        </div>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:0.5em">
+      <button type="button" class="btn btn-primary" onclick="confirmMoveServer()">Pindahkan App</button>
+      <button type="button" class="btn btn-ghost" onclick="closeMoveModal()">Batal</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var pendingEnvVars = [];
 {{if .SecretsJSON}}
@@ -420,12 +450,45 @@ function saveAsDraft() {
   form.appendChild(input);
   form.submit();
 }
+var initialServerId = "{{if and .IsEdit .App}}{{.App.ServerID}}{{end}}";
+var isEdit = {{if .IsEdit}}true{{else}}false{{end}};
+var moveModalConfirmed = false;
+
 function validateServer() {
   if (document.querySelector('input[name="draft"]')) return true;
   var sel = document.querySelector('select[name="server_id"]');
   if (!sel.value) { alert('Please select a server or save as draft.'); return false; }
+  if (isEdit && initialServerId && initialServerId !== "0" && sel.value !== initialServerId && !moveModalConfirmed) {
+    document.getElementById('move-modal').style.display = 'flex';
+    return false;
+  }
   return true;
 }
+
+function closeMoveModal() {
+  document.getElementById('move-modal').style.display = 'none';
+}
+
+function confirmMoveServer() {
+  moveModalConfirmed = true;
+  var form = document.querySelector('form');
+
+  var moveFilesInput = document.createElement('input');
+  moveFilesInput.type = 'hidden';
+  moveFilesInput.name = 'move_files';
+  moveFilesInput.value = document.getElementById('chk-move-files').checked ? '1' : '0';
+  form.appendChild(moveFilesInput);
+
+  var purgeOldInput = document.createElement('input');
+  purgeOldInput.type = 'hidden';
+  purgeOldInput.name = 'purge_old';
+  purgeOldInput.value = document.getElementById('chk-purge-old').checked ? '1' : '0';
+  form.appendChild(purgeOldInput);
+
+  closeMoveModal();
+  form.submit();
+}
+
 renderEnvVars();
 </script>
 {{template "scripts" .}}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -203,6 +204,24 @@ func (h *Handler) Init(w http.ResponseWriter, r *http.Request) {
 	}(id)
 
 	JSON(w, http.StatusAccepted, map[string]string{"message": "initialization started"})
+}
+
+func (h *Handler) Prune(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	var input struct {
+		All     bool `json:"all"`
+		Volumes bool `json:"volumes"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&input)
+
+	out, err := h.service.PruneWorker(id, input.All, input.Volumes)
+	if err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "output": out})
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]string{"output": out, "message": "prune completed"})
 }
 
 type AppLister interface {
@@ -512,6 +531,25 @@ func (h *Handler) StatsHistory(w http.ResponseWriter, r *http.Request) {
 		rangeParam = "1h"
 	}
 	JSON(w, http.StatusOK, h.service.GetStatsHistory(id, rangeParam))
+}
+
+func (h *WebHandler) ServerPrune(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	removeAll := r.FormValue("all") == "1" || r.FormValue("all") == "true" || r.FormValue("all") == "on"
+	removeVolumes := r.FormValue("volumes") == "1" || r.FormValue("volumes") == "true" || r.FormValue("volumes") == "on"
+
+	out, err := h.service.PruneWorker(id, removeAll, removeVolumes)
+	msg := "Worker disk prune completed successfully."
+	if err != nil {
+		msg = fmt.Sprintf("Prune error: %v", err)
+	} else if strings.TrimSpace(out) != "" {
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		lastLine := lines[len(lines)-1]
+		msg = fmt.Sprintf("Prune finished: %s", lastLine)
+	}
+
+	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10)+"?msg="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func JSON(w http.ResponseWriter, status int, data interface{}) {
