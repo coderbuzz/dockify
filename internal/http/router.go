@@ -132,6 +132,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Post("/{id}/stop", appAPIHandler.Stop)
 			r.Post("/{id}/start", appAPIHandler.Start)
 			r.Get("/{id}/deployments", appAPIHandler.ListDeployments)
+			r.Delete("/{id}/deployments", appAPIHandler.ClearDeployments)
 			r.Get("/{id}/logs", appAPIHandler.Logs)
 			r.Get("/{id}/secrets", appAPIHandler.ListSecrets)
 			r.Post("/{id}/secrets", appAPIHandler.SetSecret)
@@ -173,6 +174,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			})
 			r.Post("/{id}/deploy", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppDeployWeb(w, r, render)
+			})
+			r.Post("/{id}/clear-deployments", func(w http.ResponseWriter, r *http.Request) {
+				appWebHandler.AppClearDeploymentsWeb(w, r, render)
 			})
 			r.Post("/{id}/redeploy", func(w http.ResponseWriter, r *http.Request) {
 				appWebHandler.AppRedeployWeb(w, r, render)

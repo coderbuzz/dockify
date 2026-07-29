@@ -84,7 +84,6 @@
         <button type="submit" class="btn btn-danger">Init Worker</button>
       </form>
       <button type="button" class="btn btn-ghost" onclick="openPruneModal()">Prune Disk</button>
-      <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh</button>
       <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
     </div>
     <div class="btn-group-right">

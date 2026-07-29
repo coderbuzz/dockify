@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/caddy"
@@ -25,11 +26,13 @@ const (
 )
 
 type Service struct {
-	repo             *Repository
-	serverRepo       *server.Repository
-	cf               *cloudflare.Client
-	scheduler        *scheduler.Scheduler
-	connFactory      ssh.Factory
+	repo        *Repository
+	serverRepo  *server.Repository
+	cf          *cloudflare.Client
+	scheduler   *scheduler.Scheduler
+	connFactory ssh.Factory
+	statsCache  map[int64]*StatsOverview
+	statsMu     sync.RWMutex
 }
 
 func (s *Service) SetConnFactory(f ssh.Factory) {
@@ -37,7 +40,14 @@ func (s *Service) SetConnFactory(f ssh.Factory) {
 }
 
 func NewService(repo *Repository, serverRepo *server.Repository, cf *cloudflare.Client, sch *scheduler.Scheduler) *Service {
-	return &Service{repo: repo, serverRepo: serverRepo, cf: cf, scheduler: sch, connFactory: ssh.RealFactory()}
+	return &Service{
+		repo:        repo,
+		serverRepo:  serverRepo,
+		cf:          cf,
+		scheduler:   sch,
+		connFactory: ssh.RealFactory(),
+		statsCache:  make(map[int64]*StatsOverview),
+	}
 }
 
 func (s *Service) List() ([]App, error) {
@@ -792,10 +802,79 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 	}
 }
 
-// StatsOverviewByApp returns the latest per-app resource snapshot for all apps
-// in two batched queries (container stats + disk), keyed by app ID. Apps with no
-// collected stats are absent. Never returns nil (always a non-nil, possibly empty map).
+func (s *Service) UpdateStatsCache(appID int64, update *StatsOverview) {
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	if s.statsCache == nil {
+		s.statsCache = make(map[int64]*StatsOverview)
+	}
+	existing, ok := s.statsCache[appID]
+	if !ok {
+		cp := *update
+		s.statsCache[appID] = &cp
+		return
+	}
+	if update.CPUPercent > 0 || update.MemUsageBytes > 0 || update.MemPercent > 0 {
+		existing.CPUPercent = update.CPUPercent
+		existing.MemPercent = update.MemPercent
+		existing.MemUsageBytes = update.MemUsageBytes
+		existing.MemLimitBytes = update.MemLimitBytes
+		existing.NetIORxBytes = update.NetIORxBytes
+		existing.NetIOTxBytes = update.NetIOTxBytes
+		existing.BlockIORead = update.BlockIORead
+		existing.BlockIOWrite = update.BlockIOWrite
+	}
+	if update.DiskUsageBytes > 0 {
+		existing.DiskUsageBytes = update.DiskUsageBytes
+	}
+}
+
+func (s *Service) UpdateStatsCacheBatch(stats map[int64]*StatsOverview) {
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	if s.statsCache == nil {
+		s.statsCache = make(map[int64]*StatsOverview)
+	}
+	for appID, st := range stats {
+		existing, ok := s.statsCache[appID]
+		if !ok {
+			cp := *st
+			s.statsCache[appID] = &cp
+			continue
+		}
+		if st.CPUPercent > 0 || st.MemUsageBytes > 0 || st.MemPercent > 0 {
+			existing.CPUPercent = st.CPUPercent
+			existing.MemPercent = st.MemPercent
+			existing.MemUsageBytes = st.MemUsageBytes
+			existing.MemLimitBytes = st.MemLimitBytes
+			existing.NetIORxBytes = st.NetIORxBytes
+			existing.NetIOTxBytes = st.NetIOTxBytes
+			existing.BlockIORead = st.BlockIORead
+			existing.BlockIOWrite = st.BlockIOWrite
+		}
+		if st.DiskUsageBytes > 0 {
+			existing.DiskUsageBytes = st.DiskUsageBytes
+		}
+	}
+}
+
+// StatsOverviewByApp returns the latest per-app resource snapshot for all apps.
+// Reads from the in-memory cache for 0ms DB latency, falling back to DB on cold start.
 func (s *Service) StatsOverviewByApp() map[int64]*StatsOverview {
+	s.statsMu.RLock()
+	cacheLen := len(s.statsCache)
+	if cacheLen > 0 {
+		out := make(map[int64]*StatsOverview, cacheLen)
+		for k, v := range s.statsCache {
+			cp := *v
+			out[k] = &cp
+		}
+		s.statsMu.RUnlock()
+		return out
+	}
+	s.statsMu.RUnlock()
+
+	// Cold cache fallback: load from DB and populate cache
 	out := make(map[int64]*StatsOverview)
 	if stats, err := s.repo.LatestStatsByApp(); err == nil {
 		for appID, cs := range stats {
@@ -819,6 +898,10 @@ func (s *Service) StatsOverviewByApp() map[int64]*StatsOverview {
 				out[appID] = &StatsOverview{DiskUsageBytes: b}
 			}
 		}
+	}
+
+	if len(out) > 0 {
+		s.UpdateStatsCacheBatch(out)
 	}
 	return out
 }
@@ -854,6 +937,10 @@ func (s *Service) recordDeployment(appID, serverID int64, status, logMsg, commit
 
 func (s *Service) ListDeployments(appID int64) ([]Deployment, error) {
 	return s.repo.ListDeployments(appID)
+}
+
+func (s *Service) ClearDeployments(appID int64) error {
+	return s.repo.DeleteDeployments(appID)
 }
 
 func (s *Service) GetDeployment(id int64) (*Deployment, error) {

@@ -226,7 +226,12 @@
 
   {{if .Deployments}}
   <div class="card" style="margin-top:1em">
-    <h3>Deployment History</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8em">
+      <h3 style="margin:0">Deployment History</h3>
+      <form method="POST" action="apps/{{.App.ID}}/clear-deployments" onsubmit="return confirm('Clear deployment history? This cannot be undone.')">
+        <button type="submit" class="btn btn-ghost btn-red" style="font-size:0.8em;padding:0.2em 0.6em">Clear History</button>
+      </form>
+    </div>
     <div class="table-wrap"><table style="font-size:0.85em">
       <thead>
         <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>

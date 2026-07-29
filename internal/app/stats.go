@@ -199,9 +199,10 @@ func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
 		return
 	}
 
-	// Append a disk sample for each app.
+	// Append a disk sample for each app and update cache.
 	for _, e := range entries {
 		s.repo.InsertAppDiskUsage(e.appID, serverByApp[e.appID], e.bytes)
+		s.UpdateStatsCache(e.appID, &StatsOverview{DiskUsageBytes: e.bytes})
 	}
 }
 
@@ -322,10 +323,28 @@ func (s *Service) collectAllContainerStats(client ssh.Connector, serverID int64,
 		return
 	}
 
+	batch := make(map[int64]*StatsOverview)
 	for _, cs := range parsed {
 		if err := s.repo.InsertContainerStats(cs); err != nil {
 			log.Printf("Stats collector: failed to insert stats for %q: %v", cs.ContainerName, err)
 		}
+		st, ok := batch[cs.AppID]
+		if !ok {
+			st = &StatsOverview{ContainerName: cs.ContainerName}
+			batch[cs.AppID] = st
+		}
+		st.CPUPercent += cs.CPUPercent
+		st.MemUsageBytes += cs.MemUsageBytes
+		st.MemLimitBytes += cs.MemLimitBytes
+		st.MemPercent += cs.MemPercent
+		st.NetIORxBytes += cs.NetIORxBytes
+		st.NetIOTxBytes += cs.NetIOTxBytes
+		st.BlockIORead += cs.BlockIORead
+		st.BlockIOWrite += cs.BlockIOWrite
+	}
+
+	if len(batch) > 0 {
+		s.UpdateStatsCacheBatch(batch)
 	}
 }
 

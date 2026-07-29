@@ -338,6 +338,16 @@ func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, deps)
 }
 
+func (h *Handler) ClearDeployments(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	if err := h.service.ClearDeployments(id); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
 func (h *Handler) GetDeployment(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
@@ -993,6 +1003,14 @@ func (h *WebHandler) AppDeleteWeb(w http.ResponseWriter, r *http.Request, render
 	go h.service.Undeploy(id)
 
 	http.Redirect(w, r, "/apps", http.StatusSeeOther)
+}
+
+func (h *WebHandler) AppClearDeploymentsWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	_ = h.service.ClearDeployments(id)
+
+	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {

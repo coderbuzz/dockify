@@ -627,68 +627,28 @@ func (r *Repository) LatestAggregatedStats(appID int64) (*ContainerStats, error)
 	return s, nil
 }
 
-// LatestStatsByApp returns refined per-app resource metrics for the app list view:
-// - CPU: 15-minute moving average (AVG of total container CPU per tick)
-// - Memory: 1-hour peak usage (MAX of total container RAM per tick)
-// - Network / Block IO: Latest snapshot
-// Falls back to latest available tick if no data exists within the time window.
+// LatestStatsByApp returns the latest real-time resource snapshot per app.
+// It selects the metrics from the most recent tick (latest created_at) per app.
 func (r *Repository) LatestStatsByApp() (map[int64]*ContainerStats, error) {
 	rows, err := r.db.Query(`
-		WITH cs_15m AS (
-			SELECT app_id, AVG(tick_cpu) AS avg_cpu
-			FROM (
-				SELECT app_id, created_at, SUM(cpu_percent) AS tick_cpu
-				FROM container_stats
-				WHERE created_at >= DATETIME('now', '-15 minutes')
-				GROUP BY app_id, created_at
-			)
-			GROUP BY app_id
-		),
-		cs_60m AS (
-			SELECT app_id,
-			       MAX(tick_mem_bytes) AS max_mem_bytes,
-			       MAX(tick_mem_limit) AS max_mem_limit,
-			       MAX(tick_mem_pct) AS max_mem_pct
-			FROM (
-				SELECT app_id, created_at,
-				       SUM(mem_usage_bytes) AS tick_mem_bytes,
-				       SUM(mem_limit_bytes) AS tick_mem_limit,
-				       SUM(mem_percent) AS tick_mem_pct
-				FROM container_stats
-				WHERE created_at >= DATETIME('now', '-1 hour')
-				GROUP BY app_id, created_at
-			)
-			GROUP BY app_id
-		),
-		cs_latest AS (
-			SELECT cs.app_id,
-			       SUM(cs.cpu_percent) AS fallback_cpu,
-			       SUM(cs.mem_usage_bytes) AS fallback_mem_bytes,
-			       SUM(cs.mem_limit_bytes) AS fallback_mem_limit,
-			       SUM(cs.mem_percent) AS fallback_mem_pct,
-			       SUM(cs.net_io_rx_bytes) AS latest_rx,
-			       SUM(cs.net_io_tx_bytes) AS latest_tx,
-			       SUM(cs.block_io_read) AS latest_blk_r,
-			       SUM(cs.block_io_write) AS latest_blk_w
-			FROM container_stats cs
-			JOIN (
-				SELECT app_id, MAX(created_at) AS max_ts
-				FROM container_stats
-				WHERE created_at >= DATETIME('now', '-24 hours')
-				GROUP BY app_id
-			) m ON m.app_id = cs.app_id AND m.max_ts = cs.created_at
-			GROUP BY cs.app_id
-		)
 		SELECT 
-			l.app_id,
-			COALESCE(c15.avg_cpu, l.fallback_cpu) AS cpu_percent,
-			COALESCE(c60.max_mem_bytes, l.fallback_mem_bytes) AS mem_usage_bytes,
-			COALESCE(c60.max_mem_limit, l.fallback_mem_limit) AS mem_limit_bytes,
-			COALESCE(c60.max_mem_pct, l.fallback_mem_pct) AS mem_percent,
-			l.latest_rx, l.latest_tx, l.latest_blk_r, l.latest_blk_w
-		FROM cs_latest l
-		LEFT JOIN cs_15m c15 ON c15.app_id = l.app_id
-		LEFT JOIN cs_60m c60 ON c60.app_id = l.app_id
+			cs.app_id,
+			SUM(cs.cpu_percent) AS cpu_percent,
+			SUM(cs.mem_usage_bytes) AS mem_usage_bytes,
+			SUM(cs.mem_limit_bytes) AS mem_limit_bytes,
+			SUM(cs.mem_percent) AS mem_percent,
+			SUM(cs.net_io_rx_bytes) AS latest_rx,
+			SUM(cs.net_io_tx_bytes) AS latest_tx,
+			SUM(cs.block_io_read) AS latest_blk_r,
+			SUM(cs.block_io_write) AS latest_blk_w
+		FROM container_stats cs
+		JOIN (
+			SELECT app_id, MAX(created_at) AS max_ts
+			FROM container_stats
+			WHERE created_at >= DATETIME('now', '-24 hours')
+			GROUP BY app_id
+		) m ON m.app_id = cs.app_id AND m.max_ts = cs.created_at
+		GROUP BY cs.app_id
 	`)
 	if err != nil {
 		return nil, err
