@@ -238,6 +238,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 				serverInfos[i] = app.ServerInfo{ID: sv.ID, Name: sv.Name, Host: sv.Host, Status: sv.Status}
 			}
 			groups := app.GroupAppsByServer(apps, serverInfos)
+			appStats := appSvc.StatsOverviewByApp()
 
 			render(w, r, http.StatusOK, "dashboard.html", map[string]interface{}{
 				"Title":        "Dashboard",
@@ -245,6 +246,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 				"Servers":      servers,
 				"Apps":         apps,
 				"ServerGroups": groups,
+				"AppStats":     appStats,
 			})
 		})
 	})

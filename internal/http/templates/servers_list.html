@@ -1,20 +1,35 @@
 {{define "servers_list"}}
 {{if .Servers}}
 <input type="text" id="server-filter" placeholder="Filter servers by name, host or user..." style="margin-bottom:1.2rem;font-size:0.85em">
-<div class="table-wrap"><table style="font-size:0.85em">
+<div class="table-wrap"><table id="servers-table" style="font-size:0.85em">
   <thead>
-    <tr><th>Name</th><th>Host</th><th>User</th><th>Status</th><th>CPU</th><th>RAM</th><th>Disk</th><th></th></tr>
+    <tr>
+      <th data-sort="name" data-type="string" style="cursor:pointer;user-select:none">Name <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="host" data-type="string" style="cursor:pointer;user-select:none">Host <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="user" data-type="string" style="cursor:pointer;user-select:none">User <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="status" data-type="string" style="cursor:pointer;user-select:none">Status <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="cpu" data-type="number" style="cursor:pointer;user-select:none">CPU <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="ram" data-type="number" style="cursor:pointer;user-select:none">RAM <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th data-sort="disk" data-type="number" style="cursor:pointer;user-select:none">Disk <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
     {{range .Servers}}
-    <tr data-name="{{.Name}}" data-host="{{.Host}}" data-user="{{.User}}">
+    <tr data-name="{{.Name}}"
+        data-host="{{.Host}}"
+        data-user="{{.User}}"
+        data-sort-status="{{.Status}}"
+        data-cpu="{{if .CPUUsage}}{{printf "%.3f" .CPUUsage}}{{else}}0{{end}}"
+        data-ram="{{if .RAMUsage}}{{printf "%.3f" .RAMUsage}}{{else}}0{{end}}"
+        data-disk="{{if .DiskUsage}}{{printf "%.3f" .DiskUsage}}{{else}}0{{end}}">
       <td style="white-space:nowrap; font-weight: 600;"><a href="servers/{{.ID}}">{{.Name}}</a></td>
       <td class="mono">{{.Host}}:{{.Port}}</td>
       <td>{{.User}}</td>
       <td><span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span></td>
-      <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} ({{printf "%.1f" .CPUUsage}}%){{end}}{{else}}-{{end}}</td>
-      <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} ({{printf "%.1f" .RAMUsage}}%){{end}}{{else}}-{{end}}</td>
-      <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} ({{printf "%.1f" .DiskUsage}}%){{end}}{{else}}-{{end}}</td>
+      <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .CPUUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .CPUUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .CPUUsage}}%</span>{{end}}{{else}}-{{end}}</td>
+      <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .RAMUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .RAMUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .RAMUsage}}%</span>{{end}}{{else}}-{{end}}</td>
+      <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .DiskUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .DiskUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .DiskUsage}}%</span>{{end}}{{else}}-{{end}}</td>
       <td style="width:1%;white-space:nowrap">
         <form method="POST" action="servers/{{.ID}}/delete" style="display:inline"
               onsubmit="return confirm('Delete {{.Name}}? This cannot be undone.')">
@@ -31,22 +46,70 @@
 <script>
 (function(){
   var input = document.getElementById('server-filter');
-  if (!input) return;
-  input.addEventListener('input', function(){
-    var q = input.value.trim().toLowerCase();
-    var rows = document.querySelectorAll('#server-filter ~ .table-wrap table tbody tr[data-name]');
-    var matchCount = 0;
-    rows.forEach(function(r){
-      var name = (r.getAttribute('data-name') || '').toLowerCase();
-      var host = (r.getAttribute('data-host') || '').toLowerCase();
-      var user = (r.getAttribute('data-user') || '').toLowerCase();
-      var hit = q === '' || name.indexOf(q) > -1 || host.indexOf(q) > -1 || user.indexOf(q) > -1;
-      r.style.display = hit ? '' : 'none';
-      if (hit) matchCount++;
+  if (input) {
+    input.addEventListener('input', function(){
+      var q = input.value.trim().toLowerCase();
+      var rows = document.querySelectorAll('#servers-table tbody tr[data-name]');
+      var matchCount = 0;
+      rows.forEach(function(r){
+        var name = (r.getAttribute('data-name') || '').toLowerCase();
+        var host = (r.getAttribute('data-host') || '').toLowerCase();
+        var user = (r.getAttribute('data-user') || '').toLowerCase();
+        var hit = q === '' || name.indexOf(q) > -1 || host.indexOf(q) > -1 || user.indexOf(q) > -1;
+        r.style.display = hit ? '' : 'none';
+        if (hit) matchCount++;
+      });
+      var empty = document.getElementById('server-filter-empty');
+      if (empty) empty.style.display = matchCount > 0 ? 'none' : 'block';
     });
-    var empty = document.getElementById('server-filter-empty');
-    if (empty) empty.style.display = matchCount > 0 ? 'none' : 'block';
-  });
+  }
+
+  var table = document.getElementById('servers-table');
+  if (table) {
+    var currentSort = null;
+    var currentDir = 'asc';
+    var headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(function(th){
+      th.addEventListener('click', function(){
+        var key = th.getAttribute('data-sort');
+        var type = th.getAttribute('data-type') || 'string';
+        var attrName = 'data-' + key;
+        if (key === 'status') attrName = 'data-sort-status';
+
+        if (currentSort === key) {
+          currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSort = key;
+          currentDir = type === 'number' ? 'desc' : 'asc';
+        }
+
+        headers.forEach(function(h){
+          var arrow = h.querySelector('.sort-arrow');
+          if (arrow) arrow.textContent = '';
+        });
+        var arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.textContent = currentDir === 'asc' ? '▲' : '▼';
+
+        var tbody = table.querySelector('tbody');
+        var rows = Array.from(tbody.querySelectorAll('tr[data-name]'));
+
+        rows.sort(function(a, b){
+          var valA = a.getAttribute(attrName) || '';
+          var valB = b.getAttribute(attrName) || '';
+
+          if (type === 'number') {
+            var numA = parseFloat(valA) || 0;
+            var numB = parseFloat(valB) || 0;
+            return currentDir === 'asc' ? numA - numB : numB - numA;
+          } else {
+            return currentDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+          }
+        });
+
+        rows.forEach(function(r){ tbody.appendChild(r); });
+      });
+    });
+  }
 })();
 </script>
 {{else}}

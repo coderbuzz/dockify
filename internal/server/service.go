@@ -4,22 +4,25 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/ssh"
 )
 
 const (
-	StatusPending  = "pending"
-	StatusOnline   = "online"
-	StatusOffline  = "offline"
-	StatusError    = "error"
+	StatusPending = "pending"
+	StatusOnline  = "online"
+	StatusOffline = "offline"
+	StatusError   = "error"
 )
 
 type Service struct {
 	repo        *Repository
 	monitor     *Monitor
 	connFactory ssh.Factory
+	serverCache []Server
+	serverMu    sync.RWMutex
 }
 
 func NewService(repo *Repository) *Service {
@@ -33,8 +36,33 @@ func (s *Service) SetConnFactory(f ssh.Factory) {
 	s.connFactory = f
 }
 
+func (s *Service) refreshCacheLocked() {
+	if servers, err := s.repo.List(); err == nil {
+		s.serverCache = servers
+	}
+}
+
 func (s *Service) List() ([]Server, error) {
-	return s.repo.List()
+	s.serverMu.RLock()
+	if s.serverCache != nil {
+		out := make([]Server, len(s.serverCache))
+		copy(out, s.serverCache)
+		s.serverMu.RUnlock()
+		return out, nil
+	}
+	s.serverMu.RUnlock()
+
+	s.serverMu.Lock()
+	defer s.serverMu.Unlock()
+	if s.serverCache != nil {
+		out := make([]Server, len(s.serverCache))
+		copy(out, s.serverCache)
+		return out, nil
+	}
+	s.refreshCacheLocked()
+	out := make([]Server, len(s.serverCache))
+	copy(out, s.serverCache)
+	return out, nil
 }
 
 func (s *Service) Get(id int64) (*Server, error) {
@@ -48,15 +76,33 @@ func (s *Service) Create(server *Server) error {
 	if server.User == "" {
 		server.User = "root"
 	}
-	return s.repo.Create(server)
+	if err := s.repo.Create(server); err != nil {
+		return err
+	}
+	s.serverMu.Lock()
+	s.refreshCacheLocked()
+	s.serverMu.Unlock()
+	return nil
 }
 
 func (s *Service) Update(server *Server) error {
-	return s.repo.Update(server)
+	if err := s.repo.Update(server); err != nil {
+		return err
+	}
+	s.serverMu.Lock()
+	s.refreshCacheLocked()
+	s.serverMu.Unlock()
+	return nil
 }
 
 func (s *Service) Delete(id int64) error {
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+	s.serverMu.Lock()
+	s.refreshCacheLocked()
+	s.serverMu.Unlock()
+	return nil
 }
 
 func (s *Service) TestConnection(id int64) error {
@@ -262,6 +308,9 @@ func (s *Service) RefreshResources(id int64) error {
 	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
+		s.serverMu.Lock()
+		s.refreshCacheLocked()
+		s.serverMu.Unlock()
 		return err
 	}
 	defer client.Close()
@@ -277,14 +326,18 @@ func (s *Service) RefreshResources(id int64) error {
 	s.repo.UpdateStatus(id, StatusOnline)
 
 	s.repo.InsertStats(&ServerStats{
-		ServerID:   id,
-		CPUPercent: cpuUsage,
-		RAMPercent: ramUsage,
+		ServerID:    id,
+		CPUPercent:  cpuUsage,
+		RAMPercent:  ramUsage,
 		DiskPercent: diskUsage,
-		CPUCores:   cpuCores,
-		RAMMB:      ramMB,
-		DiskGB:     diskGB,
+		CPUCores:    cpuCores,
+		RAMMB:       ramMB,
+		DiskGB:      diskGB,
 	})
+
+	s.serverMu.Lock()
+	s.refreshCacheLocked()
+	s.serverMu.Unlock()
 
 	return nil
 }
