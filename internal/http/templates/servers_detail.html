@@ -83,6 +83,7 @@
       <form method="POST" action="servers/{{.Server.ID}}/init" style="display:inline">
         <button type="submit" class="btn btn-danger">Init Worker</button>
       </form>
+      <button type="button" class="btn btn-ghost" onclick="openPruneModal()">Prune Disk</button>
       <button class="btn" hx-get="servers/{{.Server.ID}}/resources" hx-target="#resources-card" hx-swap="outerHTML">Refresh</button>
       <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
     </div>
@@ -93,6 +94,67 @@
       </form>
     </div>
   </div>
+
+  <div id="prune-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closePruneModal()">
+    <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:500px;width:90%">
+      <h3 style="margin:0 0 0.6em 0">Prune Worker Disk ({{.Server.Name}})</h3>
+      <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 1em 0">Bersihkan cache Docker, image tidak terpakai, dan data sisa di server worker ini untuk membebaskan ruang disk.</p>
+      
+      <form method="POST" action="servers/{{.Server.ID}}/prune">
+        <div style="display:flex;flex-direction:column;gap:0.8em;margin-bottom:1.2em">
+          <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
+            <input type="radio" name="prune_type" value="standard" checked onclick="togglePruneOptions(false)" style="margin-top:0.2em">
+            <div>
+              <strong>Standard Prune (Aman)</strong>
+              <div style="font-size:0.8em;color:var(--text-dim)">Menghapus container yang telah berhenti, network tidak terpakai, dan dangling images (`docker system prune -f`).</div>
+            </div>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
+            <input type="radio" name="prune_type" value="deep" onclick="togglePruneOptions(true)" style="margin-top:0.2em">
+            <div>
+              <strong>Deep Prune (Pembersihan Total)</strong>
+              <div style="font-size:0.8em;color:var(--text-dim)">Menghapus seluruh image tidak terpakai, build cache (`docker builder prune -af`), dan opsi volume (`docker system prune -af --volumes`).</div>
+            </div>
+          </label>
+
+          <div id="deep-options" style="margin-left:1.8em;display:flex;flex-direction:column;gap:0.4em">
+            <label style="display:flex;align-items:center;gap:0.4em;font-size:0.85em;cursor:pointer">
+              <input type="checkbox" name="all" value="1" id="chk-all"> Hapus semua unused images (bukan cuma dangling)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4em;font-size:0.85em;cursor:pointer">
+              <input type="checkbox" name="volumes" value="1" id="chk-volumes"> Hapus unused Docker volumes
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:0.5em">
+          <button type="submit" class="btn btn-danger">Jalankan Prune</button>
+          <button type="button" class="btn btn-ghost" onclick="closePruneModal()">Batal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  function openPruneModal() {
+    document.getElementById('prune-modal').style.display = 'flex';
+  }
+  function closePruneModal() {
+    document.getElementById('prune-modal').style.display = 'none';
+  }
+  function togglePruneOptions(isDeep) {
+    var chkAll = document.getElementById('chk-all');
+    var chkVol = document.getElementById('chk-volumes');
+    if (isDeep) {
+      chkAll.checked = true;
+      chkVol.checked = true;
+    } else {
+      chkAll.checked = false;
+      chkVol.checked = false;
+    }
+  }
+  </script>
 
   <div class="console-section">
     <div id="console-container" class="console-container" style="display:none">

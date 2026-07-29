@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"time"
@@ -374,8 +375,9 @@ func (s *Service) Undeploy(id int64) error {
 
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
 
-	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	client.Exec(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
 	client.Exec("docker image prune -af 2>&1 || true")
+	client.Exec("docker volume prune -f 2>&1 || true")
 	client.Exec("docker builder prune -af 2>&1 || true")
 
 	routes, _ := s.repo.GetRoutes(app.ID)
@@ -396,10 +398,76 @@ func (s *Service) Undeploy(id int64) error {
 	return nil
 }
 
-// CleanupFromServer stops containers and removes Caddy routes from a server
-// without deleting the app folder or DB rows. Used when moving an app to
-// a different server.
-func (s *Service) CleanupFromServer(appID, serverID int64) {
+// CopyAppFiles streams /opt/dockify/apps/app-<id> from sourceServerID to targetServerID
+// over SSH pipes without creating temporary archive files on disk.
+func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) error {
+	if sourceServerID == 0 || targetServerID == 0 || sourceServerID == targetServerID {
+		return nil
+	}
+
+	srcSvr, err := s.serverRepo.Get(sourceServerID)
+	if err != nil || srcSvr == nil {
+		return fmt.Errorf("source server %d not found", sourceServerID)
+	}
+
+	dstSvr, err := s.serverRepo.Get(targetServerID)
+	if err != nil || dstSvr == nil {
+		return fmt.Errorf("target server %d not found", targetServerID)
+	}
+
+	srcClient, err := s.connFactory(srcSvr.Host, srcSvr.Port, srcSvr.User, srcSvr.SSHKey)
+	if err != nil {
+		return fmt.Errorf("connect source server: %w", err)
+	}
+	defer srcClient.Close()
+
+	dstClient, err := s.connFactory(dstSvr.Host, dstSvr.Port, dstSvr.User, dstSvr.SSHKey)
+	if err != nil {
+		return fmt.Errorf("connect target server: %w", err)
+	}
+	defer dstClient.Close()
+
+	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", appID)
+	dc := DockerComposeCmd(srcClient)
+	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
+
+	// Stop containers on source server before streaming files
+	log.Printf("CopyAppFiles: stopping containers for app %d on source server %s...", appID, srcSvr.Name)
+	srcClient.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+
+	log.Printf("CopyAppFiles: streaming %s from %s to %s...", remoteDir, srcSvr.Name, dstSvr.Name)
+
+	pr, pw := io.Pipe()
+	var srcErr error
+
+	go func() {
+		srcCmd := fmt.Sprintf("tar -cf - -C /opt/dockify/apps app-%d 2>/dev/null", appID)
+		err := srcClient.ExecPipe(srcCmd, nil, pw)
+		if err != nil {
+			log.Printf("CopyAppFiles source tar error: %v", err)
+			srcErr = err
+		}
+		pw.CloseWithError(err)
+	}()
+
+	dstCmd := "mkdir -p /opt/dockify/apps && tar -xf - -C /opt/dockify/apps"
+	dstErr := dstClient.ExecPipe(dstCmd, pr, nil)
+	pr.Close()
+
+	if dstErr != nil {
+		return fmt.Errorf("target unpack error: %w", dstErr)
+	}
+	if srcErr != nil {
+		return fmt.Errorf("source pack error: %w", srcErr)
+	}
+
+	log.Printf("CopyAppFiles: successfully streamed app %d files to %s", appID, dstSvr.Name)
+	return nil
+}
+
+// CleanupFromServer stops containers and removes Caddy routes from a server.
+// If purgeOld is true, it also removes volumes, images, and the app folder.
+func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 	app, err := s.repo.Get(appID)
 	if err != nil || app == nil {
 		log.Printf("CleanupFromServer: app %d not found", appID)
@@ -423,9 +491,16 @@ func (s *Service) CleanupFromServer(appID, serverID int64) {
 	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", app.ID)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
-	log.Printf("Cleaning up %q from %s (containers stopped, folder kept)...", app.Name, svr.Name)
-
-	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	if purgeOld {
+		log.Printf("Cleaning up %q from %s (purging containers, volumes, images, folder)...", app.Name, svr.Name)
+		client.Exec(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
+		client.Exec(fmt.Sprintf("rm -rf %s", remoteDir))
+		client.Exec("docker image prune -af 2>&1 || true")
+		client.Exec("docker volume prune -f 2>&1 || true")
+	} else {
+		log.Printf("Cleaning up %q from %s (containers stopped, folder kept)...", app.Name, svr.Name)
+		client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	}
 
 	routes, _ := s.repo.GetRoutes(app.ID)
 	for _, r := range routes {
@@ -436,7 +511,11 @@ func (s *Service) CleanupFromServer(appID, serverID int64) {
 		caddy.NewClient(client).SaveConfig()
 	}
 
-	log.Printf("App %q cleaned up from %s (folder preserved at %s)", app.Name, svr.Name, remoteDir)
+	if purgeOld {
+		log.Printf("App %q purged cleanly from %s", app.Name, svr.Name)
+	} else {
+		log.Printf("App %q cleaned up from %s (folder preserved at %s)", app.Name, svr.Name, remoteDir)
+	}
 }
 
 func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {

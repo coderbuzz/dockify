@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"io"
 	"os"
 )
 
@@ -25,6 +26,7 @@ type Connector interface {
 	Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error)
 	ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error)
 	ExecStream(ctx context.Context, cmd string) (<-chan string, error)
+	ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error
 	WriteFile(path, content string, mode os.FileMode) error
 	Close() error
 }

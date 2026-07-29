@@ -86,6 +86,44 @@ func (s *Service) TestConnection(id int64) error {
 	return nil
 }
 
+func (s *Service) PruneWorker(id int64, removeAll bool, removeVolumes bool) (string, error) {
+	server, err := s.repo.Get(id)
+	if err != nil {
+		return "", err
+	}
+	if server == nil {
+		return "", fmt.Errorf("server not found")
+	}
+
+	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+	if err != nil {
+		return "", fmt.Errorf("SSH connect failed: %w", err)
+	}
+	defer client.Close()
+
+	cmd := "docker system prune -f"
+	if removeAll {
+		cmd = "docker system prune -af"
+	}
+	if removeVolumes {
+		cmd += " --volumes"
+	}
+
+	log.Printf("Running prune on server %s (%s)...", server.Name, cmd)
+	out, err := client.Exec(cmd + " 2>&1")
+	if err != nil {
+		return out, fmt.Errorf("prune failed: %w", err)
+	}
+
+	builderOut, _ := client.Exec("docker builder prune -af 2>&1")
+	if strings.TrimSpace(builderOut) != "" {
+		out += "\n" + builderOut
+	}
+
+	log.Printf("Prune completed on server %s: %s", server.Name, strings.TrimSpace(out))
+	return out, nil
+}
+
 func (s *Service) InitWorker(id int64) error {
 	server, err := s.repo.Get(id)
 	if err != nil {

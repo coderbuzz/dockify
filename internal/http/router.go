@@ -74,9 +74,10 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Delete("/{id}", apiHandler.Delete)
 			r.Post("/{id}/init", apiHandler.Init)
 			r.Post("/{id}/refresh", apiHandler.Refresh)
-		r.Get("/{id}/console", consoleHandler.ServeWS)
-		r.Get("/{id}/stats/history", apiHandler.StatsHistory)
-		r.Get("/{id}/stats/live", statsHandler.ServeLiveStats)
+			r.Post("/{id}/prune", apiHandler.Prune)
+			r.Get("/{id}/console", consoleHandler.ServeWS)
+			r.Get("/{id}/stats/history", apiHandler.StatsHistory)
+			r.Get("/{id}/stats/live", statsHandler.ServeLiveStats)
 		})
 
 		r.Route("/servers", func(r chi.Router) {
@@ -100,6 +101,9 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			})
 			r.Post("/{id}/init", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerInit(w, r, render)
+			})
+			r.Post("/{id}/prune", func(w http.ResponseWriter, r *http.Request) {
+				webHandler.ServerPrune(w, r, render)
 			})
 			r.Get("/{id}/resources", func(w http.ResponseWriter, r *http.Request) {
 				webHandler.ServerResourcesCard(w, r, render)

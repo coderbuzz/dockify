@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -90,6 +91,28 @@ func (c *Client) Exec(cmd string) (string, error) {
 	}
 
 	return stdout.String(), nil
+}
+
+func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return fmt.Errorf("new session: %w", err)
+	}
+	defer session.Close()
+
+	if stdin != nil {
+		session.Stdin = stdin
+	}
+	if stdout != nil {
+		session.Stdout = stdout
+	}
+	var stderr bytes.Buffer
+	session.Stderr = &stderr
+
+	if err := session.Run(cmd); err != nil {
+		return fmt.Errorf("exec pipe %q: %w: %s", cmd, err, stderr.String())
+	}
+	return nil
 }
 
 func (c *Client) ExecStream(ctx context.Context, cmd string) (<-chan string, error) {
