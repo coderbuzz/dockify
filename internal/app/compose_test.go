@@ -25,6 +25,17 @@ func TestGenerateSimple(t *testing.T) {
 	}
 }
 
+func TestGenerateSimpleWithLogging(t *testing.T) {
+	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "10m", "3", nil, "", "", "")
+	if c == "" {
+		t.Fatal("empty compose")
+	}
+
+	if !strings.Contains(c, "logging:") || !strings.Contains(c, "max-size: \"10m\"") || !strings.Contains(c, "max-file: \"3\"") {
+		t.Fatalf("expected logging configuration in compose, got:\n%s", c)
+	}
+}
+
 func TestGenerateSimpleWithAppName(t *testing.T) {
 	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "", "", nil, "", "", "")
 	if c == "" {
