@@ -672,7 +672,10 @@ func (r *Repository) LatestStatsByApp() (map[int64]*ContainerStats, error) {
 			       SUM(cs.block_io_write) AS latest_blk_w
 			FROM container_stats cs
 			JOIN (
-				SELECT app_id, MAX(created_at) AS max_ts FROM container_stats GROUP BY app_id
+				SELECT app_id, MAX(created_at) AS max_ts
+				FROM container_stats
+				WHERE created_at >= DATETIME('now', '-24 hours')
+				GROUP BY app_id
 			) m ON m.app_id = cs.app_id AND m.max_ts = cs.created_at
 			GROUP BY cs.app_id
 		)
@@ -850,7 +853,10 @@ func (r *Repository) LatestDiskByApp() (map[int64]int64, error) {
 		SELECT d.app_id, d.disk_usage_bytes
 		FROM app_disk_stats d
 		JOIN (
-			SELECT app_id, MAX(created_at) AS max_ts FROM app_disk_stats GROUP BY app_id
+			SELECT app_id, MAX(created_at) AS max_ts
+			FROM app_disk_stats
+			WHERE created_at >= DATETIME('now', '-7 days')
+			GROUP BY app_id
 		) m ON m.app_id = d.app_id AND m.max_ts = d.created_at
 	`)
 	if err != nil {
