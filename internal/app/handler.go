@@ -481,8 +481,10 @@ func (h *WebHandler) AppAddPage(w http.ResponseWriter, r *http.Request, render R
 	}
 
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
-		"Title":   "Deploy App",
-		"Servers": servers,
+		"Title":      "Deploy App",
+		"Servers":    servers,
+		"LogMaxSize": "10m",
+		"LogMaxFile": "3",
 	})
 }
 
