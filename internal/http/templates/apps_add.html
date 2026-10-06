@@ -226,7 +226,7 @@
         <input type="checkbox" id="chk-move-files" checked style="margin-top:0.2em">
         <div>
           <strong>Move app files ke server baru</strong>
-          <div style="font-size:0.8em;color:var(--text-dim)">Salin secara langsung (real-time stream) seluruh file aplikasi dari server lama ke server baru. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
+          <div style="font-size:0.8em;color:var(--text-dim)">Salin folder aplikasi langsung dari server lama ke server baru via SSH (key sementara, dicabut setelah selesai), berjalan di background. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
         </div>
       </label>
 

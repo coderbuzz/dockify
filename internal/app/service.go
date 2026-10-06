@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -34,6 +35,7 @@ type Service struct {
 	connFactory ssh.Factory
 	statsCache  map[int64]*StatsOverview
 	statsMu     sync.RWMutex
+	moving      sync.Map // app IDs with a server move in progress
 }
 
 func (s *Service) SetConnFactory(f ssh.Factory) {
@@ -474,6 +476,20 @@ func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) (war
 	dc := DockerComposeCmd(srcClient)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
+	// A leftover folder on the target (e.g. from an earlier move) is kept aside, not merged into.
+	unpackCmd := rootPrefix + fmt.Sprintf("$S mkdir -p /opt/dockify/apps && cd /opt/dockify/apps && "+
+		"{ [ ! -e %[1]s ] || $S mv %[1]s %[1]s.pre-migrate-$(date +%%s); } && "+
+		"$S tar --numeric-owner -xpf - -C /opt/dockify/apps", dir)
+
+	// Set up the direct worker-to-worker path before any downtime; if it is not
+	// possible, fall back to relaying the stream through this host.
+	directCmd, cleanupDirect, directErr := prepareDirectCopy(dir, srcClient, dstClient, dstSvr, unpackCmd)
+	if directErr != nil {
+		log.Printf("CopyAppFiles: direct copy %s -> %s unavailable, relaying through Dockify: %v", srcSvr.Name, dstSvr.Name, directErr)
+	} else {
+		defer cleanupDirect()
+	}
+
 	// From here on the source containers may be down: bring them back on any failure.
 	defer func() {
 		if err == nil {
@@ -490,30 +506,16 @@ func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) (war
 		return warnings, fmt.Errorf("stop containers on %s: %w\n%s", srcSvr.Name, err, out)
 	}
 
-	log.Printf("CopyAppFiles: streaming %s from %s to %s...", remoteDir, srcSvr.Name, dstSvr.Name)
-
-	pr, pw := io.Pipe()
-	srcDone := make(chan error, 1)
-
-	go func() {
-		err := srcClient.ExecPipe(rootPrefix+"$S tar --numeric-owner -cf - -C /opt/dockify/apps "+dir, nil, pw)
-		pw.CloseWithError(err)
-		srcDone <- err
-	}()
-
-	// A leftover folder on the target (e.g. from an earlier move) is kept aside, not merged into.
-	dstCmd := rootPrefix + fmt.Sprintf("$S mkdir -p /opt/dockify/apps && cd /opt/dockify/apps && "+
-		"{ [ ! -e %[1]s ] || $S mv %[1]s %[1]s.pre-migrate-$(date +%%s); } && "+
-		"$S tar --numeric-owner -xpf - -C /opt/dockify/apps", dir)
-	dstErr := dstClient.ExecPipe(dstCmd, pr, nil)
-	pr.Close()
-
-	if dstErr != nil {
-		// srcClient is closed on return, which ends the source tar too.
-		return warnings, fmt.Errorf("target unpack error: %w", dstErr)
-	}
-	if err := <-srcDone; err != nil {
-		return warnings, fmt.Errorf("source pack error: %w", err)
+	if directErr == nil {
+		log.Printf("CopyAppFiles: streaming %s directly from %s to %s...", remoteDir, srcSvr.Name, dstSvr.Name)
+		if err := srcClient.ExecPipe(directCmd, nil, nil); err != nil {
+			return warnings, fmt.Errorf("direct copy to %s: %w", dstSvr.Name, err)
+		}
+	} else {
+		log.Printf("CopyAppFiles: streaming %s from %s to %s via Dockify...", remoteDir, srcSvr.Name, dstSvr.Name)
+		if err := relayCopy(dir, srcClient, dstClient, unpackCmd); err != nil {
+			return warnings, err
+		}
 	}
 
 	countCmd := rootPrefix + fmt.Sprintf(`cd /opt/dockify/apps && $S find %s -type f -printf '%%s\n' | awk '{n++; b+=$1} END {print n+0, b+0}'`, dir)
@@ -541,6 +543,178 @@ func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) (war
 
 	log.Printf("CopyAppFiles: successfully streamed app %d files to %s (%s files/bytes)", appID, dstSvr.Name, strings.TrimSpace(dstCount))
 	return warnings, nil
+}
+
+// relayCopy pipes tar from the source through this host into unpackCmd on the target.
+func relayCopy(dir string, srcClient, dstClient ssh.Connector, unpackCmd string) error {
+	pr, pw := io.Pipe()
+	srcDone := make(chan error, 1)
+
+	go func() {
+		err := srcClient.ExecPipe(rootPrefix+"$S tar --numeric-owner -cf - -C /opt/dockify/apps "+dir, nil, pw)
+		pw.CloseWithError(err)
+		srcDone <- err
+	}()
+
+	dstErr := dstClient.ExecPipe(unpackCmd, pr, nil)
+	pr.Close()
+
+	if dstErr != nil {
+		// The caller closes srcClient on return, which ends the source tar too.
+		return fmt.Errorf("target unpack error: %w", dstErr)
+	}
+	if err := <-srcDone; err != nil {
+		return fmt.Errorf("source pack error: %w", err)
+	}
+	return nil
+}
+
+// prepareDirectCopy lets the source worker stream straight to the target with a
+// one-off key. The key is generated on the source (the private half never leaves
+// it), and the target accepts it only for unpackCmd, with no PTY or forwarding,
+// until ExecPipeTimeout passes. cleanup removes it from both sides.
+func prepareDirectCopy(dir string, srcClient, dstClient ssh.Connector, dst *server.Server, unpackCmd string) (streamCmd string, cleanup func(), err error) {
+	if out, _ := srcClient.Exec(fmt.Sprintf("ssh-keyscan -T 5 -p %d %s 2>/dev/null", dst.Port, shellQuote(dst.Host))); strings.TrimSpace(out) == "" {
+		return "", nil, fmt.Errorf("source cannot reach %s:%d", dst.Host, dst.Port)
+	}
+
+	marker := fmt.Sprintf("dockify-migrate-%s-%d", dir, time.Now().Unix())
+	out, err := srcClient.Exec("D=$(mktemp -d) && ssh-keygen -q -t ed25519 -N '' -C " + marker + " -f $D/k && echo $D && cat $D/k.pub")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if err != nil || len(lines) != 2 || !strings.HasPrefix(lines[0], "/") {
+		return "", nil, fmt.Errorf("generate key on source: %v %q", err, out)
+	}
+	keyDir, pub := lines[0], lines[1]
+	cleanup = func() {
+		srcClient.Exec("rm -rf " + shellQuote(keyDir))
+		if _, err := dstClient.Exec("sed -i --follow-symlinks '/" + marker + "/d' ~/.ssh/authorized_keys"); err != nil {
+			log.Printf("WARNING: could not remove migration key %s from %s (it expires on its own): %v", marker, dst.Name, err)
+		}
+	}
+
+	// Pin the target's host keys instead of trusting whatever answers.
+	hostKeys, err := dstClient.Exec("cat /etc/ssh/ssh_host_*_key.pub")
+	var known strings.Builder
+	for _, l := range strings.Split(hostKeys, "\n") {
+		if f := strings.Fields(l); len(f) >= 2 {
+			fmt.Fprintf(&known, "dockify-target %s %s\n", f[0], f[1])
+		}
+	}
+	if err != nil || known.Len() == 0 {
+		cleanup()
+		return "", nil, fmt.Errorf("read target host keys: %v", err)
+	}
+	if err := srcClient.WriteFile(keyDir+"/known_hosts", known.String(), 0600); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("write known_hosts on source: %w", err)
+	}
+
+	// base64 keeps the command free of quotes inside authorized_keys; Z = UTC.
+	expiry := time.Now().UTC().Add(ssh.ExecPipeTimeout).Format("200601021504") + "Z"
+	entry := fmt.Sprintf(`restrict,command="sh -c \"$(echo %s | base64 -d)\"",expiry-time="%s" %s`,
+		base64.StdEncoding.EncodeToString([]byte(unpackCmd)), expiry, pub)
+	if _, err := dstClient.Exec("mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo " + shellQuote(entry) + " >> ~/.ssh/authorized_keys"); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("authorize key on target: %w", err)
+	}
+
+	// The subshell records tar's exit code, since sh has no pipefail.
+	streamCmd = rootPrefix + fmt.Sprintf(`( $S tar --numeric-owner -cf - -C /opt/dockify/apps %[1]s; echo $? > %[2]s/rc ) | `+
+		`ssh -i %[2]s/k -o BatchMode=yes -o IdentitiesOnly=yes -o UserKnownHostsFile=%[2]s/known_hosts `+
+		`-o HostKeyAlias=dockify-target -o StrictHostKeyChecking=yes -p %[3]d %[4]s@%[5]s && [ "$(cat %[2]s/rc)" = 0 ]`,
+		dir, keyDir, dst.Port, shellQuote(dst.User), shellQuote(dst.Host))
+	return streamCmd, cleanup, nil
+}
+
+// BeginMove reserves appID for a server move; false if one is already running.
+// MoveApp releases it.
+func (s *Service) BeginMove(appID int64) bool {
+	_, busy := s.moving.LoadOrStore(appID, true)
+	return !busy
+}
+
+func (s *Service) MoveInProgress(appID int64) bool {
+	_, busy := s.moving.Load(appID)
+	return busy
+}
+
+// MoveApp copies the app folder to toServerID and only then switches the app
+// over: server_id, routes, deploy, and finally stop (or purge) on the old
+// server once the new deploy runs. It is slow and meant to run in the
+// background; the outcome lands in the deployment history.
+func (s *Service) MoveApp(appID, fromServerID, toServerID int64, purgeOld bool) {
+	defer s.moving.Delete(appID)
+
+	app, err := s.repo.Get(appID)
+	if err != nil || app == nil {
+		return
+	}
+	fromName, toName := s.serverName(fromServerID), s.serverName(toServerID)
+	prevStatus := app.Status
+	s.repo.UpdateStatus(appID, StatusDeploying)
+
+	fail := func(msg string) {
+		log.Printf("MoveApp %q: %s", app.Name, msg)
+		s.repo.UpdateStatus(appID, prevStatus)
+		s.recordDeployment(appID, fromServerID, StatusFailed, fmt.Sprintf("Move to %s aborted, app is still on %s: %s", toName, fromName, msg), "", app.Compose)
+	}
+
+	warnings, err := s.CopyAppFiles(appID, fromServerID, toServerID)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+
+	// Re-read: the edit form may have saved other fields meanwhile.
+	app, err = s.repo.Get(appID)
+	if err == nil && app != nil {
+		app.ServerID = toServerID
+		err = s.repo.Update(app)
+	}
+	if err != nil || app == nil {
+		if upErr := s.upOnServer(appID, fromServerID); upErr != nil {
+			log.Printf("MoveApp: restart on %s failed: %v", fromName, upErr)
+		}
+		fail(fmt.Sprintf("save new server: %v", err))
+		return
+	}
+
+	routes, _ := s.repo.GetRoutes(appID)
+	s.repo.DeleteRoutes(appID)
+	for _, r := range routes {
+		s.repo.SaveRoute(&Route{AppID: appID, ServerID: toServerID, Domain: r.Domain})
+	}
+
+	s.Redeploy(appID)
+	if a, _ := s.repo.Get(appID); a == nil || a.Status != StatusRunning {
+		log.Printf("MoveApp %q: deploy on %s failed, leaving %s untouched", app.Name, toName, fromName)
+		return
+	}
+
+	// Purge runs `down --volumes`, which would destroy data the move did not copy.
+	if vols := dockerVolumes(app.Compose); purgeOld && len(vols) > 0 {
+		purgeOld = false
+		warnings = append(warnings, fmt.Sprintf("purge of %s skipped, Docker volumes still live there", fromName))
+	}
+	s.CleanupFromServer(appID, fromServerID, purgeOld)
+
+	msg := fmt.Sprintf("Moved from %s to %s; %s ", fromName, toName, fromName)
+	if purgeOld {
+		msg += "purged."
+	} else {
+		msg += "stopped, folder kept."
+	}
+	for _, w := range warnings {
+		msg += "\nWarning: " + w
+	}
+	s.recordDeployment(appID, toServerID, "success", msg, "", app.Compose)
+}
+
+func (s *Service) serverName(id int64) string {
+	if svr, err := s.serverRepo.Get(id); err == nil && svr != nil {
+		return svr.Name
+	}
+	return fmt.Sprintf("#%d", id)
 }
 
 // upOnServer runs `compose up -d` for the app on the given server, e.g. to bring

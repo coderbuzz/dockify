@@ -834,6 +834,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		render(w, r, http.StatusBadRequest, "apps_add.html", editCtx(servers, "name and compose are required"))
 		return
 	}
+	if h.service.MoveInProgress(id) {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusConflict, "apps_add.html", editCtx(servers, "this app is being moved to another server; try again when the move has finished"))
+		return
+	}
 
 	moving := !isDraft && oldServerID != 0 && oldServerID != serverID
 	moveFiles := r.FormValue("move_files") == "1" || r.FormValue("move_files") == "true" || r.FormValue("move_files") == "on"
@@ -853,54 +858,37 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	// Files are copied before server_id is saved: if the copy fails the app
-	// stays on (and is restarted on) the old server, and nothing else changes.
-	var moveWarnings []string
+	// With "move files" the app stays on the old server until MoveApp has
+	// copied the files; it switches server_id itself.
 	if moving && moveFiles {
-		moveWarnings, err = h.service.CopyAppFiles(id, oldServerID, serverID)
-		if err != nil {
-			log.Printf("EditApp %q: CopyAppFiles error: %v", app.Name, err)
-			msg := fmt.Sprintf("Move to %s aborted, app is still on %s: %v", newServerName, oldServerName, err)
-			h.service.recordDeployment(id, oldServerID, StatusFailed, msg, "", app.Compose)
-			app.ServerID = oldServerID
-			servers, _ := h.serverRepo.List()
-			render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, msg))
-			return
-		}
+		app.ServerID = oldServerID
 	}
 
 	if err := h.service.Update(app); err != nil {
-		if moving && moveFiles {
-			if upErr := h.service.upOnServer(id, oldServerID); upErr != nil {
-				log.Printf("EditApp %q: restart on %s failed: %v", app.Name, oldServerName, upErr)
-			}
-		}
-		app.ServerID = oldServerID
 		servers, _ := h.serverRepo.List()
 		render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, err.Error()))
 		return
 	}
 
 	var flashMsg string
-	if moving {
+	startMove := false
+	if moving && moveFiles {
+		if startMove = h.service.BeginMove(id); startMove {
+			msg := fmt.Sprintf("Moving to %s in the background: %s is stopped while files are copied; if the copy fails the app is restarted there. See the deployment history for the result.", newServerName, oldServerName)
+			if vols := dockerVolumes(app.Compose); len(vols) > 0 {
+				msg += fmt.Sprintf(" Warning: Docker volumes (%s) are not copied.", strings.Join(vols, ", "))
+			}
+			flashMsg = url.QueryEscape(msg)
+		} else {
+			flashMsg = url.QueryEscape("A move of this app is already in progress; other changes were saved.")
+		}
+	} else if moving {
 		h.service.DeleteRoutes(app.ID)
-
 		msg := fmt.Sprintf("App moved from %s to %s.", oldServerName, newServerName)
-		if moveFiles {
-			msg += " Files copied to new server."
-		}
-		if vols := dockerVolumes(app.Compose); purgeOld && len(vols) > 0 {
-			// Purge runs `down --volumes`, which would destroy data the move did not copy.
-			purgeOld = false
-			msg += fmt.Sprintf(" Purge skipped: the app uses Docker volumes (%s) that only exist on %s.", strings.Join(vols, ", "), oldServerName)
-		}
 		if purgeOld {
 			msg += fmt.Sprintf(" %s will be purged once the new deployment succeeds.", oldServerName)
 		} else {
 			msg += fmt.Sprintf(" Containers on %s will be stopped once the new deployment succeeds.", oldServerName)
-		}
-		for _, warn := range moveWarnings {
-			msg += " Warning: " + warn + "."
 		}
 		flashMsg = url.QueryEscape(msg)
 	}
@@ -952,9 +940,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	if moving {
-		// The old server is only touched after the new one is up, so a failed
-		// deploy never leaves the app purged from both.
+	switch {
+	case startMove:
+		go h.service.MoveApp(id, oldServerID, serverID, purgeOld)
+	case moving && !moveFiles:
+		// The old server is only touched after the new one is up.
 		go func() {
 			h.service.Redeploy(id, removedDomains...)
 			if a, _ := h.service.Get(id); a == nil || a.Status != StatusRunning {
@@ -963,7 +953,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 			}
 			h.service.CleanupFromServer(id, oldServerID, purgeOld)
 		}()
-	} else if !isDraft {
+	case !isDraft && !moving:
 		go h.service.Redeploy(id, removedDomains...)
 	}
 
