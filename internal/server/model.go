@@ -6,6 +6,9 @@ import (
 	"github.com/coderbuzz/dockify/internal/model"
 )
 
+// DefaultRegistryHost is used for registry login when a credential has no host.
+const DefaultRegistryHost = "ghcr.io"
+
 type Server struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
@@ -21,6 +24,9 @@ type Server struct {
 	RAMUsage  float64   `json:"ram_usage"`
 	DiskUsage         float64   `json:"disk_usage"`
 	ResourcesUpdatedAt time.Time `json:"resources_updated_at"`
+	RegistryHost      string    `json:"registry_host"`
+	RegistryUser      string    `json:"registry_user"`
+	RegistryToken     string    `json:"-"` // path to 0600 token file, never serialized
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

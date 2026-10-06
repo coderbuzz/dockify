@@ -28,11 +28,14 @@ type ExportData struct {
 }
 
 type ExportServer struct {
-	Name   string `yaml:"name"`
-	Host   string `yaml:"host"`
-	Port   int    `yaml:"port"`
-	User   string `yaml:"user"`
-	SSHKey string `yaml:"ssh_key,omitempty"`
+	Name          string `yaml:"name"`
+	Host          string `yaml:"host"`
+	Port          int    `yaml:"port"`
+	User          string `yaml:"user"`
+	SSHKey        string `yaml:"ssh_key,omitempty"`
+	RegistryHost  string `yaml:"registry_host,omitempty"`
+	RegistryUser  string `yaml:"registry_user,omitempty"`
+	RegistryToken string `yaml:"registry_token,omitempty"`
 }
 
 type ExportSecret struct {
@@ -272,6 +275,17 @@ func (s *Service) Export(passphrase string) (string, error) {
 				return "", fmt.Errorf("encrypt ssh_key for %q: %w", svr.Name, err)
 			}
 		}
+		if svr.RegistryToken != "" {
+			raw, err := os.ReadFile(svr.RegistryToken)
+			if err != nil {
+				return "", fmt.Errorf("read registry token file for %q: %w", svr.Name, err)
+			}
+			es.RegistryHost, es.RegistryUser = svr.RegistryHost, svr.RegistryUser
+			es.RegistryToken, err = enc(string(raw))
+			if err != nil {
+				return "", fmt.Errorf("encrypt registry_token for %q: %w", svr.Name, err)
+			}
+		}
 		data.Servers = append(data.Servers, es)
 	}
 
@@ -390,9 +404,15 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			if err := validateDecryptWithAEAD(impAEAD, es.SSHKey); err != nil {
 				return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
 			}
+			if err := validateDecryptWithAEAD(impAEAD, es.RegistryToken); err != nil {
+				return "", fmt.Errorf("server %q registry_token: %w", es.Name, err)
+			}
 		} else {
 			if err := validateDecrypt(es.SSHKey, passphrase); err != nil {
 				return "", fmt.Errorf("server %q ssh_key: %w", es.Name, err)
+			}
+			if err := validateDecrypt(es.RegistryToken, passphrase); err != nil {
+				return "", fmt.Errorf("server %q registry_token: %w", es.Name, err)
 			}
 		}
 	}
@@ -456,6 +476,10 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		if err != nil {
 			return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
 		}
+		registryToken, err := dec(es.RegistryToken)
+		if err != nil {
+			return strings.Join(logLines, "\n"), fmt.Errorf("server %q: wrong passphrase or corrupted data", es.Name)
+		}
 
 		svr := &server.Server{
 			Name:   es.Name,
@@ -483,6 +507,17 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 			svr.SSHKey = path
 			if err := s.serverSvc.Update(svr); err != nil {
 				return strings.Join(logLines, "\n"), fmt.Errorf("update ssh_key path for %q: %w", es.Name, err)
+			}
+		}
+
+		if registryToken != "" && es.RegistryUser != "" {
+			path := filepath.Join(s.keyDir, fmt.Sprintf("%d.registry-token", svr.ID))
+			if err := os.WriteFile(path, []byte(registryToken), 0600); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("save registry token file for %q: %w", es.Name, err)
+			}
+			svr.RegistryHost, svr.RegistryUser, svr.RegistryToken = es.RegistryHost, es.RegistryUser, path
+			if err := s.serverSvc.Update(svr); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("update registry credential for %q: %w", es.Name, err)
 			}
 		}
 

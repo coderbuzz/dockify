@@ -23,6 +23,14 @@
       </div>
       <label>SSH Private Key<textarea name="ssh_key" rows="8" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" required></textarea><small>Paste the full private key content (not a file path)</small></label>
     </fieldset>
+    <fieldset>
+      <h3>Registry Credential <small style="font-weight:normal;color:var(--text-muted)">(optional)</small></h3>
+      <div class="grid">
+        <label>Registry Host<input type="text" name="registry_host" value="ghcr.io" placeholder="ghcr.io"></label>
+        <label>Registry User<input type="text" name="registry_user" placeholder="github-username" autocomplete="off"></label>
+      </div>
+      <label>Registry Token<input type="password" name="registry_token" placeholder="ghp_..." autocomplete="new-password"><small>Used for <code>docker login</code> on the worker before pulling private images. For GHCR, use a PAT with <code>read:packages</code> scope.</small></label>
+    </fieldset>
     <button type="submit" class="btn btn-primary">Add Server</button>
   </form>
 </div>

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,11 +36,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name   string `json:"name"`
-		Host   string `json:"host"`
-		Port   int    `json:"port"`
-		User   string `json:"user"`
-		SSHKey string `json:"ssh_key"`
+		Name          string `json:"name"`
+		Host          string `json:"host"`
+		Port          int    `json:"port"`
+		User          string `json:"user"`
+		SSHKey        string `json:"ssh_key"`
+		RegistryHost  string `json:"registry_host"`
+		RegistryUser  string `json:"registry_user"`
+		RegistryToken string `json:"registry_token"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -49,6 +53,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if input.Name == "" || input.Host == "" || input.SSHKey == "" {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "name, host, and ssh_key are required"})
+		return
+	}
+	if (input.RegistryUser == "") != (input.RegistryToken == "") {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": errRegistryPair.Error()})
 		return
 	}
 
@@ -72,6 +80,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.SSHKey = path
+	if _, err := applyRegistry(h.sshKeyDir, server, input.RegistryHost, input.RegistryUser, input.RegistryToken, false); err != nil {
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	if err := h.service.Update(server); err != nil {
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -116,11 +128,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input struct {
-		Name   string `json:"name"`
-		Host   string `json:"host"`
-		Port   int    `json:"port"`
-		User   string `json:"user"`
-		SSHKey string `json:"ssh_key"`
+		Name          string `json:"name"`
+		Host          string `json:"host"`
+		Port          int    `json:"port"`
+		User          string `json:"user"`
+		SSHKey        string `json:"ssh_key"`
+		RegistryHost  string `json:"registry_host"`
+		RegistryUser  string `json:"registry_user"`
+		RegistryToken string `json:"registry_token"`
+		RegistryClear bool   `json:"registry_clear"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -149,10 +165,24 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		server.SSHKey = path
 	}
 
+	regHost, regUser := input.RegistryHost, input.RegistryUser
+	if regHost == "" {
+		regHost = server.RegistryHost
+	}
+	if regUser == "" {
+		regUser = server.RegistryUser
+	}
+	oldToken, err := applyRegistry(h.sshKeyDir, server, regHost, regUser, input.RegistryToken, input.RegistryClear)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
 	if err := h.service.Update(server); err != nil {
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	removeTokenFile(oldToken)
 
 	JSON(w, http.StatusOK, server)
 }
@@ -246,6 +276,52 @@ func saveKeyFile(dir string, id int64, content string) (string, error) {
 	return path, nil
 }
 
+var errRegistryPair = errors.New("registry user and token must be set together")
+
+func saveRegistryTokenFile(dir string, id int64, token string) (string, error) {
+	path := filepath.Join(dir, fmt.Sprintf("%d.registry-token", id))
+	if err := os.WriteFile(path, []byte(token), 0600); err != nil {
+		return "", fmt.Errorf("save registry token: %w", err)
+	}
+	return path, nil
+}
+
+// applyRegistry sets the server's registry credential. The token is stored
+// like the SSH key: a 0600 file in dir, its path in RegistryToken. An empty
+// token keeps the current one; clear removes the whole credential and returns
+// the old token file, to be deleted once the server is saved.
+func applyRegistry(dir string, s *Server, host, user, token string, clear bool) (string, error) {
+	if clear {
+		old := s.RegistryToken
+		s.RegistryHost, s.RegistryUser, s.RegistryToken = "", "", ""
+		return old, nil
+	}
+	if (user == "") != (token == "" && s.RegistryToken == "") {
+		return "", errRegistryPair
+	}
+	if user == "" {
+		return "", nil
+	}
+	if host == "" {
+		host = DefaultRegistryHost
+	}
+	if token != "" {
+		path, err := saveRegistryTokenFile(dir, s.ID, token)
+		if err != nil {
+			return "", err
+		}
+		s.RegistryToken = path
+	}
+	s.RegistryHost, s.RegistryUser = host, user
+	return "", nil
+}
+
+func removeTokenFile(path string) {
+	if path != "" {
+		os.Remove(path)
+	}
+}
+
 func (h *WebHandler) ServerListPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
 	servers, err := h.service.List()
 	if err != nil {
@@ -295,6 +371,17 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		return
 	}
 
+	registryHost := strings.TrimSpace(r.FormValue("registry_host"))
+	registryUser := strings.TrimSpace(r.FormValue("registry_user"))
+	registryToken := strings.TrimSpace(r.FormValue("registry_token"))
+	if (registryUser == "") != (registryToken == "") {
+		render(w, r, http.StatusBadRequest, "servers_add.html", map[string]interface{}{
+			"Title": "Add Server",
+			"Error": errRegistryPair.Error(),
+		})
+		return
+	}
+
 	server := &Server{
 		Name:   name,
 		Host:   host,
@@ -321,6 +408,13 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 	}
 
 	server.SSHKey = path
+	if _, err := applyRegistry(h.sshKeyDir, server, registryHost, registryUser, registryToken, false); err != nil {
+		render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
+			"Title": "Add Server",
+			"Error": err.Error(),
+		})
+		return
+	}
 	if err := h.service.Update(server); err != nil {
 		render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
 			"Title": "Add Server",
@@ -419,6 +513,20 @@ func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, rend
 		server.SSHKey = path
 	}
 
+	oldToken, err := applyRegistry(h.sshKeyDir, server,
+		strings.TrimSpace(r.FormValue("registry_host")),
+		strings.TrimSpace(r.FormValue("registry_user")),
+		strings.TrimSpace(r.FormValue("registry_token")),
+		r.FormValue("registry_clear") != "")
+	if err != nil {
+		render(w, r, http.StatusBadRequest, "servers_edit.html", map[string]interface{}{
+			"Title":  "Edit " + server.Name,
+			"Server": server,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
 	if err := h.service.Update(server); err != nil {
 		render(w, r, http.StatusInternalServerError, "servers_edit.html", map[string]interface{}{
 			"Title":  "Edit " + server.Name,
@@ -427,6 +535,7 @@ func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, rend
 		})
 		return
 	}
+	removeTokenFile(oldToken)
 
 	go h.service.TestConnection(id)
 

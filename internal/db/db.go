@@ -130,5 +130,11 @@ func Open(path string) (*sql.DB, error) {
 	// Drop the pids column — not shown in the UI and not worth collecting.
 	db.Exec("ALTER TABLE container_stats DROP COLUMN pids")
 
+	// Migration: add per-server registry credential columns. registry_token
+	// holds the path to a 0600 token file, like ssh_key.
+	db.Exec("ALTER TABLE servers ADD COLUMN registry_host TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE servers ADD COLUMN registry_user TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE servers ADD COLUMN registry_token TEXT DEFAULT ''")
+
 	return db, nil
 }
