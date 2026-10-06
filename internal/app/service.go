@@ -419,70 +419,147 @@ func (s *Service) Undeploy(id int64) error {
 	return nil
 }
 
+// rootPrefix sets $S to "sudo -n" when the SSH user is not root but has
+// passwordless sudo, so tar can read container-owned data (e.g. mongo uid 999)
+// and keep its ownership on extract.
+const rootPrefix = `S=; [ "$(id -u)" = 0 ] || ! sudo -n true 2>/dev/null || S="sudo -n"; `
+
 // CopyAppFiles streams /opt/dockify/apps/app-<id> from sourceServerID to targetServerID
 // over SSH pipes without creating temporary archive files on disk.
-func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) error {
+//
+// Containers on the source are stopped first; if anything fails after that they
+// are started again, so on error the app keeps running on the source server.
+// Returned warnings describe things the copy did not carry over.
+func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) (warnings []string, err error) {
 	if sourceServerID == 0 || targetServerID == 0 || sourceServerID == targetServerID {
-		return nil
+		return nil, nil
+	}
+
+	app, err := s.repo.Get(appID)
+	if err != nil || app == nil {
+		return nil, fmt.Errorf("app %d not found", appID)
 	}
 
 	srcSvr, err := s.serverRepo.Get(sourceServerID)
 	if err != nil || srcSvr == nil {
-		return fmt.Errorf("source server %d not found", sourceServerID)
+		return nil, fmt.Errorf("source server %d not found", sourceServerID)
 	}
 
 	dstSvr, err := s.serverRepo.Get(targetServerID)
 	if err != nil || dstSvr == nil {
-		return fmt.Errorf("target server %d not found", targetServerID)
+		return nil, fmt.Errorf("target server %d not found", targetServerID)
 	}
 
 	srcClient, err := s.connFactory(srcSvr.Host, srcSvr.Port, srcSvr.User, srcSvr.SSHKey)
 	if err != nil {
-		return fmt.Errorf("connect source server: %w", err)
+		return nil, fmt.Errorf("connect source server: %w", err)
 	}
 	defer srcClient.Close()
 
 	dstClient, err := s.connFactory(dstSvr.Host, dstSvr.Port, dstSvr.User, dstSvr.SSHKey)
 	if err != nil {
-		return fmt.Errorf("connect target server: %w", err)
+		return nil, fmt.Errorf("connect target server: %w", err)
 	}
 	defer dstClient.Close()
 
-	remoteDir := fmt.Sprintf("/opt/dockify/apps/app-%d", appID)
+	if vols := dockerVolumes(app.Compose); len(vols) > 0 {
+		warnings = append(warnings, fmt.Sprintf("Docker volumes are not copied, only the app folder: %s", strings.Join(vols, ", ")))
+	}
+	if _, err := dstClient.Exec(`[ "$(id -u)" = 0 ] || sudo -n true`); err != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: SSH user is not root and has no passwordless sudo, so file ownership was not preserved", dstSvr.Name))
+	}
+
+	dir := fmt.Sprintf("app-%d", appID)
+	remoteDir := "/opt/dockify/apps/" + dir
 	dc := DockerComposeCmd(srcClient)
 	composePath := fmt.Sprintf("%s/docker-compose.yml", remoteDir)
 
-	// Stop containers on source server before streaming files
+	// From here on the source containers may be down: bring them back on any failure.
+	defer func() {
+		if err == nil {
+			return
+		}
+		log.Printf("CopyAppFiles: %v; restarting app %d on %s", err, appID, srcSvr.Name)
+		if upErr := s.upOnServer(appID, sourceServerID); upErr != nil {
+			err = fmt.Errorf("%w (restart on %s also failed: %v)", err, srcSvr.Name, upErr)
+		}
+	}()
+
 	log.Printf("CopyAppFiles: stopping containers for app %d on source server %s...", appID, srcSvr.Name)
-	srcClient.ExecLong(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	if out, err := srcClient.ExecLong(fmt.Sprintf("%s -f %s down 2>&1", dc, composePath)); err != nil {
+		return warnings, fmt.Errorf("stop containers on %s: %w\n%s", srcSvr.Name, err, out)
+	}
 
 	log.Printf("CopyAppFiles: streaming %s from %s to %s...", remoteDir, srcSvr.Name, dstSvr.Name)
 
 	pr, pw := io.Pipe()
-	var srcErr error
+	srcDone := make(chan error, 1)
 
 	go func() {
-		srcCmd := fmt.Sprintf("tar -cf - -C /opt/dockify/apps app-%d 2>/dev/null", appID)
-		err := srcClient.ExecPipe(srcCmd, nil, pw)
-		if err != nil {
-			log.Printf("CopyAppFiles source tar error: %v", err)
-			srcErr = err
-		}
+		err := srcClient.ExecPipe(rootPrefix+"$S tar --numeric-owner -cf - -C /opt/dockify/apps "+dir, nil, pw)
 		pw.CloseWithError(err)
+		srcDone <- err
 	}()
 
-	dstCmd := "mkdir -p /opt/dockify/apps && tar -xf - -C /opt/dockify/apps"
+	// A leftover folder on the target (e.g. from an earlier move) is kept aside, not merged into.
+	dstCmd := rootPrefix + fmt.Sprintf("$S mkdir -p /opt/dockify/apps && cd /opt/dockify/apps && "+
+		"{ [ ! -e %[1]s ] || $S mv %[1]s %[1]s.pre-migrate-$(date +%%s); } && "+
+		"$S tar --numeric-owner -xpf - -C /opt/dockify/apps", dir)
 	dstErr := dstClient.ExecPipe(dstCmd, pr, nil)
 	pr.Close()
 
 	if dstErr != nil {
-		return fmt.Errorf("target unpack error: %w", dstErr)
+		// srcClient is closed on return, which ends the source tar too.
+		return warnings, fmt.Errorf("target unpack error: %w", dstErr)
 	}
-	if srcErr != nil {
-		return fmt.Errorf("source pack error: %w", srcErr)
+	if err := <-srcDone; err != nil {
+		return warnings, fmt.Errorf("source pack error: %w", err)
 	}
 
-	log.Printf("CopyAppFiles: successfully streamed app %d files to %s", appID, dstSvr.Name)
+	countCmd := rootPrefix + fmt.Sprintf(`cd /opt/dockify/apps && $S find %s -type f -printf '%%s\n' | awk '{n++; b+=$1} END {print n+0, b+0}'`, dir)
+	srcCount, err := srcClient.ExecLong(countCmd)
+	if err != nil {
+		return warnings, fmt.Errorf("count source files: %w", err)
+	}
+	dstCount, err := dstClient.ExecLong(countCmd)
+	if err != nil {
+		return warnings, fmt.Errorf("count target files: %w", err)
+	}
+	if strings.TrimSpace(srcCount) != strings.TrimSpace(dstCount) {
+		return warnings, fmt.Errorf("copy verification failed: source has %q (files bytes), target has %q", strings.TrimSpace(srcCount), strings.TrimSpace(dstCount))
+	}
+
+	// Files Dockify rewrites on deploy must belong to the target SSH user,
+	// whose uid may differ from the source one.
+	managed := []string{dir, dir + "/docker-compose.yml", dir + "/.env"}
+	if files, _ := s.repo.ListFiles(appID); files != nil {
+		for _, f := range files {
+			managed = append(managed, shellQuote(dir+"/"+f.Path))
+		}
+	}
+	dstClient.Exec(rootPrefix + "cd /opt/dockify/apps && $S chown -h $(id -u):$(id -g) " + strings.Join(managed, " ") + " 2>/dev/null; true")
+
+	log.Printf("CopyAppFiles: successfully streamed app %d files to %s (%s files/bytes)", appID, dstSvr.Name, strings.TrimSpace(dstCount))
+	return warnings, nil
+}
+
+// upOnServer runs `compose up -d` for the app on the given server, e.g. to bring
+// the source back after an aborted move.
+func (s *Service) upOnServer(appID, serverID int64) error {
+	svr, err := s.serverRepo.Get(serverID)
+	if err != nil || svr == nil {
+		return fmt.Errorf("server %d not found", serverID)
+	}
+	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
+	if err != nil {
+		return fmt.Errorf("SSH connect: %w", err)
+	}
+	defer client.Close()
+
+	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", appID)
+	if out, err := client.ExecLong(fmt.Sprintf("%s -f %s up -d 2>&1", DockerComposeCmd(client), composePath)); err != nil {
+		return fmt.Errorf("compose up: %w\n%s", err, out)
+	}
 	return nil
 }
 

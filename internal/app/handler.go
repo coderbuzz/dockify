@@ -835,16 +835,12 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
-	if err := h.service.Update(app); err != nil {
-		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, err.Error()))
-		return
-	}
-
-	var flashMsg string
-	if !isDraft && oldServerID != 0 && oldServerID != serverID {
-		oldServerName := fmt.Sprintf("#%d", oldServerID)
-		newServerName := fmt.Sprintf("#%d", serverID)
+	moving := !isDraft && oldServerID != 0 && oldServerID != serverID
+	moveFiles := r.FormValue("move_files") == "1" || r.FormValue("move_files") == "true" || r.FormValue("move_files") == "on"
+	purgeOld := r.FormValue("purge_old") == "1" || r.FormValue("purge_old") == "true" || r.FormValue("purge_old") == "on"
+	oldServerName := fmt.Sprintf("#%d", oldServerID)
+	newServerName := fmt.Sprintf("#%d", serverID)
+	if moving {
 		if servers, err := h.serverRepo.List(); err == nil {
 			for _, s := range servers {
 				if s.ID == oldServerID {
@@ -855,28 +851,58 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 				}
 			}
 		}
+	}
 
-		moveFiles := r.FormValue("move_files") == "1" || r.FormValue("move_files") == "true" || r.FormValue("move_files") == "on"
-		purgeOld := r.FormValue("purge_old") == "1" || r.FormValue("purge_old") == "true" || r.FormValue("purge_old") == "on"
+	// Files are copied before server_id is saved: if the copy fails the app
+	// stays on (and is restarted on) the old server, and nothing else changes.
+	var moveWarnings []string
+	if moving && moveFiles {
+		moveWarnings, err = h.service.CopyAppFiles(id, oldServerID, serverID)
+		if err != nil {
+			log.Printf("EditApp %q: CopyAppFiles error: %v", app.Name, err)
+			msg := fmt.Sprintf("Move to %s aborted, app is still on %s: %v", newServerName, oldServerName, err)
+			h.service.recordDeployment(id, oldServerID, StatusFailed, msg, "", app.Compose)
+			app.ServerID = oldServerID
+			servers, _ := h.serverRepo.List()
+			render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, msg))
+			return
+		}
+	}
 
-		if moveFiles {
-			if err := h.service.CopyAppFiles(id, oldServerID, serverID); err != nil {
-				log.Printf("EditApp %q: CopyAppFiles error: %v", app.Name, err)
+	if err := h.service.Update(app); err != nil {
+		if moving && moveFiles {
+			if upErr := h.service.upOnServer(id, oldServerID); upErr != nil {
+				log.Printf("EditApp %q: restart on %s failed: %v", app.Name, oldServerName, upErr)
 			}
 		}
+		app.ServerID = oldServerID
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusInternalServerError, "apps_add.html", editCtx(servers, err.Error()))
+		return
+	}
 
+	var flashMsg string
+	if moving {
 		h.service.DeleteRoutes(app.ID)
-		go h.service.CleanupFromServer(id, oldServerID, purgeOld)
 
-		if moveFiles && purgeOld {
-			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Files streamed to new server and previous server purged.", oldServerName, newServerName))
-		} else if moveFiles {
-			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Files streamed to new server. Containers stopped on %s.", oldServerName, newServerName, oldServerName))
-		} else if purgeOld {
-			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Previous server %s purged.", oldServerName, newServerName, oldServerName))
-		} else {
-			flashMsg = url.QueryEscape(fmt.Sprintf("App moved from %s to %s. Containers stopped on %s.", oldServerName, newServerName, oldServerName))
+		msg := fmt.Sprintf("App moved from %s to %s.", oldServerName, newServerName)
+		if moveFiles {
+			msg += " Files copied to new server."
 		}
+		if vols := dockerVolumes(app.Compose); purgeOld && len(vols) > 0 {
+			// Purge runs `down --volumes`, which would destroy data the move did not copy.
+			purgeOld = false
+			msg += fmt.Sprintf(" Purge skipped: the app uses Docker volumes (%s) that only exist on %s.", strings.Join(vols, ", "), oldServerName)
+		}
+		if purgeOld {
+			msg += fmt.Sprintf(" %s will be purged once the new deployment succeeds.", oldServerName)
+		} else {
+			msg += fmt.Sprintf(" Containers on %s will be stopped once the new deployment succeeds.", oldServerName)
+		}
+		for _, warn := range moveWarnings {
+			msg += " Warning: " + warn + "."
+		}
+		flashMsg = url.QueryEscape(msg)
 	}
 
 	saveFormEnvVars(r, h.service, id)
@@ -926,7 +952,18 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	if !isDraft {
+	if moving {
+		// The old server is only touched after the new one is up, so a failed
+		// deploy never leaves the app purged from both.
+		go func() {
+			h.service.Redeploy(id, removedDomains...)
+			if a, _ := h.service.Get(id); a == nil || a.Status != StatusRunning {
+				log.Printf("EditApp %q: deploy on %s failed, leaving %s untouched", app.Name, newServerName, oldServerName)
+				return
+			}
+			h.service.CleanupFromServer(id, oldServerID, purgeOld)
+		}()
+	} else if !isDraft {
 		go h.service.Redeploy(id, removedDomains...)
 	}
 

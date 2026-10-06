@@ -1,7 +1,9 @@
 package app
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -369,4 +371,38 @@ func parseSimpleFields(compose string) simpleFields {
 	}
 
 	return sf
+}
+
+// dockerVolumes lists the named and anonymous Docker volumes used by the
+// compose services; unlike bind mounts they live outside the app folder.
+func dockerVolumes(compose string) []string {
+	var cf struct {
+		Services map[string]struct {
+			Volumes []yaml.Node `yaml:"volumes"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal([]byte(compose), &cf); err != nil {
+		return nil
+	}
+	var vols []string
+	for _, svc := range cf.Services {
+		for _, v := range svc.Volumes {
+			switch v.Kind {
+			case yaml.ScalarNode:
+				src, _, hasTarget := strings.Cut(v.Value, ":")
+				if !hasTarget {
+					vols = append(vols, v.Value) // anonymous
+				} else if strings.IndexAny(src, "./~$") != 0 {
+					vols = append(vols, src)
+				}
+			case yaml.MappingNode:
+				var m struct{ Type, Source, Target string }
+				if v.Decode(&m) == nil && m.Type == "volume" {
+					vols = append(vols, cmp.Or(m.Source, m.Target))
+				}
+			}
+		}
+	}
+	slices.Sort(vols)
+	return slices.Compact(vols)
 }

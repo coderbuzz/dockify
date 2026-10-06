@@ -81,6 +81,8 @@ func Connect(host string, port int, user, keyPath string) (*Client, error) {
 const (
 	ExecTimeout     = 2 * time.Minute
 	ExecLongTimeout = time.Hour
+	// ExecPipeTimeout bounds streaming copies (app data can be many GB).
+	ExecPipeTimeout = 6 * time.Hour
 )
 
 // Exec runs a command that is expected to finish quickly (reads, inspects, small writes).
@@ -152,7 +154,22 @@ func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
 	var stderr bytes.Buffer
 	session.Stderr = &stderr
 
-	if err := session.Run(cmd); err != nil {
+	if err := session.Start(wrapTimeout(cmd, ExecPipeTimeout)); err != nil {
+		return fmt.Errorf("exec pipe %q: %w", cmd, err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- session.Wait() }()
+
+	timer := time.NewTimer(ExecPipeTimeout + 30*time.Second)
+	defer timer.Stop()
+	select {
+	case err = <-done:
+	case <-timer.C:
+		session.Close()
+		<-done
+		return fmt.Errorf("exec pipe %q: timed out after %s", cmd, ExecPipeTimeout)
+	}
+	if err != nil {
 		return fmt.Errorf("exec pipe %q: %w: %s", cmd, err, stderr.String())
 	}
 	return nil
