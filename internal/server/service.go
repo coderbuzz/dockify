@@ -156,12 +156,12 @@ func (s *Service) PruneWorker(id int64, removeAll bool, removeVolumes bool) (str
 	}
 
 	log.Printf("Running prune on server %s (%s)...", server.Name, cmd)
-	out, err := client.Exec(cmd + " 2>&1")
+	out, err := client.ExecLong(cmd + " 2>&1")
 	if err != nil {
 		return out, fmt.Errorf("prune failed: %w", err)
 	}
 
-	builderOut, _ := client.Exec("docker builder prune -af 2>&1")
+	builderOut, _ := client.ExecLong("docker builder prune -af 2>&1")
 	if strings.TrimSpace(builderOut) != "" {
 		out += "\n" + builderOut
 	}
@@ -189,14 +189,14 @@ func (s *Service) InitWorker(id int64) error {
 	defer client.Close()
 
 	log.Printf("Installing Docker on %s...", server.Name)
-	_, err = client.Exec("command -v docker || curl -fsSL https://get.docker.com | sh")
+	_, err = client.ExecLong("command -v docker || curl -fsSL https://get.docker.com | sh")
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusError)
 		return fmt.Errorf("install docker: %w", err)
 	}
 
 	log.Printf("Installing Docker Compose plugin on %s...", server.Name)
-	_, err = client.Exec(`docker compose version 2>/dev/null || (sudo mkdir -p /usr/local/lib/docker/cli-plugins && sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose)`)
+	_, err = client.ExecLong(`docker compose version 2>/dev/null || (sudo mkdir -p /usr/local/lib/docker/cli-plugins && sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose)`)
 	if err != nil {
 		log.Printf("Warning: failed to install docker compose plugin on %s: %v", server.Name, err)
 	}
@@ -244,7 +244,7 @@ if docker ps -q --filter name=^/caddy$ --filter status=running | grep -q .; then
 else
   echo "CADDY_FAILED"
 fi`, baseConfig)
-		out, err := client.Exec(caddyRun)
+		out, err := client.ExecLong(caddyRun)
 		if err != nil || strings.Contains(out, "CADDY_FAILED") {
 			s.repo.UpdateStatus(id, StatusError)
 			return fmt.Errorf("deploy caddy: container failed to start")
@@ -281,7 +281,7 @@ if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config
 else
   echo "METRICS_UNAVAILABLE"
 fi`
-		out, err := client.Exec(migrateCmd)
+		out, err := client.ExecLong(migrateCmd)
 		if err != nil {
 			log.Printf("Warning: caddy config migration failed for %s: %v", server.Name, err)
 		}
