@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS servers (
     ram_usage   REAL,
     disk_usage  REAL,
     resources_updated_at DATETIME,
+    registry_host  TEXT DEFAULT '',
+    registry_user  TEXT DEFAULT '',
+    registry_token TEXT DEFAULT '',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );

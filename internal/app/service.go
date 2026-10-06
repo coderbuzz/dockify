@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -251,6 +252,16 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 	logs := []string{}
 
 	client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
+
+	if svr.RegistryUser != "" && svr.RegistryToken != "" {
+		if err := registryLogin(client, svr); err != nil {
+			logs = append(logs, fmt.Sprintf("registry login failed: %v", err))
+			s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
+			s.repo.UpdateStatus(id, StatusFailed)
+			return
+		}
+		logs = append(logs, fmt.Sprintf("registry login: %s as %s", registryHost(svr), svr.RegistryUser))
+	}
 
 	if pullOut, pullErr := client.Exec(fmt.Sprintf("%s -f %s pull 2>&1", composeCmd, composePath)); pullErr != nil {
 		logs = append(logs, fmt.Sprintf("compose pull failed: %v\n%s", pullErr, pullOut))
@@ -948,6 +959,41 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 }
 
 	var _ = time.Now
+
+func registryHost(svr *server.Server) string {
+	if svr.RegistryHost == "" {
+		return server.DefaultRegistryHost
+	}
+	return svr.RegistryHost
+}
+
+// registryLogin runs `docker login` on the worker with the token sent via
+// stdin, so it never appears in the remote command line. The token is
+// redacted from the returned error.
+func registryLogin(client ssh.Connector, svr *server.Server) error {
+	raw, err := os.ReadFile(svr.RegistryToken)
+	if err != nil {
+		return fmt.Errorf("read registry token file")
+	}
+	token := strings.TrimSpace(string(raw))
+	cmd := fmt.Sprintf("docker login %s -u %s --password-stdin 2>&1", shellQuote(registryHost(svr)), shellQuote(svr.RegistryUser))
+	var out strings.Builder
+	if err := client.ExecPipe(cmd, strings.NewReader(token), &out); err != nil {
+		return fmt.Errorf("%s", redact(fmt.Sprintf("%v\n%s", err, out.String()), token))
+	}
+	return nil
+}
+
+func redact(s, secret string) string {
+	if secret == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, secret, "[REDACTED]")
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 func DockerComposeCmd(c ssh.Connector) string {
 	out, err := c.Exec("docker compose version 2>/dev/null")

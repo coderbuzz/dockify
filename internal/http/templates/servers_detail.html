@@ -71,6 +71,7 @@
         <tr><td><strong>Port</strong></td><td>{{.Server.Port}}</td></tr>
         <tr><td><strong>User</strong></td><td>{{.Server.User}}</td></tr>
         <tr><td><strong>SSH Key</strong></td><td><code style="word-break:break-all;font-size:0.78em">{{.Server.SSHKey}}</code></td></tr>
+        <tr><td><strong>Registry</strong></td><td>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></td></tr>
       </table></div>
     </div>

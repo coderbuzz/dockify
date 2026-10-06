@@ -119,6 +119,9 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `ram_usage` | REAL | RAM usage % (0.0 - 100.0) |
 | `disk_usage` | REAL | Disk usage % (0.0 - 100.0) |
 | `resources_updated_at` | DATETIME | Last resource refresh timestamp |
+| `registry_host` | TEXT DEFAULT '' | Registry for `docker login` (empty → `ghcr.io`) |
+| `registry_user` | TEXT DEFAULT '' | Registry username (empty = no credential) |
+| `registry_token` | TEXT DEFAULT '' | Path to registry token file (`0600`, `$DOCKIFY_SSH_KEY_DIR/<id>.registry-token`); never serialized to the API |
 | `created_at` | DATETIME | Creation timestamp |
 | `updated_at` | DATETIME | Last update timestamp |
 
@@ -230,7 +233,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/api/servers` | List servers |
 | POST | `/api/servers` | Create server |
 | GET | `/api/servers/:id` | Get server details |
-| PATCH | `/api/servers/:id` | Partial update (host, port, user, ssh_key) |
+| PATCH | `/api/servers/:id` | Partial update (host, port, user, ssh_key, registry_host, registry_user, registry_token, registry_clear) |
 | DELETE | `/api/servers/:id` | Delete server |
 | POST | `/api/servers/:id/init` | Initialize worker (Docker + Caddy) |
 | POST | `/api/servers/:id/refresh` | Refresh resource metrics |
@@ -317,13 +320,14 @@ When an app is deployed (create/redeploy):
 4. SSH → write `docker-compose.yml` to `/opt/dockify/apps/app-{id}/`
 5. Write app secrets as `.env` file to `/opt/dockify/apps/app-{id}/.env`
 6. Write config files to `/opt/dockify/apps/app-{id}/{path}`
-7. SSH → `docker compose up -d` (auto-detects `docker-compose` vs `docker compose`)
-8. Inject Caddy route via Admin API (`POST /config/apps/http/servers/srv0/routes`)
-9. If HTTP basic auth set: include bcrypt `basic_auth` handler in route
-10. Create Cloudflare DNS A record (if configured, skips duplicates, upserts on IP change)
-11. Save compose snapshot in deployment record (for rollback)
-12. Record deployment with status, log, commit SHA (if Git-triggered)
-13. Update app status → running
+7. If the server has a registry credential: SSH → `docker login <host> -u <user> --password-stdin` with the token on stdin; on failure record `registry login failed: …` (token redacted) and stop
+8. SSH → `docker compose pull`, then `docker compose up -d` (auto-detects `docker-compose` vs `docker compose`)
+9. Inject Caddy route via Admin API (`POST /config/apps/http/servers/srv0/routes`)
+10. If HTTP basic auth set: include bcrypt `basic_auth` handler in route
+11. Create Cloudflare DNS A record (if configured, skips duplicates, upserts on IP change)
+12. Save compose snapshot in deployment record (for rollback)
+13. Record deployment with status, log, commit SHA (if Git-triggered)
+14. Update app status → running
 
 ## Worker Init Flow
 
@@ -354,10 +358,10 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 
 ### Export
 
-1. Query all servers (name, host, port, user, SSH key)
+1. Query all servers (name, host, port, user, SSH key, registry host/user/token)
 2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, server name mapping)
 3. Query all app secrets and config files
-4. If passphrase provided: encrypt SSH keys, secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
+4. If passphrase provided: encrypt SSH keys, registry tokens, secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
 5. Generate YAML document
 6. Download as `dockify-config.yaml`
 
@@ -471,6 +475,7 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 - Worker Caddy Admin API bound to `127.0.0.1:2019` — no external access
 - Controller ↔ Worker communication only via SSH (encrypted)
 - SSH private keys stored in `DOCKIFY_DATA_DIR/keys/` with `0600` permissions
+- Registry tokens stored the same way (`<id>.registry-token`, `0600`); DB holds only the path. Sent to `docker login --password-stdin` over SSH stdin (never in the command line), redacted from deploy logs and errors, never returned by the API
 - Cloudflare API token requires minimal scope: Zone:DNS:Edit
 - App containers on internal `dockify` Docker network only — no public port exposure except via Caddy
 - Webhook authentication: HMAC-SHA256 (GitHub), plain token (GitLab), auto-generated 64-char hex secret

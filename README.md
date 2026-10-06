@@ -223,6 +223,26 @@ The **Servers** page lists all worker VMs with connection status and live resour
 
 Servers can be added via the web form (name, host, port, user, SSH private key) and edited after creation — update host, port, user, or SSH key without deleting and re-adding.
 
+### Private Registry Credential
+
+Each server can optionally store one registry credential (**Registry Host**, default `ghcr.io`; **Registry User**; **Registry Token**) so private images can be pulled without making the package public or running `docker login` by hand on the worker.
+
+- On every deploy, if the server has a credential, Dockify runs `docker login <host> -u <user> --password-stdin` on the worker **before** `docker compose pull`. The token is sent over the SSH session's stdin — it never appears in the remote command line (`ps`, shell history).
+- If login fails, the deploy stops and the deployment log shows `registry login failed: …` with the token redacted (`[REDACTED]`).
+- The token is stored like the SSH private key: a `0600` file in `DOCKIFY_SSH_KEY_DIR` (`<id>.registry-token`); the database only holds its path. It is never returned by the API or shown in the UI.
+- When editing a server, leave the token empty to keep the current one; tick **Remove registry credential** to delete it (host, user, and token file).
+- Servers without a credential deploy exactly as before (no login).
+- Docker saves the login in `~/.docker/config.json` of the SSH user on the worker (standard `docker login` behavior).
+- API: `POST /api/servers` and `PATCH /api/servers/:id` accept `registry_host`, `registry_user`, `registry_token`; `PATCH` also accepts `"registry_clear": true`.
+
+**Creating a GHCR token (PAT):**
+
+1. GitHub → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**.
+2. Select only the **`read:packages`** scope (pulling needs nothing more). Set an expiration that suits you.
+3. Copy the token (`ghp_…`) into the server's **Registry Token** field, with your GitHub username as **Registry User** and `ghcr.io` as **Registry Host**.
+
+For an organization package, the token's owner must have read access to the package (or the org must allow the user via package settings). If the org enforces SSO, authorize the token for that org.
+
 ### Resource Monitoring
 
 Dockify collects CPU, RAM, and disk usage from all online servers every 60 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
@@ -489,7 +509,7 @@ Export your configuration (servers + apps + secrets + config files) as YAML and 
 
 Backups can be protected with a passphrase using **AES-GCM encryption** (PBKDF2 key derivation, 600,000 iterations):
 
-- **Secret** environment variables, SSH keys, and auth passwords are encrypted before export
+- **Secret** environment variables, SSH keys, registry tokens, and auth passwords are encrypted before export
 - **Plain** environment variables are exported as readable YAML (they are not sensitive by definition)
 - The `is_secret` flag is preserved on import, so plain/secret distinctions survive migration
 - Encrypted values use the prefix `enc:` with base64 salt + nonce + ciphertext

@@ -38,6 +38,21 @@
         <small>Paste a new key only if you want to replace the current one</small>
       </label>
     </div>
+    <div class="card">
+      <h3>Registry Credential</h3>
+      <div class="grid">
+        <label>Registry Host<input type="text" name="registry_host" value="{{or .Server.RegistryHost "ghcr.io"}}" placeholder="ghcr.io"></label>
+        <label>Registry User<input type="text" name="registry_user" value="{{.Server.RegistryUser}}" placeholder="github-username" autocomplete="off"></label>
+      </div>
+      <label>Registry Token<input type="password" name="registry_token" placeholder="{{if .Server.RegistryToken}}Leave empty to keep current token{{else}}ghp_...{{end}}" autocomplete="new-password">
+        <small>Used for <code>docker login</code> on the worker before pulling private images. For GHCR, use a PAT with <code>read:packages</code> scope.</small>
+      </label>
+      {{if .Server.RegistryToken}}
+      <label style="display:flex;align-items:center;gap:0.4em;font-size:0.85em;cursor:pointer">
+        <input type="checkbox" name="registry_clear" value="1"> Remove registry credential
+      </label>
+      {{end}}
+    </div>
     <div style="display:flex;gap:0.6em;align-items:center">
       <button type="submit" class="btn btn-primary">Save Changes</button>
       <a href="servers/{{.Server.ID}}" class="btn btn-ghost">Cancel</a>

@@ -18,7 +18,8 @@ func (r *Repository) List() ([]Server, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, host, port, user, ssh_key, status,
 		       cpu_cores, ram_mb, disk_gb, cpu_usage, ram_usage, disk_usage,
-		       resources_updated_at, created_at, updated_at
+		       resources_updated_at, registry_host, registry_user, registry_token,
+		       created_at, updated_at
 		FROM servers ORDER BY name ASC
 	`)
 	if err != nil {
@@ -32,10 +33,12 @@ func (r *Repository) List() ([]Server, error) {
 		var cpuCores, ramMB, diskGB sql.NullInt64
 		var cpuUsage, ramUsage, diskUsage sql.NullFloat64
 		var resourcesUpdated sql.NullTime
+		var regHost, regUser, regToken sql.NullString
 		if err := rows.Scan(
 			&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
 			&s.Status, &cpuCores, &ramMB, &diskGB,
 			&cpuUsage, &ramUsage, &diskUsage, &resourcesUpdated,
+			&regHost, &regUser, &regToken,
 			&s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -49,6 +52,9 @@ func (r *Repository) List() ([]Server, error) {
 		if resourcesUpdated.Valid {
 			s.ResourcesUpdatedAt = resourcesUpdated.Time
 		}
+		s.RegistryHost = nullString(regHost)
+		s.RegistryUser = nullString(regUser)
+		s.RegistryToken = nullString(regToken)
 		servers = append(servers, s)
 	}
 	return servers, rows.Err()
@@ -59,15 +65,18 @@ func (r *Repository) Get(id int64) (*Server, error) {
 	var cpuCores, ramMB, diskGB sql.NullInt64
 	var cpuUsage, ramUsage, diskUsage sql.NullFloat64
 	var resourcesUpdated sql.NullTime
+	var regHost, regUser, regToken sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, host, port, user, ssh_key, status,
 		       cpu_cores, ram_mb, disk_gb, cpu_usage, ram_usage, disk_usage,
-		       resources_updated_at, created_at, updated_at
+		       resources_updated_at, registry_host, registry_user, registry_token,
+		       created_at, updated_at
 		FROM servers WHERE id = ?
 	`, id).Scan(
 		&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
 		&s.Status, &cpuCores, &ramMB, &diskGB,
 		&cpuUsage, &ramUsage, &diskUsage, &resourcesUpdated,
+		&regHost, &regUser, &regToken,
 		&s.CreatedAt, &s.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -85,14 +94,19 @@ func (r *Repository) Get(id int64) (*Server, error) {
 	if resourcesUpdated.Valid {
 		s.ResourcesUpdatedAt = resourcesUpdated.Time
 	}
+	s.RegistryHost = nullString(regHost)
+	s.RegistryUser = nullString(regUser)
+	s.RegistryToken = nullString(regToken)
 	return s, nil
 }
 
 func (r *Repository) Create(s *Server) error {
 	result, err := r.db.Exec(`
-		INSERT INTO servers (name, host, port, user, ssh_key, status)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, s.Name, s.Host, s.Port, s.User, s.SSHKey, s.Status)
+		INSERT INTO servers (name, host, port, user, ssh_key, status,
+		                     registry_host, registry_user, registry_token)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.Name, s.Host, s.Port, s.User, s.SSHKey, s.Status,
+		s.RegistryHost, s.RegistryUser, s.RegistryToken)
 	if err != nil {
 		return fmt.Errorf("insert server: %w", err)
 	}
@@ -106,10 +120,12 @@ func (r *Repository) Update(s *Server) error {
 		UPDATE servers SET
 			name=?, host=?, port=?, user=?, ssh_key=?, status=?,
 			cpu_cores=?, ram_mb=?, disk_gb=?, cpu_usage=?, ram_usage=?, disk_usage=?,
+			registry_host=?, registry_user=?, registry_token=?,
 			updated_at=CURRENT_TIMESTAMP
 		WHERE id=?
 	`, s.Name, s.Host, s.Port, s.User, s.SSHKey, s.Status,
 		s.CPUCores, s.RAMMB, s.DiskGB, s.CPUUsage, s.RAMUsage, s.DiskUsage,
+		s.RegistryHost, s.RegistryUser, s.RegistryToken,
 		s.ID)
 	return err
 }
@@ -141,7 +157,8 @@ func (r *Repository) ListOnline() ([]Server, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, host, port, user, ssh_key, status,
 		       cpu_cores, ram_mb, disk_gb, cpu_usage, ram_usage, disk_usage,
-		       resources_updated_at, created_at, updated_at
+		       resources_updated_at, registry_host, registry_user, registry_token,
+		       created_at, updated_at
 		FROM servers WHERE status = 'online' ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -155,10 +172,12 @@ func (r *Repository) ListOnline() ([]Server, error) {
 		var cpuCores, ramMB, diskGB sql.NullInt64
 		var cpuUsage, ramUsage, diskUsage sql.NullFloat64
 		var resourcesUpdated sql.NullTime
+		var regHost, regUser, regToken sql.NullString
 		if err := rows.Scan(
 			&s.ID, &s.Name, &s.Host, &s.Port, &s.User, &s.SSHKey,
 			&s.Status, &cpuCores, &ramMB, &diskGB,
 			&cpuUsage, &ramUsage, &diskUsage, &resourcesUpdated,
+			&regHost, &regUser, &regToken,
 			&s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -172,6 +191,9 @@ func (r *Repository) ListOnline() ([]Server, error) {
 		if resourcesUpdated.Valid {
 			s.ResourcesUpdatedAt = resourcesUpdated.Time
 		}
+		s.RegistryHost = nullString(regHost)
+		s.RegistryUser = nullString(regUser)
+		s.RegistryToken = nullString(regToken)
 		servers = append(servers, s)
 	}
 	return servers, rows.Err()
