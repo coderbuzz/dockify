@@ -202,7 +202,7 @@ func (s *Service) InitWorker(id int64) error {
 	}
 
 	log.Printf("Preparing /opt/dockify directories on %s...", server.Name)
-	_, _ = client.Exec("sudo mkdir -p /opt/dockify/apps /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/apps /opt/dockify/caddy 2>/dev/null")
+	_, _ = client.Exec("sudo mkdir -p /opt/dockify/apps /opt/dockify/caddy && sudo chown $(id -u):$(id -g) /opt/dockify /opt/dockify/apps 2>/dev/null && sudo chown -R $(id -u):$(id -g) /opt/dockify/caddy 2>/dev/null || mkdir -p /opt/dockify/apps /opt/dockify/caddy 2>/dev/null")
 
 	log.Printf("Creating dockify network on %s...", server.Name)
 	_, err = client.Exec("docker network inspect dockify >/dev/null 2>&1 || docker network create dockify")
@@ -218,7 +218,7 @@ func (s *Service) InitWorker(id int64) error {
 if [ -d /opt/dockify/caddy/config.json ]; then
   sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
 fi
-sudo mkdir -p /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/caddy
+sudo mkdir -p /opt/dockify/caddy && sudo chown $(id -u):$(id -g) /opt/dockify 2>/dev/null && sudo chown -R $(id -u):$(id -g) /opt/dockify/caddy 2>/dev/null || mkdir -p /opt/dockify/caddy
 if [ ! -f /opt/dockify/caddy/config.json ]; then
   echo '%s' > /opt/dockify/caddy/config.json
 fi
@@ -260,7 +260,7 @@ fi`, baseConfig)
 if [ -d /opt/dockify/caddy/config.json ]; then
   sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
 fi
-sudo mkdir -p /opt/dockify/caddy && sudo chown -R $(id -u):$(id -g) /opt/dockify 2>/dev/null || mkdir -p /opt/dockify/caddy
+sudo mkdir -p /opt/dockify/caddy && sudo chown $(id -u):$(id -g) /opt/dockify 2>/dev/null && sudo chown -R $(id -u):$(id -g) /opt/dockify/caddy 2>/dev/null || mkdir -p /opt/dockify/caddy
 if [ ! -f /opt/dockify/caddy/config.json ]; then
   docker exec caddy curl -s http://localhost:2019/config/ > /opt/dockify/caddy/config.json 2>/dev/null || echo '{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"],"metrics":{}}}}}}' > /opt/dockify/caddy/config.json
 fi

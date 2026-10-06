@@ -85,7 +85,9 @@ fi
 echo ""
 echo "[INFO] Preparing /opt/dockify directory..."
 sudo mkdir -p /opt/dockify/apps /opt/dockify/caddy
-sudo chown -R "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify
+# Not recursive: app bind-mount data under apps/ keeps its container-owned uid.
+sudo chown "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify /opt/dockify/apps
+sudo chown -R "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify/caddy
 echo "[OK] /opt/dockify prepared with ownership for $ACTIVE_USER"
 
 
