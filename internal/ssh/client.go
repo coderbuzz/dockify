@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -75,7 +76,33 @@ func Connect(host string, port int, user, keyPath string) (*Client, error) {
 	return client, nil
 }
 
+// Remote commands are wrapped in coreutils `timeout` so they die on the worker
+// even if the SSH session drops (no PTY means no SIGHUP reaches them).
+const (
+	ExecTimeout     = 2 * time.Minute
+	ExecLongTimeout = time.Hour
+)
+
+// Exec runs a command that is expected to finish quickly (reads, inspects, small writes).
 func (c *Client) Exec(cmd string) (string, error) {
+	return c.exec(cmd, ExecTimeout)
+}
+
+// ExecLong runs a slow command such as pull, up, prune or install.
+func (c *Client) ExecLong(cmd string) (string, error) {
+	return c.exec(cmd, ExecLongTimeout)
+}
+
+// wrapTimeout makes the worker kill cmd (and its whole process group) after d.
+func wrapTimeout(cmd string, d time.Duration) string {
+	return fmt.Sprintf("timeout -k 10 %d sh -c %s", int(d.Seconds()), shellQuote(cmd))
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func (c *Client) exec(cmd string, d time.Duration) (string, error) {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("new session: %w", err)
@@ -86,7 +113,23 @@ func (c *Client) Exec(cmd string) (string, error) {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	if err := session.Run(cmd); err != nil {
+	if err := session.Start(wrapTimeout(cmd, d)); err != nil {
+		return "", fmt.Errorf("exec %q: %w", cmd, err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- session.Wait() }()
+
+	// Backstop in case the connection itself hangs; the remote timeout fires first.
+	timer := time.NewTimer(d + 30*time.Second)
+	defer timer.Stop()
+	select {
+	case err = <-done:
+	case <-timer.C:
+		session.Close()
+		<-done
+		return stdout.String(), fmt.Errorf("exec %q: timed out after %s", cmd, d)
+	}
+	if err != nil {
 		return stdout.String(), fmt.Errorf("exec %q: %w: %s", cmd, err, stderr.String())
 	}
 

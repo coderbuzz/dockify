@@ -241,7 +241,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		log.Printf("Renamed first service to %q (compose_mode=simple)", newName)
 	}
 
-	client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", composeCmd, composePath))
+	client.ExecLong(fmt.Sprintf("%s -f %s down 2>&1 || true", composeCmd, composePath))
 
 	if err := client.WriteFile(composePath, composeContent, 0644); err != nil {
 		s.recordDeployment(id, svr.ID, StatusFailed, fmt.Sprintf("write compose: %v", err), commitSHA, app.Compose)
@@ -263,14 +263,14 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		logs = append(logs, fmt.Sprintf("registry login: %s as %s", registryHost(svr), svr.RegistryUser))
 	}
 
-	if pullOut, pullErr := client.Exec(fmt.Sprintf("%s -f %s pull 2>&1", composeCmd, composePath)); pullErr != nil {
+	if pullOut, pullErr := client.ExecLong(fmt.Sprintf("%s -f %s pull 2>&1", composeCmd, composePath)); pullErr != nil {
 		logs = append(logs, fmt.Sprintf("compose pull failed: %v\n%s", pullErr, pullOut))
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
 		s.repo.UpdateStatus(id, StatusFailed)
 		return
 	}
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s up -d --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
+	if out, err := client.ExecLong(fmt.Sprintf("%s -f %s up -d --remove-orphans 2>&1", composeCmd, composePath)); err != nil {
 		logs = append(logs, fmt.Sprintf("compose up: %v", err))
 		logs = append(logs, out)
 		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
@@ -278,7 +278,7 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		return
 	}
 
-	if _, err := client.Exec("docker image prune -f 2>&1"); err != nil {
+	if _, err := client.ExecLong("docker image prune -f 2>&1"); err != nil {
 		log.Printf("Warning: image prune failed: %v (non-fatal)", err)
 	}
 
@@ -396,10 +396,10 @@ func (s *Service) Undeploy(id int64) error {
 
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
 
-	client.Exec(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
-	client.Exec("docker image prune -af 2>&1 || true")
-	client.Exec("docker volume prune -f 2>&1 || true")
-	client.Exec("docker builder prune -af 2>&1 || true")
+	client.ExecLong(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
+	client.ExecLong("docker image prune -af 2>&1 || true")
+	client.ExecLong("docker volume prune -f 2>&1 || true")
+	client.ExecLong("docker builder prune -af 2>&1 || true")
 
 	routes, _ := s.repo.GetRoutes(app.ID)
 	for _, r := range routes {
@@ -412,7 +412,7 @@ func (s *Service) Undeploy(id int64) error {
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDeployments(app.ID)
 
-	client.Exec(fmt.Sprintf("rm -rf %s", remoteDir))
+	client.ExecLong(fmt.Sprintf("rm -rf %s", remoteDir))
 
 	s.repo.Delete(id)
 	log.Printf("App %q undeployed", app.Name)
@@ -454,7 +454,7 @@ func (s *Service) CopyAppFiles(appID, sourceServerID, targetServerID int64) erro
 
 	// Stop containers on source server before streaming files
 	log.Printf("CopyAppFiles: stopping containers for app %d on source server %s...", appID, srcSvr.Name)
-	srcClient.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+	srcClient.ExecLong(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
 
 	log.Printf("CopyAppFiles: streaming %s from %s to %s...", remoteDir, srcSvr.Name, dstSvr.Name)
 
@@ -514,13 +514,13 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 
 	if purgeOld {
 		log.Printf("Cleaning up %q from %s (purging containers, volumes, images, folder)...", app.Name, svr.Name)
-		client.Exec(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
-		client.Exec(fmt.Sprintf("rm -rf %s", remoteDir))
-		client.Exec("docker image prune -af 2>&1 || true")
-		client.Exec("docker volume prune -f 2>&1 || true")
+		client.ExecLong(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
+		client.ExecLong(fmt.Sprintf("rm -rf %s", remoteDir))
+		client.ExecLong("docker image prune -af 2>&1 || true")
+		client.ExecLong("docker volume prune -f 2>&1 || true")
 	} else {
 		log.Printf("Cleaning up %q from %s (containers stopped, folder kept)...", app.Name, svr.Name)
-		client.Exec(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
+		client.ExecLong(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
 	}
 
 	routes, _ := s.repo.GetRoutes(app.ID)
@@ -720,7 +720,7 @@ func (s *Service) Stop(id int64) error {
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Stopping %q on %s...", app.Name, svr.Name)
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s stop 2>&1", dc, composePath)); err != nil {
+	if out, err := client.ExecLong(fmt.Sprintf("%s -f %s stop 2>&1", dc, composePath)); err != nil {
 		return fmt.Errorf("compose stop: %w\n%s", err, out)
 	}
 
@@ -750,7 +750,7 @@ func (s *Service) Start(id int64) error {
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", app.ID)
 	log.Printf("Starting %q on %s...", app.Name, svr.Name)
 
-	if out, err := client.Exec(fmt.Sprintf("%s -f %s start 2>&1", dc, composePath)); err != nil {
+	if out, err := client.ExecLong(fmt.Sprintf("%s -f %s start 2>&1", dc, composePath)); err != nil {
 		return fmt.Errorf("compose start: %w\n%s", err, out)
 	}
 

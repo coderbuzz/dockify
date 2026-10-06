@@ -29,6 +29,10 @@ func (c *recordingConn) Exec(cmd string) (string, error) {
 	return c.MockClient.Exec(cmd)
 }
 
+func (c *recordingConn) ExecLong(cmd string) (string, error) {
+	return c.Exec(cmd)
+}
+
 func (c *recordingConn) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
 	c.cmds = append(c.cmds, cmd)
 	c.pipes++
