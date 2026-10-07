@@ -226,7 +226,7 @@
         <input type="checkbox" id="chk-move-files" checked style="margin-top:0.2em">
         <div>
           <strong>Move app files ke server baru</strong>
-          <div style="font-size:0.8em;color:var(--text-dim)">Salin secara langsung (real-time stream) seluruh file aplikasi dari server lama ke server baru.</div>
+          <div style="font-size:0.8em;color:var(--text-dim)">Salin folder aplikasi langsung dari server lama ke server baru via SSH (key sementara, dicabut setelah selesai), berjalan di background. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
         </div>
       </label>
 
@@ -234,7 +234,7 @@
         <input type="checkbox" id="chk-purge-old" checked style="margin-top:0.2em">
         <div>
           <strong>Purge app files and volumes from previous server</strong>
-          <div style="font-size:0.8em;color:var(--text-dim)">Hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama.</div>
+          <div style="font-size:0.8em;color:var(--text-dim)">Setelah deploy di server baru sukses: hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama. Dilewati jika app memakai Docker volume.</div>
         </div>
       </label>
     </div>
