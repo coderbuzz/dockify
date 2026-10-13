@@ -94,6 +94,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
 | `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. Not set = no authentication |
+| `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
 | `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for DNS automation (Zone:DNS:Edit scope) |
