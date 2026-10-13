@@ -107,6 +107,7 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
 | `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. If not set, the web UI has **no authentication** |
+| `DOCKIFY_API_TOKEN` | — | No | Bearer token for scripts/agents calling `/api/*` (needs `DOCKIFY_ADMIN_PASSWORD` set) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID |
@@ -130,6 +131,16 @@ DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
 - **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
 - **Session:** Cookie-based, expires after 24 hours
 - **Logout:** Visit `/logout`
+
+**API token (scripts, CI, AI agents):** set `DOCKIFY_API_TOKEN` (e.g. `openssl rand -hex 32`) and
+send it as a bearer header. It works on every protected route, needs no login and survives
+controller restarts and self-updates. A wrong token gets `401`; requests without the header
+still get the login redirect.
+
+```bash
+curl -H "Authorization: Bearer $DOCKIFY_API_TOKEN" https://dockify.example.com/api/apps
+curl -X POST -H "Authorization: Bearer $DOCKIFY_API_TOKEN" https://dockify.example.com/api/settings/update/run
+```
 
 The login page is at `/login`. Webhook endpoints (`/api/webhook/github`, `/api/webhook/gitlab`) and health check (`/health`) do not require authentication.
 

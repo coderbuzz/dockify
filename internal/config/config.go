@@ -13,6 +13,7 @@ type Config struct {
 
 	AdminUser string
 	AdminPass string
+	APIToken  string
 
 	CloudflareAPIToken string
 	CloudflareZoneID   string
@@ -29,6 +30,7 @@ func Load() *Config {
 		SSHKeyDir:          getEnv("DOCKIFY_SSH_KEY_DIR", filepath.Join(dataDir, "keys")),
 		AdminUser:          getEnv("DOCKIFY_ADMIN_USER", "admin"),
 		AdminPass:          os.Getenv("DOCKIFY_ADMIN_PASSWORD"),
+		APIToken:           os.Getenv("DOCKIFY_API_TOKEN"),
 		CloudflareAPIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),
 		CloudflareZoneID:   os.Getenv("CLOUDFLARE_ZONE_ID"),
 

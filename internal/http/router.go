@@ -14,7 +14,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock bool) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock bool) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -63,7 +63,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	// Protected routes (auth required)
 	r.Group(func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
-			return AuthMiddleware(authEnabled, next)
+			return AuthMiddleware(authEnabled, apiToken, next)
 		})
 
 		r.Route("/api/servers", func(r chi.Router) {

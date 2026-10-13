@@ -2,9 +2,11 @@ package http
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,10 +70,22 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func AuthMiddleware(enabled bool, next http.Handler) http.Handler {
+// AuthMiddleware lets a request through with a valid session cookie or, when apiToken is set,
+// an "Authorization: Bearer <apiToken>" header (for scripts and agents; no login round trip,
+// survives controller restarts). A wrong bearer token gets 401 instead of the login redirect.
+func AuthMiddleware(enabled bool, apiToken string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !enabled {
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+			if apiToken != "" && subtle.ConstantTimeCompare([]byte(bearer), []byte(apiToken)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			http.Error(w, "invalid api token", http.StatusUnauthorized)
 			return
 		}
 
