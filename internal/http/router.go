@@ -126,6 +126,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Get("/", appAPIHandler.List)
 			r.Post("/", appAPIHandler.Create)
 			r.Get("/{id}", appAPIHandler.Get)
+			r.Patch("/{id}", appAPIHandler.Patch)
 			r.Delete("/{id}", appAPIHandler.Delete)
 			r.Post("/{id}/redeploy", appAPIHandler.Redeploy)
 			r.Post("/{id}/rollback", appAPIHandler.Rollback)
