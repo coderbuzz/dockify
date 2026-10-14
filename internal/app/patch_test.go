@@ -151,3 +151,33 @@ func TestPatchRefusedDuringMove(t *testing.T) {
 		t.Errorf("got %d, want 409", code)
 	}
 }
+
+func TestSetSecretIsSecretFlag(t *testing.T) {
+	f := newMoveFixture(t)
+	h := NewHandler(f.svc)
+	r := chi.NewRouter()
+	r.Post("/api/apps/{id}/secrets", h.SetSecret)
+	post := func(body string) {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/apps/%d/secrets", f.app.ID), strings.NewReader(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	flag := func() bool {
+		secrets, _ := f.svc.ListSecrets(f.app.ID)
+		return len(secrets) == 1 && secrets[0].IsSecret
+	}
+	post(`{"key": "PW", "value": "a", "is_secret": true}`)
+	if !flag() {
+		t.Fatal("is_secret true not stored")
+	}
+	post(`{"key": "PW", "value": "b"}`)
+	if !flag() {
+		t.Fatal("omitting is_secret must keep the stored flag")
+	}
+	post(`{"key": "PW", "value": "c", "is_secret": false}`)
+	if flag() {
+		t.Fatal("is_secret false not stored")
+	}
+}

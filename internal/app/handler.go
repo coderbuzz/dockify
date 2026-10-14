@@ -378,6 +378,9 @@ func (h *Handler) SetSecret(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
+		// IsSecret, when sent, sets whether the UI masks the value; omitted keeps
+		// the stored flag (new keys default to not secret).
+		IsSecret *bool `json:"is_secret"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
@@ -387,7 +390,11 @@ func (h *Handler) SetSecret(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "key is required"})
 		return
 	}
-	if err := h.service.SetSecret(id, input.Key, input.Value); err != nil {
+	set := func() error { return h.service.SetSecret(id, input.Key, input.Value) }
+	if input.IsSecret != nil {
+		set = func() error { return h.service.SetSecretWithType(id, input.Key, input.Value, *input.IsSecret) }
+	}
+	if err := set(); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

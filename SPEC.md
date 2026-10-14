@@ -272,7 +272,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/api/apps/:id/deployments` | List deployment history (last 20) |
 | GET | `/api/apps/:id/logs` | Stream logs (`docker compose logs --tail=N`) |
 | GET | `/api/apps/:id/secrets` | List secrets |
-| POST | `/api/apps/:id/secrets` | Set secret `{key, value}` |
+| POST | `/api/apps/:id/secrets` | Set env var `{key, value, is_secret?}`; `is_secret` omitted keeps the stored flag (new keys: not secret) |
 | DELETE | `/api/apps/:id/secrets/:key` | Delete secret |
 | GET | `/api/apps/:id/files` | List config files |
 | POST | `/api/apps/:id/files` | Set config file `{path, content}` |
