@@ -263,6 +263,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/api/apps` | List apps |
 | POST | `/api/apps` | Create and deploy app |
 | GET | `/api/apps/:id` | Get app details |
+| PATCH | `/api/apps/:id` | Partial update `{compose?, server_id?, move_files?, purge_old?}`; never touches env vars, files or domains; unknown fields are rejected; redeploys (or moves) a non-draft app |
 | DELETE | `/api/apps/:id` | Undeploy and remove app |
 | POST | `/api/apps/:id/redeploy` | Redeploy app |
 | POST | `/api/apps/:id/rollback` | Rollback to last successful deployment |

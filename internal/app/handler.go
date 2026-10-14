@@ -16,10 +16,12 @@ import (
 
 type Handler struct {
 	service *Service
+	// run starts background work (deploys, moves); tests swap in a synchronous runner.
+	run func(func())
 }
 
 func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+	return &Handler{service: service, run: func(f func()) { go f() }}
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -178,6 +180,126 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, app)
+}
+
+// Patch changes only the fields present in the JSON body. Unlike the edit form it
+// never touches env vars, files or domains, so a partial update cannot drop them.
+//
+//	compose     replaces the compose file (switches the app to advanced mode)
+//	server_id   moves the app; with move_files the folder is copied first (MoveApp),
+//	            purge_old removes it from the old server afterwards
+//
+// A non-draft app is redeployed when anything changed.
+func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var input struct {
+		Compose   *string `json:"compose"`
+		ServerID  *int64  `json:"server_id"`
+		MoveFiles bool    `json:"move_files"`
+		PurgeOld  bool    `json:"purge_old"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&input); err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+		return
+	}
+
+	app, err := h.service.Get(id)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if app == nil {
+		jsonResponse(w, http.StatusNotFound, map[string]string{"error": "app not found"})
+		return
+	}
+	if h.service.MoveInProgress(id) {
+		jsonResponse(w, http.StatusConflict, map[string]string{"error": "this app is being moved to another server; try again when the move has finished"})
+		return
+	}
+
+	isDraft := app.Status == StatusDraft
+	oldServerID := app.ServerID
+	changed := false
+
+	if input.Compose != nil {
+		compose := strings.TrimSpace(*input.Compose)
+		if compose == "" {
+			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "compose must not be empty"})
+			return
+		}
+		app.Compose = compose
+		app.ComposeMode = "advanced"
+		changed = true
+	}
+
+	moving := false
+	if input.ServerID != nil && *input.ServerID != oldServerID {
+		if svr, err := h.service.serverRepo.Get(*input.ServerID); err != nil || svr == nil {
+			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("server %d not found", *input.ServerID)})
+			return
+		}
+		app.ServerID = *input.ServerID
+		moving = !isDraft && oldServerID != 0
+		changed = true
+	}
+	if (input.MoveFiles || input.PurgeOld) && !moving {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "move_files and purge_old need a server_id different from the current one"})
+		return
+	}
+
+	newServerID := app.ServerID
+	// With move_files the app stays on the old server until MoveApp has copied
+	// the files; it switches server_id itself.
+	if moving && input.MoveFiles {
+		app.ServerID = oldServerID
+	}
+	if changed {
+		if err := h.service.Update(app); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": friendlyError(err)})
+			return
+		}
+	}
+
+	action := "none"
+	switch {
+	case moving && input.MoveFiles:
+		if !h.service.BeginMove(id) {
+			jsonResponse(w, http.StatusConflict, map[string]string{"error": "a move of this app is already in progress; other changes were saved"})
+			return
+		}
+		action = "move"
+		h.run(func() { h.service.MoveApp(id, oldServerID, newServerID, input.PurgeOld) })
+	case moving:
+		// Fresh start on the new server from whatever its folder holds; the old
+		// server is only touched after the new deploy runs.
+		action = "move_without_files"
+		routes, _ := h.service.GetRoutes(id)
+		h.service.DeleteRoutes(id)
+		for _, rt := range routes {
+			h.service.SaveRoute(&Route{AppID: id, ServerID: newServerID, Domain: rt.Domain})
+		}
+		h.run(func() {
+			h.service.Redeploy(id)
+			if a, _ := h.service.Get(id); a == nil || a.Status != StatusRunning {
+				log.Printf("Patch %q: deploy on server %d failed, leaving server %d untouched", app.Name, newServerID, oldServerID)
+				return
+			}
+			h.service.CleanupFromServer(id, oldServerID, input.PurgeOld)
+		})
+	case changed && !isDraft:
+		action = "redeploy"
+		h.run(func() { h.service.Redeploy(id) })
+	}
+
+	resp := map[string]interface{}{"app": app, "action": action}
+	if moving && input.MoveFiles {
+		if vols := dockerVolumes(app.Compose); len(vols) > 0 {
+			resp["warning"] = fmt.Sprintf("Docker volumes (%s) are not copied", strings.Join(vols, ", "))
+		}
+	}
+	jsonResponse(w, http.StatusAccepted, resp)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
