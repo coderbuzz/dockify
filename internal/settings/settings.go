@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"os/exec"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -107,25 +107,31 @@ func (s *Service) CheckUpdate(force bool) (*UpdateInfo, error) {
 }
 
 func (s *Service) RunUpdate() error {
-	script := `#!/bin/bash
-exec > /tmp/dockify-update.log 2>&1
-echo "Update started $(date)"
-sleep 3
-export DOCKIFY_FORCE=y
-curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
-echo "Update finished $(date)"
-`
-	path := "/tmp/dockify-upgrade.sh"
-	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
-		return fmt.Errorf("write upgrade script: %w", err)
+	info, _ := s.CheckUpdate(false)
+	argv, err := upgradeArgv(info.Latest)
+	if err != nil {
+		return err
 	}
-	cmd := exec.Command("systemd-run", "--no-block", "--unit=dockify-upgrade", "--collect", path)
-	output, err := cmd.CombinedOutput()
+	output, err := exec.Command(argv[0], argv[1:]...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("systemd-run: %w: %s", err, output)
 	}
-	log.Printf("Update triggered via systemd-run: %s", output)
+	log.Printf("Update to %s triggered via systemd-run (journalctl -u dockify-upgrade): %s", info.Latest, output)
 	return nil
+}
+
+var releaseTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
+
+// upgradeArgv runs update.sh from the release tag in a transient unit, so it
+// survives the dockify restart. Nothing is written to disk; output goes to the journal.
+func upgradeArgv(tag string) ([]string, error) {
+	if !releaseTag.MatchString(tag) {
+		return nil, fmt.Errorf("no latest release tag known (got %q); check for updates first", tag)
+	}
+	url := "https://raw.githubusercontent.com/coderbuzz/dockify/" + tag + "/scripts/update.sh"
+	return []string{"systemd-run", "--no-block", "--unit=dockify-upgrade", "--collect",
+		"--setenv=DOCKIFY_FORCE=y", "--setenv=DOCKIFY_VERSION=" + tag,
+		"/bin/bash", "-c", "set -o pipefail; sleep 3; curl -fsSL " + url + " | bash"}, nil
 }
 
 func (s *Service) ensureWebhookSecret() {

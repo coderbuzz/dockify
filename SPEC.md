@@ -89,7 +89,7 @@ scripts/
 Dockerfile                       # Multi-stage Docker build
 docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 .air.toml                        # Air live-reload config
-.github/workflows/build.yml      # CI: vet, test, smoke test, build binary + Docker, release on v* tag
+.github/workflows/build.yml      # CI on PRs, main and v* tags: vet, gofmt -l, test -race, govulncheck, smoke test; v* tag also builds binary + .sha256 + Docker, releases
 ```
 
 ## Environment Variables
@@ -102,7 +102,8 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOCKIFY_SSH_KEY_DIR` | `$DATA_DIR/keys` | No | Per-server SSH private key files |
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
-| `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. Not set = no authentication |
+| `DOCKIFY_ADMIN_PASSWORD` | — | Unless loopback | Web UI password. Not set = no authentication, and `serve` exits unless `DOCKIFY_HOST` is loopback or `DOCKIFY_ALLOW_NO_AUTH=true` |
+| `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | Allow a passwordless UI on a non-loopback bind |
 | `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
 | `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`) |
@@ -353,7 +354,7 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | GET | `/api/settings/webhook-secret` | Get webhook secret |
 | POST | `/api/settings/webhook-secret/roll` | Regenerate webhook secret (it cannot be disabled) |
 | GET | `/api/settings/update/check` | Check latest GitHub Release version (`?force=1` skips the 5-minute cache) |
-| POST | `/api/settings/update/run` | Trigger self-update via systemd-run |
+| POST | `/api/settings/update/run` | Trigger self-update: `systemd-run --unit=dockify-upgrade /bin/bash -c` fetching `scripts/update.sh` from the latest release tag (no temp file; refused when no tag is known); `update.sh` verifies the binary against the release's `.sha256` |
 | POST | `/api/backup/export` | Download YAML export |
 | POST | `/api/backup/import` | Upload YAML import (multipart: `file` + `mode`), ≤ 16 MiB |
 
@@ -397,10 +398,11 @@ When a server is initialized (`POST /api/servers/:id/init`):
 2. Install Docker via `get.docker.com` (if not present)
 3. Install Docker Compose plugin (if not present)
 4. Create `dockify` Docker network
-5. Deploy Caddy container (ports 80/443 + Admin API on localhost:2019)
-6. Collect CPU cores (`nproc`), RAM total (`/proc/meminfo`), disk total (`df -BG`)
-7. Collect CPU usage (`/proc/stat`), RAM usage (`/proc/meminfo`), disk usage (`df -BG`)
-8. Status → online
+5. Check an existing `caddy` container (`docker inspect caddy --format '{{json .Mounts}} {{json .Config.Labels}}'`): it is Dockify-managed when a mount source is `/opt/dockify/caddy` (current layout) or `/opt/dockify/caddy/config.json` (old layout), or it has the label `dockify.managed=true`. Any other `caddy` container (running or stopped) → status `error`, init stops: remove or rename it first
+6. Deploy Caddy container `caddy:2` with `--label dockify.managed=true` (ports 80/443 + Admin API on localhost:2019); a running managed container is migrated to `/opt/dockify/caddy:/etc/caddy` when its admin API answers
+7. Collect CPU cores (`nproc`), RAM total (`/proc/meminfo`), disk total (`df -BG`)
+8. Collect CPU usage (`/proc/stat`), RAM usage (`/proc/meminfo`), disk usage (`df -BG`)
+9. Status → online
 
 Init is idempotent — re-running skips components that already exist (Caddy container, Docker, network).
 

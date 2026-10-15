@@ -30,14 +30,14 @@ go vet ./...             # lint
 go mod tidy              # clean dependencies
 
 # Run once (no auto-reload)
-DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
+DOCKIFY_HOST=127.0.0.1 DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
 
 # Verify templates parse
 go test ./internal/http/... -run TestTemplates
 
 # Build and run with Docker
 docker build -t dockify .
-docker run -p 8080:8080 -v $(pwd)/data:/var/lib/dockify dockify
+docker run -p 127.0.0.1:8080:8080 -e DOCKIFY_ALLOW_NO_AUTH=true -v $(pwd)/data:/var/lib/dockify dockify
 ```
 
 ### Dev Mode

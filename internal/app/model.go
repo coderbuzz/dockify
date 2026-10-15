@@ -7,27 +7,27 @@ import (
 )
 
 type App struct {
-	ID                int64     `json:"id"`
-	Name              string    `json:"name"`
-	ServerID          int64     `json:"server_id"`
-	Domain            string    `json:"domain"`
-	Port              int       `json:"port"`
-	Compose           string    `json:"compose"`
-	GitRepo           string    `json:"git_repo"`
-	GitBranch         string    `json:"git_branch"`
-	AuthUser          string    `json:"auth_user"`
-	AuthPass          string    `json:"auth_pass"`
-	Status            string    `json:"status"`
-	ComposeMode       string    `json:"compose_mode"`
-	MemoryLimit       string    `json:"memory_limit"`
-	CPULimit          string    `json:"cpu_limit"`
-	LogMaxSize        string    `json:"log_max_size"`
-	LogMaxFile        string    `json:"log_max_file"`
-	Command           string    `json:"command"`
-	Ports             string    `json:"ports"`
-	UlimitsNofile     string    `json:"ulimits_nofile"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	ServerID      int64     `json:"server_id"`
+	Domain        string    `json:"domain"`
+	Port          int       `json:"port"`
+	Compose       string    `json:"compose"`
+	GitRepo       string    `json:"git_repo"`
+	GitBranch     string    `json:"git_branch"`
+	AuthUser      string    `json:"auth_user"`
+	AuthPass      string    `json:"auth_pass"`
+	Status        string    `json:"status"`
+	ComposeMode   string    `json:"compose_mode"`
+	MemoryLimit   string    `json:"memory_limit"`
+	CPULimit      string    `json:"cpu_limit"`
+	LogMaxSize    string    `json:"log_max_size"`
+	LogMaxFile    string    `json:"log_max_file"`
+	Command       string    `json:"command"`
+	Ports         string    `json:"ports"`
+	UlimitsNofile string    `json:"ulimits_nofile"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type Deployment struct {
@@ -42,19 +42,19 @@ type Deployment struct {
 }
 
 type ContainerStats struct {
-	ID             int64     `json:"id"`
-	AppID          int64     `json:"app_id"`
-	ServerID       int64     `json:"server_id"`
-	ContainerName  string    `json:"container_name"`
-	CPUPercent     float64   `json:"cpu_percent"`
-	MemUsageBytes  int64     `json:"mem_usage_bytes"`
-	MemLimitBytes  int64     `json:"mem_limit_bytes"`
-	MemPercent     float64   `json:"mem_percent"`
-	NetIORxBytes   int64     `json:"net_io_rx_bytes"`
-	NetIOTxBytes   int64     `json:"net_io_tx_bytes"`
-	BlockIORead    int64     `json:"block_io_read"`
-	BlockIOWrite   int64     `json:"block_io_write"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	AppID         int64     `json:"app_id"`
+	ServerID      int64     `json:"server_id"`
+	ContainerName string    `json:"container_name"`
+	CPUPercent    float64   `json:"cpu_percent"`
+	MemUsageBytes int64     `json:"mem_usage_bytes"`
+	MemLimitBytes int64     `json:"mem_limit_bytes"`
+	MemPercent    float64   `json:"mem_percent"`
+	NetIORxBytes  int64     `json:"net_io_rx_bytes"`
+	NetIOTxBytes  int64     `json:"net_io_tx_bytes"`
+	BlockIORead   int64     `json:"block_io_read"`
+	BlockIOWrite  int64     `json:"block_io_write"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type RouteStats struct {

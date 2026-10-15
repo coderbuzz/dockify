@@ -13,7 +13,7 @@ cmd = "go build -o ./tmp/dockify ./cmd/dockify"
   exclude_dir = ["assets", "tmp", "vendor", "data", "scripts"]
   exclude_regex = ["_test\\.go"]
   exclude_unchanged = true
-  full_bin = "DOCKIFY_DATA_DIR=./data ./tmp/dockify serve"
+  full_bin = "DOCKIFY_HOST=${DOCKIFY_HOST:-127.0.0.1} DOCKIFY_DATA_DIR=./data ./tmp/dockify serve"
   include_dir = ["cmd", "internal"]
   include_ext = ["go", "html"]
   kill_delay = "500ms"

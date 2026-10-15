@@ -8,12 +8,10 @@ services:
     env_file: .env
     volumes:
       - dockify_data:/var/lib/dockify
-      - ${HOME}/.ssh:/home/dockify/.ssh:ro
     environment:
       DOCKIFY_HOST: 0.0.0.0
       DOCKIFY_PORT: 8080
       DOCKIFY_DATA_DIR: /var/lib/dockify
-      DOCKIFY_SSH_KEY_DIR: /home/dockify/.ssh
     networks:
       - dockify
 

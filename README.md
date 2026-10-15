@@ -75,13 +75,17 @@ curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/inst
 cd /opt/dockify && docker compose up -d
 ```
 
+The image binds `DOCKIFY_HOST=0.0.0.0`, so the container needs `DOCKIFY_ADMIN_PASSWORD` in `/opt/dockify/.env` (the installer asks for it) or it exits at start; `DOCKIFY_ALLOW_NO_AUTH=true` overrides this.
+
+Worker SSH keys live in the `dockify_data` volume (`/var/lib/dockify/keys`); the host's `~/.ssh` is not mounted. Dockify generates each worker's key when you add the server and shows the public key on the server page (Step 2). Older compose files mounted `${HOME}/.ssh` read-only, which made adding a server fail with `read-only file system`: re-download `docker-compose.yml` and run `docker compose up -d`.
+
 **Option D: Build from source (development)**
 
 ```bash
 git clone https://github.com/coderbuzz/dockify.git
 cd dockify
 go build -o dockify ./cmd/dockify
-./dockify serve
+DOCKIFY_HOST=127.0.0.1 ./dockify serve   # or set DOCKIFY_ADMIN_PASSWORD
 ```
 
 **All installation methods share the same architecture for worker VMs:**
@@ -106,7 +110,8 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOCKIFY_SSH_KEY_DIR` | `/var/lib/dockify/keys` | No | Per-server SSH private key storage |
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
-| `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. If not set, the web UI has **no authentication** |
+| `DOCKIFY_ADMIN_PASSWORD` | — | Yes, unless bound to loopback | Web UI password. Without it Dockify refuses to start on a non-loopback `DOCKIFY_HOST` |
+| `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | `true` lets Dockify start without a password on a non-loopback bind (web UI open to anyone who can reach it) |
 | `DOCKIFY_API_TOKEN` | — | No | Bearer token for scripts/agents calling `/api/*` (needs `DOCKIFY_ADMIN_PASSWORD` set) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
@@ -127,7 +132,7 @@ DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
 ```
 
 - **Default username:** `admin` (configurable via `DOCKIFY_ADMIN_USER`)
-- **No password set:** Web UI has **no authentication** (open to anyone)
+- **No password set:** Dockify refuses to start unless it binds to loopback (`DOCKIFY_HOST=127.0.0.1`, `::1` or `localhost`) or `DOCKIFY_ALLOW_NO_AUTH=true` is set; in both cases the web UI has **no authentication**
 - **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
 - **Session:** Cookie-based (`HttpOnly`, `SameSite=Lax`, `Secure` behind HTTPS), expires after 24 hours
 - **Cross-site requests:** a form or script on another site cannot change anything (`403`). Behind a reverse proxy, forward the original `Host` header (Caddy does this by default)
@@ -178,7 +183,7 @@ The `public_key` is also returned by `POST /api/servers` (send no `ssh_key`) and
 2. Install Docker via `get.docker.com` (if not present)
 3. Install Docker Compose plugin (if not present)
 4. Create `dockify` Docker network
-5. Deploy Caddy container (port 80/443 + Admin API on localhost:2019)
+5. Deploy Caddy container `caddy:2` (port 80/443 + Admin API on localhost:2019). A `caddy` container Dockify did not create (no `/opt/dockify/caddy` mount, no `dockify.managed=true` label) is left alone and init fails until it is removed or renamed
 6. Collect CPU, RAM, Disk info
 7. Status → **online**. Ready to deploy apps.
 
@@ -497,7 +502,7 @@ The **Settings** page (`/settings`) provides centralized management:
 |---|---|
 | **Webhook Secret** | View, copy, or roll (regenerate) the global webhook secret |
 | **Update Check** | Checks GitHub Releases for a newer version |
-| **Run Update** | Triggers a self-update via `systemd-run` — downloads and runs the latest `update.sh` |
+| **Run Update** | Triggers a self-update via `systemd-run` — runs `update.sh` from the latest release tag found by the update check (refused when none is known); output in `journalctl -u dockify-upgrade` |
 
 The **About** page (`/about`) shows the current version, project description, and a **Sponsor** link. An update progress bar with live polling keeps you informed during self-updates.
 
@@ -534,6 +539,8 @@ A universal update script detects your install mode and updates accordingly:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
 ```
+
+Binary installs are checked against the release's `dockify-linux-amd64.sha256` before the binary is replaced; the update aborts if the file is missing (releases published before checksums have none) or does not match. `DOCKIFY_VERSION=vX.Y.Z` pins the release.
 
 Or manually per mode:
 

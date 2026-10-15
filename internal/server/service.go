@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -242,11 +243,18 @@ func (s *Service) InitWorker(id int64) error {
 		log.Printf("Warning: failed to create dockify network: %v", err)
 	}
 
+	// Never touch a caddy container (running or stopped) that Dockify did not create.
+	inspect, err := client.Exec(`docker inspect caddy --format '{{json .Mounts}} {{json .Config.Labels}}' 2>/dev/null`)
+	if err == nil && strings.TrimSpace(inspect) != "" && !caddyManaged(inspect) {
+		s.repo.UpdateStatus(id, StatusError)
+		return fmt.Errorf("a caddy container not created by Dockify exists on %s (running or stopped); remove or rename it first", server.Name)
+	}
+
 	caddyRunning, _ := client.Exec("docker ps -q --filter name=^/caddy$")
 	baseConfig := `{"apps":{"http":{"servers":{"srv0":{"listen":[":80",":443"],"metrics":{}}}}}}`
 	if strings.TrimSpace(caddyRunning) == "" {
 		log.Printf("Deploying Caddy on %s...", server.Name)
-		caddyRun := fmt.Sprintf(`docker pull caddy:latest 2>/dev/null
+		caddyRun := fmt.Sprintf(`docker pull caddy:2 2>/dev/null
 if [ -d /opt/dockify/caddy/config.json ]; then
   sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
 fi
@@ -263,8 +271,9 @@ docker run -d \
   -p 127.0.0.1:2019:2019 \
   -v caddy_data:/data \
   -v /opt/dockify/caddy:/etc/caddy \
+  --label dockify.managed=true \
   --restart unless-stopped \
-  caddy:latest caddy run --config /etc/caddy/config.json
+  caddy:2 caddy run --config /etc/caddy/config.json
 sleep 2
 if docker ps -q --filter name=^/caddy$ --filter status=running | grep -q .; then
   if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config/metrics -H 'Content-Type: application/json' -d '{}' 2>/dev/null; then
@@ -288,7 +297,7 @@ fi`, baseConfig)
 		}
 	} else {
 		log.Printf("Caddy already running on %s, checking config...", server.Name)
-		migrateCmd := `docker pull caddy:latest 2>/dev/null
+		migrateCmd := `docker pull caddy:2 2>/dev/null
 if [ -d /opt/dockify/caddy/config.json ]; then
   sudo rm -rf /opt/dockify/caddy/config.json 2>/dev/null || rm -rf /opt/dockify/caddy/config.json 2>/dev/null
 fi
@@ -307,8 +316,9 @@ if docker exec caddy curl -sf -o /dev/null -X PATCH http://localhost:2019/config
     -p 127.0.0.1:2019:2019 \
     -v caddy_data:/data \
     -v /opt/dockify/caddy:/etc/caddy \
+    --label dockify.managed=true \
     --restart unless-stopped \
-    caddy:latest caddy run --config /etc/caddy/config.json
+    caddy:2 caddy run --config /etc/caddy/config.json
   echo "METRICS_ENABLED"
 else
   echo "METRICS_UNAVAILABLE"
@@ -329,6 +339,28 @@ fi`
 
 	go s.RefreshResources(id)
 	return nil
+}
+
+// caddyManaged reports whether `docker inspect caddy --format '{{json .Mounts}}
+// {{json .Config.Labels}}'` describes a container Dockify created: one mounting
+// /opt/dockify/caddy (current layout) or /opt/dockify/caddy/config.json (old
+// layout), or one labelled dockify.managed=true.
+func caddyManaged(inspect string) bool {
+	dec := json.NewDecoder(strings.NewReader(inspect))
+	var mounts []struct{ Source string }
+	var labels map[string]string
+	if dec.Decode(&mounts) != nil || dec.Decode(&labels) != nil {
+		return false
+	}
+	if labels["dockify.managed"] == "true" {
+		return true
+	}
+	for _, m := range mounts {
+		if m.Source == "/opt/dockify/caddy" || m.Source == "/opt/dockify/caddy/config.json" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) RefreshResources(id int64) error {

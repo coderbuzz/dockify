@@ -32,11 +32,14 @@ fi
 echo "Detected mode: $MODE"
 echo ""
 
-# Fetch latest version from GitHub
-echo "Fetching latest version..."
-VERSION=$(curl -fsSL "https://api.github.com/repos/coderbuzz/dockify/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+# DOCKIFY_VERSION pins the release (set by the in-app updater); otherwise ask GitHub
+VERSION="${DOCKIFY_VERSION:-}"
+if [ -z "$VERSION" ]; then
+  echo "Fetching latest version..."
+  VERSION=$(curl -fsSL "https://api.github.com/repos/coderbuzz/dockify/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+fi
 if [ -z "$VERSION" ]; then echo "Error: could not fetch latest version"; exit 1; fi
-echo "Latest: $VERSION"
+echo "Version: $VERSION"
 echo ""
 
 if [ "$MODE" = "docker" ]; then
@@ -52,11 +55,21 @@ fi
 # Use a temp dir so stale files never block a future run
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
-BINARY="$TMP_DIR/dockify"
+BINARY="$TMP_DIR/dockify-linux-amd64"
+URL="https://github.com/coderbuzz/dockify/releases/download/${VERSION}/dockify-linux-amd64"
 
 echo "Downloading Dockify $VERSION..."
-curl -fsSL -o "$BINARY" \
-  "https://github.com/coderbuzz/dockify/releases/download/${VERSION}/dockify-linux-amd64"
+curl -fsSL -o "$BINARY" "$URL"
+
+echo "Verifying checksum..."
+if ! curl -fsSL -o "$BINARY.sha256" "$URL.sha256"; then
+  echo -e "${RED}Error: $VERSION has no dockify-linux-amd64.sha256 (releases before checksums were published have none). Keeping current version.${NC}"
+  exit 1
+fi
+if ! (cd "$TMP_DIR" && sha256sum -c dockify-linux-amd64.sha256); then
+  echo -e "${RED}Error: checksum mismatch for $VERSION. Keeping current version.${NC}"
+  exit 1
+fi
 chmod +x "$BINARY"
 
 echo ""

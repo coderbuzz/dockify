@@ -40,6 +40,9 @@ func main() {
 	}
 
 	cfg := config.Load()
+	if err := cfg.CheckAuth(); err != nil {
+		log.Fatal(err)
+	}
 
 	database, err := db.Open(cfg.DBPath())
 	if err != nil {
