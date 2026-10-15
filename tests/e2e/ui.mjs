@@ -144,6 +144,18 @@ for (const pal of ['navy', 'teal']) {
   await ctx.close();
 }
 
+// ---------- partial requests must not inherit the boost hx-select (logs tail, stats range) ----------
+{
+  const [ctx, p] = await newCtx();
+  await p.goto(BASE + '/' + appRun.href); await p.waitForTimeout(800);
+  await p.click('button:has-text("Tail 50")'); await p.waitForTimeout(800);
+  const log = await p.evaluate(() => (document.getElementById('log-output') || {}).textContent || '');
+  if (!log.trim()) fail('logs tail: empty output after Tail 50 (hx-select inherited?)');
+  await p.click('button:has-text("1h")'); await p.waitForTimeout(800);
+  if (!(await p.evaluate(() => !!document.getElementById('app-stats-body')))) fail('stats range: #app-stats-body vanished after 1h');
+  await ctx.close();
+}
+
 // ---------- transfer size (cold) ----------
 const transfer = {};
 const [lc] = await newCtx();
