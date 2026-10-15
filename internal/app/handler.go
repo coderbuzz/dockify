@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -22,6 +21,15 @@ type Handler struct {
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service, run: func(f func()) { go f() }}
+}
+
+// refuseBusy answers 409 when another lifecycle operation runs for the app.
+func (h *Handler) refuseBusy(w http.ResponseWriter, id int64) bool {
+	if !h.service.Busy(id) {
+		return false
+	}
+	jsonResponse(w, http.StatusConflict, map[string]string{"error": "operation in progress"})
+	return true
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -214,8 +222,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusNotFound, map[string]string{"error": "app not found"})
 		return
 	}
-	if h.service.MoveInProgress(id) {
-		jsonResponse(w, http.StatusConflict, map[string]string{"error": "this app is being moved to another server; try again when the move has finished"})
+	if h.refuseBusy(w, id) {
 		return
 	}
 
@@ -265,10 +272,6 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	action := "none"
 	switch {
 	case moving && input.MoveFiles:
-		if !h.service.BeginMove(id) {
-			jsonResponse(w, http.StatusConflict, map[string]string{"error": "a move of this app is already in progress; other changes were saved"})
-			return
-		}
 		action = "move"
 		h.run(func() { h.service.MoveApp(id, oldServerID, newServerID, input.PurgeOld) })
 	case moving:
@@ -280,14 +283,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		for _, rt := range routes {
 			h.service.SaveRoute(&Route{AppID: id, ServerID: newServerID, Domain: rt.Domain})
 		}
-		h.run(func() {
-			h.service.Redeploy(id)
-			if a, _ := h.service.Get(id); a == nil || a.Status != StatusRunning {
-				log.Printf("Patch %q: deploy on server %d failed, leaving server %d untouched", app.Name, newServerID, oldServerID)
-				return
-			}
-			h.service.CleanupFromServer(id, oldServerID, input.PurgeOld)
-		})
+		h.run(func() { h.service.MoveWithoutFiles(id, oldServerID, input.PurgeOld) })
 	case changed && !isDraft:
 		action = "redeploy"
 		h.run(func() { h.service.Redeploy(id) })
@@ -304,6 +300,9 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, id) {
+		return
+	}
 
 	go h.service.Undeploy(id)
 
@@ -312,14 +311,20 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, id) {
+		return
+	}
 
-	go h.service.Redeploy(id)
+	h.run(func() { h.service.Redeploy(id) })
 
 	jsonResponse(w, http.StatusAccepted, map[string]string{"message": "redeploy started"})
 }
 
 func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, id) {
+		return
+	}
 
 	if err := h.service.Rollback(id); err != nil {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -337,6 +342,9 @@ func (h *Handler) Stop(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "cannot stop a draft — deploy it first"})
 		return
 	}
+	if h.refuseBusy(w, id) {
+		return
+	}
 
 	if err := h.service.Stop(id); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -352,6 +360,9 @@ func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	app, _ := h.service.Get(id)
 	if app != nil && app.Status == StatusDraft {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "cannot start a draft — deploy it first"})
+		return
+	}
+	if h.refuseBusy(w, id) {
 		return
 	}
 
@@ -963,9 +974,9 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		render(w, r, http.StatusBadRequest, "apps_add.html", editCtx(servers, "name and compose are required"))
 		return
 	}
-	if h.service.MoveInProgress(id) {
+	if h.service.Busy(id) {
 		servers, _ := h.serverRepo.List()
-		render(w, r, http.StatusConflict, "apps_add.html", editCtx(servers, "this app is being moved to another server; try again when the move has finished"))
+		render(w, r, http.StatusConflict, "apps_add.html", editCtx(servers, busyMsg))
 		return
 	}
 
@@ -1000,17 +1011,12 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	var flashMsg string
-	startMove := false
 	if moving && moveFiles {
-		if startMove = h.service.BeginMove(id); startMove {
-			msg := fmt.Sprintf("Moving to %s in the background: %s is stopped while files are copied; if the copy fails the app is restarted there. See the deployment history for the result.", newServerName, oldServerName)
-			if vols := dockerVolumes(app.Compose); len(vols) > 0 {
-				msg += fmt.Sprintf(" Warning: Docker volumes (%s) are not copied.", strings.Join(vols, ", "))
-			}
-			flashMsg = url.QueryEscape(msg)
-		} else {
-			flashMsg = url.QueryEscape("A move of this app is already in progress; other changes were saved.")
+		msg := fmt.Sprintf("Moving to %s in the background: %s is stopped while files are copied; if the copy fails the app is restarted there. See the deployment history for the result.", newServerName, oldServerName)
+		if vols := dockerVolumes(app.Compose); len(vols) > 0 {
+			msg += fmt.Sprintf(" Warning: Docker volumes (%s) are not copied.", strings.Join(vols, ", "))
 		}
+		flashMsg = url.QueryEscape(msg)
 	} else if moving {
 		h.service.DeleteRoutes(app.ID)
 		msg := fmt.Sprintf("App moved from %s to %s.", oldServerName, newServerName)
@@ -1070,19 +1076,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	}
 
 	switch {
-	case startMove:
+	case moving && moveFiles:
 		go h.service.MoveApp(id, oldServerID, serverID, purgeOld)
-	case moving && !moveFiles:
-		// The old server is only touched after the new one is up.
-		go func() {
-			h.service.Redeploy(id, removedDomains...)
-			if a, _ := h.service.Get(id); a == nil || a.Status != StatusRunning {
-				log.Printf("EditApp %q: deploy on %s failed, leaving %s untouched", app.Name, newServerName, oldServerName)
-				return
-			}
-			h.service.CleanupFromServer(id, oldServerID, purgeOld)
-		}()
-	case !isDraft && !moving:
+	case moving:
+		go h.service.MoveWithoutFiles(id, oldServerID, purgeOld, removedDomains...)
+	case !isDraft:
 		go h.service.Redeploy(id, removedDomains...)
 	}
 
@@ -1155,8 +1153,23 @@ func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, rende
 	})
 }
 
+const busyMsg = "Another operation on this app is still running; try again when it has finished."
+
+// refuseBusy sends the browser back to the app page with a flash when another
+// lifecycle operation runs for the app.
+func (h *WebHandler) refuseBusy(w http.ResponseWriter, r *http.Request, id int64) bool {
+	if !h.service.Busy(id) {
+		return false
+	}
+	http.Redirect(w, r, fmt.Sprintf("/apps/%d?flash=%s", id, url.QueryEscape(busyMsg)), http.StatusSeeOther)
+	return true
+}
+
 func (h *WebHandler) AppDeleteWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	go h.service.Undeploy(id)
 
@@ -1173,6 +1186,9 @@ func (h *WebHandler) AppClearDeploymentsWeb(w http.ResponseWriter, r *http.Reque
 
 func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	go h.service.Redeploy(id)
 
@@ -1192,6 +1208,9 @@ func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render
 		http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
 		return
 	}
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	h.service.UpdateStatus(id, StatusDeploying)
 	go h.service.Redeploy(id)
@@ -1201,6 +1220,9 @@ func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render
 
 func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	if err := h.service.Rollback(id); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1212,6 +1234,9 @@ func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, rend
 
 func (h *WebHandler) AppStopWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	if err := h.service.Stop(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1223,6 +1248,9 @@ func (h *WebHandler) AppStopWeb(w http.ResponseWriter, r *http.Request, render R
 
 func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if h.refuseBusy(w, r, id) {
+		return
+	}
 
 	if err := h.service.Start(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1241,7 +1269,7 @@ func (h *WebHandler) AppRedeployAll(w http.ResponseWriter, r *http.Request, rend
 
 	count := 0
 	for _, a := range apps {
-		if a.Status == StatusRunning {
+		if a.Status == StatusRunning && !h.service.Busy(a.ID) {
 			go h.service.Redeploy(a.ID)
 			count++
 		}
@@ -1332,10 +1360,10 @@ func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 		"mem_limit_bytes":  overview.MemLimitBytes,
 		"net_io_rx_bytes":  overview.NetIORxBytes,
 		"net_io_tx_bytes":  overview.NetIOTxBytes,
-		"block_io_read":  overview.BlockIORead,
-		"block_io_write": overview.BlockIOWrite,
+		"block_io_read":    overview.BlockIORead,
+		"block_io_write":   overview.BlockIOWrite,
 		"disk_usage_bytes": overview.DiskUsageBytes,
-		"container_name": overview.ContainerName,
+		"container_name":   overview.ContainerName,
 	})
 }
 

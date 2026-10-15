@@ -24,6 +24,8 @@ func NewMockClient() *MockClient {
 			{"docker compose version", "Docker Compose version v2.24.0"},
 			{"docker compose", "app\n"},
 			{"docker inspect caddy", `["caddy","run","--config","/etc/caddy/config.json"]`},
+			{"localhost:2019/config/apps/http/servers/srv0/routes", "200"}, // add route (with -w http_code)
+			{"localhost:2019/id/", "200"},                                  // remove/verify route
 			{"docker", "Docker version 28.0.4, build b8034c0"},
 			{"uptime", "10:00:00 up 30 days,  0 users,  load average: 0.08, 0.03, 0.01"},
 			{"nproc", "4"},

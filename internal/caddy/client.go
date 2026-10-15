@@ -24,8 +24,27 @@ type match struct {
 type handle struct {
 	Handler   string     `json:"handler"`
 	Upstreams []upstream `json:"upstreams,omitempty"`
-	Username  string     `json:"username,omitempty"`
-	Hash      string     `json:"hash,omitempty"`
+	Providers *providers `json:"providers,omitempty"`
+}
+
+// providers configures Caddy's http.handlers.authentication module.
+type providers struct {
+	HTTPBasic httpBasic `json:"http_basic"`
+}
+
+type httpBasic struct {
+	Hash      hashConfig `json:"hash"`
+	HashCache struct{}   `json:"hash_cache"` // without it every request re-runs bcrypt cost 14 (~1 s CPU)
+	Accounts  []account  `json:"accounts"`
+}
+
+type hashConfig struct {
+	Algorithm string `json:"algorithm"`
+}
+
+type account struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type upstream struct {
@@ -53,27 +72,35 @@ func (c *Client) AddRoute(domain, target string) error {
 }
 
 func (c *Client) AddRouteWithAuth(domain, target, user, pass string) error {
+	route, err := authRoute(domain, target, user, pass)
+	if err != nil {
+		return err
+	}
+	return c.postRoute(route)
+}
+
+func authRoute(domain, target, user, pass string) (Route, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(pass), 14)
 	if err != nil {
-		return fmt.Errorf("bcrypt hash: %w", err)
+		return Route{}, fmt.Errorf("bcrypt hash: %w", err)
 	}
-
-	route := Route{
+	return Route{
 		ID:    sanitizeID(domain),
 		Match: []match{{Host: []string{domain}}},
 		Handle: []handle{
 			{
-				Handler:  "basic_auth",
-				Username: user,
-				Hash:     string(hash),
+				Handler: "authentication",
+				Providers: &providers{HTTPBasic: httpBasic{
+					Hash:     hashConfig{Algorithm: "bcrypt"},
+					Accounts: []account{{Username: user, Password: string(hash)}},
+				}},
 			},
 			{
 				Handler:   "reverse_proxy",
 				Upstreams: []upstream{{Dial: target}},
 			},
 		},
-	}
-	return c.postRoute(route)
+	}, nil
 }
 
 func (c *Client) postRoute(route Route) error {

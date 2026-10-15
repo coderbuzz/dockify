@@ -97,6 +97,9 @@ func (c *recConn) Exec(cmd string) (string, error) {
 			return "ssh-ed25519 AAAAhost root@prod\n", nil
 		}
 	}
+	if c.f.failRoute && strings.Contains(cmd, "srv0/routes") && strings.Contains(cmd, `"@id"`) {
+		return "400\n{\"error\":\"loading module: unknown module\"}", nil
+	}
 	return c.MockClient.Exec(cmd)
 }
 
@@ -117,15 +120,16 @@ func (c *recConn) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error 
 }
 
 type moveFixture struct {
-	repo     *Repository
-	svc      *Service
-	app      *App
-	src, dst *server.Server
-	mu       sync.Mutex
-	cmds     []string
-	direct   bool // source can reach the target over SSH
-	failPipe bool // the copy stream fails
-	failDown bool // `compose down` fails on the source
+	repo      *Repository
+	svc       *Service
+	app       *App
+	src, dst  *server.Server
+	mu        sync.Mutex
+	cmds      []string
+	direct    bool // source can reach the target over SSH
+	failPipe  bool // the copy stream fails
+	failDown  bool // `compose down` fails on the source
+	failRoute bool // Caddy rejects the route POST
 }
 
 func newMoveFixture(t *testing.T) *moveFixture {
@@ -239,6 +243,27 @@ func TestMoveAppDirectSuccess(t *testing.T) {
 	}
 	if !f.ranOn(f.src, " down") || f.ranOn(f.src, "rm -rf /opt") {
 		t.Errorf("old server should be stopped, not purged; commands: %v", f.cmds)
+	}
+}
+
+func TestDeployCaddyRouteFailureMarksFailed(t *testing.T) {
+	f := newMoveFixture(t)
+	f.failRoute = true
+	f.svc.Deploy(f.app.ID)
+
+	got, _ := f.repo.Get(f.app.ID)
+	if got.Status != StatusFailed {
+		t.Errorf("status = %q, want failed", got.Status)
+	}
+	deps, _ := f.repo.ListDeployments(f.app.ID)
+	if len(deps) != 1 || deps[0].Status != StatusFailed || !strings.Contains(deps[0].Log, "caddy/mongo.example.com: caddy returned HTTP 400") {
+		t.Errorf("want one failed deployment with the caddy error, got %+v", deps)
+	}
+
+	f.failRoute = false
+	f.svc.Deploy(f.app.ID)
+	if got, _ := f.repo.Get(f.app.ID); got.Status != StatusRunning {
+		t.Errorf("status after a good deploy = %q, want running", got.Status)
 	}
 }
 

@@ -143,12 +143,46 @@ func TestPatchRejectsBadInputWithoutChanges(t *testing.T) {
 	}
 }
 
-func TestPatchRefusedDuringMove(t *testing.T) {
+// While a deploy (or move) holds the app's lock, every lifecycle request is
+// refused with 409 and nothing runs on the worker.
+func TestLifecycleRefusedWhileBusy(t *testing.T) {
 	f := newMoveFixture(t)
-	f.svc.BeginMove(f.app.ID)
-	code, _ := patchApp(t, f, f.app.ID, `{"compose": "services: {}"}`)
-	if code != http.StatusConflict {
-		t.Errorf("got %d, want 409", code)
+	h := NewHandler(f.svc)
+	h.run = func(fn func()) { fn() }
+	r := chi.NewRouter()
+	r.Post("/api/apps/{id}/redeploy", h.Redeploy)
+	r.Post("/api/apps/{id}/stop", h.Stop)
+	r.Post("/api/apps/{id}/start", h.Start)
+	r.Post("/api/apps/{id}/rollback", h.Rollback)
+	r.Delete("/api/apps/{id}", h.Delete)
+	do := func(method, path string) (int, string) {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(method, fmt.Sprintf("/api/apps/%d%s", f.app.ID, path), nil))
+		return rec.Code, rec.Body.String()
+	}
+
+	unlock := f.svc.lock(f.app.ID)
+	for _, c := range []struct{ method, path string }{
+		{http.MethodPost, "/redeploy"}, {http.MethodPost, "/stop"}, {http.MethodPost, "/start"},
+		{http.MethodPost, "/rollback"}, {http.MethodDelete, ""},
+	} {
+		if code, body := do(c.method, c.path); code != http.StatusConflict || !strings.Contains(body, "operation in progress") {
+			t.Errorf("%s %s: got %d %s, want 409", c.method, c.path, code, body)
+		}
+	}
+	if code, _ := patchApp(t, f, f.app.ID, `{"compose": "services: {}"}`); code != http.StatusConflict {
+		t.Errorf("patch: got %d, want 409", code)
+	}
+	if len(f.cmds) != 0 {
+		t.Errorf("commands ran while busy: %v", f.cmds)
+	}
+	unlock()
+
+	if code, body := do(http.MethodPost, "/redeploy"); code != http.StatusAccepted || !f.ranOn(f.src, "up -d") {
+		t.Errorf("redeploy after unlock: got %d %s; commands: %v", code, body, f.cmds)
+	}
+	if f.svc.Busy(f.app.ID) {
+		t.Error("lock still held after the redeploy finished")
 	}
 }
 

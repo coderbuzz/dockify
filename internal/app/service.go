@@ -35,7 +35,33 @@ type Service struct {
 	connFactory ssh.Factory
 	statsCache  map[int64]*StatsOverview
 	statsMu     sync.RWMutex
-	moving      sync.Map // app IDs with a server move in progress
+	appLocks    sync.Map // app ID -> *sync.Mutex held by a running lifecycle operation
+}
+
+// lock serializes lifecycle operations (deploy, undeploy, stop, start, move) of
+// one app; use as `defer s.lock(id)()`. Only public entry points take it: the
+// internal helpers they call must not, as the mutex is not re-entrant.
+func (s *Service) lock(id int64) (unlock func()) {
+	m := s.appMutex(id)
+	m.Lock()
+	return m.Unlock
+}
+
+func (s *Service) appMutex(id int64) *sync.Mutex {
+	m, _ := s.appLocks.LoadOrStore(id, new(sync.Mutex))
+	return m.(*sync.Mutex)
+}
+
+// Busy reports whether a lifecycle operation is running for the app. Handlers
+// use it to refuse a second request; the lock itself still serializes callers
+// that slip past the check.
+func (s *Service) Busy(id int64) bool {
+	m := s.appMutex(id)
+	if !m.TryLock() {
+		return true
+	}
+	m.Unlock()
+	return false
 }
 
 func (s *Service) SetConnFactory(f ssh.Factory) {
@@ -165,6 +191,7 @@ func (s *Service) DeleteRouteByDomain(appID int64, domain string) error {
 }
 
 func (s *Service) Deploy(id int64) {
+	defer s.lock(id)()
 	s.deployWithCommit(id, "")
 }
 
@@ -180,7 +207,10 @@ func (s *Service) DeployByGit(repo, branch, commitSHA string) {
 			continue
 		}
 		log.Printf("Webhook triggered deploy for %q (commit %s)", app.Name, commitSHA)
-		go s.deployWithCommit(app.ID, commitSHA)
+		go func(id int64) {
+			defer s.lock(id)()
+			s.deployWithCommit(id, commitSHA)
+		}(app.ID)
 	}
 }
 
@@ -294,13 +324,25 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		}
 	}
 
+	routeFailed := false
 	if app.Domain != "" {
 		routes, _ := s.repo.GetRoutes(app.ID)
 		for _, r := range routes {
-			s.setupRouteAndDNSForDomain(r, app, svr, client, composeContent, &logs)
+			if err := s.setupRouteAndDNSForDomain(r, app, svr, client, composeContent, &logs); err != nil {
+				routeFailed = true
+			}
 		}
 	} else {
 		log.Printf("App %q deployed as internal service (no domain, no Caddy route)", app.Name)
+	}
+
+	// Containers are up but unreachable without their route; DNS and SaveConfig
+	// problems stay warnings in the log.
+	if routeFailed {
+		s.repo.UpdateStatus(id, StatusFailed)
+		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
+		log.Printf("App %q deployed, but its Caddy route failed", app.Name)
+		return
 	}
 
 	s.repo.UpdateStatus(id, StatusRunning)
@@ -308,7 +350,14 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 	log.Printf("App %q deployed successfully", app.Name)
 }
 
-func (s *Service) Rollback(id int64) error {
+func (s *Service) Rollback(id int64) (err error) {
+	unlock := s.lock(id)
+	defer func() {
+		if err != nil {
+			unlock()
+		}
+	}()
+
 	last, err := s.repo.GetLastSuccessfulDeployment(id)
 	if err != nil || last == nil {
 		return fmt.Errorf("no successful deployment to rollback to")
@@ -329,7 +378,10 @@ func (s *Service) Rollback(id int64) error {
 	}
 
 	log.Printf("Rolling back %q to deployment #%d", app.Name, last.ID)
-	go s.deployWithCommit(id, "")
+	go func() {
+		defer unlock()
+		s.deployWithCommit(id, "")
+	}()
 	return nil
 }
 
@@ -360,6 +412,7 @@ func (s *Service) FetchLogs(id int64, tail int) (string, error) {
 }
 
 func (s *Service) Undeploy(id int64) error {
+	defer s.lock(id)()
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return fmt.Errorf("app not found")
@@ -625,24 +678,12 @@ func prepareDirectCopy(dir string, srcClient, dstClient ssh.Connector, dst *serv
 	return streamCmd, cleanup, nil
 }
 
-// BeginMove reserves appID for a server move; false if one is already running.
-// MoveApp releases it.
-func (s *Service) BeginMove(appID int64) bool {
-	_, busy := s.moving.LoadOrStore(appID, true)
-	return !busy
-}
-
-func (s *Service) MoveInProgress(appID int64) bool {
-	_, busy := s.moving.Load(appID)
-	return busy
-}
-
 // MoveApp copies the app folder to toServerID and only then switches the app
 // over: server_id, routes, deploy, and finally stop (or purge) on the old
 // server once the new deploy runs. It is slow and meant to run in the
 // background; the outcome lands in the deployment history.
 func (s *Service) MoveApp(appID, fromServerID, toServerID int64, purgeOld bool) {
-	defer s.moving.Delete(appID)
+	defer s.lock(appID)()
 
 	app, err := s.repo.Get(appID)
 	if err != nil || app == nil {
@@ -684,7 +725,7 @@ func (s *Service) MoveApp(appID, fromServerID, toServerID int64, purgeOld bool) 
 		s.repo.SaveRoute(&Route{AppID: appID, ServerID: toServerID, Domain: r.Domain})
 	}
 
-	s.Redeploy(appID)
+	s.deployWithCommit(appID, "")
 	if a, _ := s.repo.Get(appID); a == nil || a.Status != StatusRunning {
 		log.Printf("MoveApp %q: deploy on %s failed, leaving %s untouched", app.Name, toName, fromName)
 		return
@@ -707,6 +748,19 @@ func (s *Service) MoveApp(appID, fromServerID, toServerID int64, purgeOld bool) 
 		msg += "\nWarning: " + w
 	}
 	s.recordDeployment(appID, toServerID, "success", msg, "", app.Compose)
+}
+
+// MoveWithoutFiles deploys the app on the server it now points to, starting from
+// whatever that server's folder holds, and only then stops (or purges) it on
+// oldServerID; a failed deploy leaves the old server untouched.
+func (s *Service) MoveWithoutFiles(appID, oldServerID int64, purgeOld bool, removedDomains ...string) {
+	defer s.lock(appID)()
+	s.deployWithCommit(appID, "", removedDomains...)
+	if a, _ := s.repo.Get(appID); a == nil || a.Status != StatusRunning {
+		log.Printf("Move of app %d: deploy failed, leaving %s untouched", appID, s.serverName(oldServerID))
+		return
+	}
+	s.CleanupFromServer(appID, oldServerID, purgeOld)
 }
 
 func (s *Service) serverName(id int64) string {
@@ -789,7 +843,9 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 	}
 }
 
-func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {
+// setupRouteAndDNSForDomain returns the Caddy route error, if any; DNS for the
+// domain is then skipped. DNS failures are only logged.
+func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) error {
 	target := fmt.Sprintf("%s:%d", getServiceName(composeContent), app.Port)
 	caddyClient := caddy.NewClient(client)
 
@@ -806,12 +862,12 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 		if logs != nil {
 			*logs = append(*logs, fmt.Sprintf("caddy/%s: %v", route.Domain, caddyErr))
 		}
-	} else {
-		if err := caddyClient.SaveConfig(); err != nil {
-			log.Printf("Warning: failed to save caddy config: %v", err)
-			if logs != nil {
-				*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
-			}
+		return caddyErr
+	}
+	if err := caddyClient.SaveConfig(); err != nil {
+		log.Printf("Warning: failed to save caddy config: %v", err)
+		if logs != nil {
+			*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
 		}
 	}
 
@@ -824,7 +880,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 			if logs != nil {
 				*logs = append(*logs, fmt.Sprintf("dns/%s: lookup failed: %v", route.Domain, err))
 			}
-			return
+			return nil
 		}
 		var existing *cloudflare.DNSRecord
 		for _, r := range records {
@@ -941,9 +997,11 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 			}
 		}
 	}
+	return nil
 }
 
 func (s *Service) Redeploy(id int64, removedDomains ...string) {
+	defer s.lock(id)()
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return
@@ -953,6 +1011,7 @@ func (s *Service) Redeploy(id int64, removedDomains ...string) {
 }
 
 func (s *Service) Stop(id int64) error {
+	defer s.lock(id)()
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return fmt.Errorf("app not found")
@@ -983,6 +1042,7 @@ func (s *Service) Stop(id int64) error {
 }
 
 func (s *Service) Start(id int64) error {
+	defer s.lock(id)()
 	app, err := s.repo.Get(id)
 	if err != nil || app == nil {
 		return fmt.Errorf("app not found")
