@@ -257,7 +257,7 @@ func navSection(r *http.Request) string {
 		return "servers"
 	case strings.HasPrefix(p, "/apps"):
 		return "apps"
-	case strings.HasPrefix(p, "/settings"), strings.HasPrefix(p, "/about"):
+	case strings.HasPrefix(p, "/settings"), strings.HasPrefix(p, "/about"), strings.HasPrefix(p, "/export"), strings.HasPrefix(p, "/import"):
 		return "settings"
 	}
 	return "dashboard"

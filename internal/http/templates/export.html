@@ -5,7 +5,7 @@
 {{template "nav" .}}
 <div class="container">
   <div class="breadcrumb">
-    <a href=".">Dashboard</a>
+    <a href="settings">Settings</a>
     <span>/</span>
     <span>Export</span>
   </div>
@@ -21,7 +21,7 @@
         <div class="secret-row">
           <input type="text" name="passphrase" id="passphrase" value="{{.Passphrase}}" readonly required>
           <button type="button" class="btn btn-ghost btn-sm" onclick="regenerate()">Regenerate</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="copy-pass" onclick="copyPassphrase()">Copy</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="copy-pass" data-copy="#passphrase">Copy</button>
         </div>
       </div>
       {{template "ui_alert" (dict "Kind" "warn" "Icon" "alert" "Title" "Sensitive values are encrypted" "Sub" "Secrets, auth passwords, SSH keys and config files need the passphrase to import. Without it this backup cannot be restored.")}}
@@ -55,11 +55,7 @@ function regenerate() {
   document.getElementById('passphrase').value = generatePassphrase();
 }
 
-function copyPassphrase() {
-  var input = document.getElementById('passphrase');
-  input.select();
-  input.setSelectionRange(0, 99999);
-  navigator.clipboard.writeText(input.value).then(function() {
+(function() {
     var btn = document.getElementById('copy-pass');
     btn.textContent = 'Copied';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1500);

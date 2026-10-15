@@ -4,10 +4,9 @@
 <body>
 {{template "nav" .}}
 <div class="container">
-  <div class="card empty-state">
-    <span class="empty-icon">{{template "ui_icon" "alert"}}</span>
-    <h2>Something went wrong</h2>
-    <p>{{.Message}}</p>
+  {{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" "Something went wrong" "Sub" .Message)}}
+  <div class="form-actions">
+    <button type="button" class="btn btn-secondary" onclick="if (history.length > 1) history.back(); else location.href = '.'">Back</button>
     <a href="." class="btn btn-secondary">Go Home</a>
   </div>
 </div>

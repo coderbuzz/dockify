@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}<script src="static/htmx.min.js"></script><script src="static/charts.js?v={{.AssetVersion}}"></script>{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<head>{{template "head" .}}<script src="static/htmx.min.js?v={{.AssetVersion}}"></script><script src="static/charts.js?v={{.AssetVersion}}"></script><script src="static/console.js?v={{.AssetVersion}}"></script>{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
@@ -195,129 +195,6 @@
   </div>
 </div>
 
-<script>
-var appTerm = null;
-var appWs = null;
-
-function toggleAppConsole() {
-	var container = document.getElementById('app-console-container');
-	if (container.hidden) {
-		container.hidden = false;
-		loadXterm(connectAppConsole);
-	} else {
-		container.hidden = true;
-		disconnectAppConsole();
-	}
-}
-
-function connectAppConsole() {
-	var btn = document.getElementById('app-console-toggle');
-	var appId = btn.getAttribute('data-app-id');
-	if (!appId) return;
-	var base = document.querySelector('base').getAttribute('href') || '/';
-	var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-	var host = window.location.host;
-
-	appTerm = new Terminal({
-		fontFamily: '"Berkeley Mono", "IBM Plex Mono", ui-monospace, monospace',
-		fontSize: 13,
-		lineHeight: 1.35,
-		cursorBlink: true,
-		cursorStyle: 'block',
-		theme: {
-			background: '#0d0d0d',
-			foreground: '#cfcecd',
-			cursor: '#cfcecd',
-			selectionBackground: '#3a3a3a',
-			black: '#0d0d0d',
-			red: '#b33a3a',
-			green: '#3d8b4a',
-			yellow: '#b8942e',
-			blue: '#4a7bbb',
-			magenta: '#b84a7b',
-			cyan: '#4ab8b8',
-			white: '#cfcecd',
-			brightBlack: '#555',
-			brightRed: '#b33a3a',
-			brightGreen: '#3d8b4a',
-			brightYellow: '#b8942e',
-			brightBlue: '#4a7bbb',
-			brightMagenta: '#b84a7b',
-			brightCyan: '#4ab8b8',
-			brightWhite: '#cfcecd'
-		}
-	});
-
-	var fitAddon = new FitAddon.FitAddon();
-	appTerm.loadAddon(fitAddon);
-	appTerm.open(document.getElementById('app-terminal'));
-
-	setTimeout(function() { fitAddon.fit(); }, 50);
-
-	appWs = new WebSocket(proto + '//' + host + base + 'api/apps/' + appId + '/console');
-	appWs.binaryType = 'arraybuffer';
-
-	appWs.onopen = function() {
-		document.getElementById('app-console-status').textContent = 'Connected';
-		document.getElementById('app-console-status').className = 'badge badge-online';
-		appTerm.focus();
-		var enc = new TextEncoder();
-		var dims = fitAddon.proposeDimensions();
-		if (dims) {
-			appWs.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
-		}
-	};
-
-	appWs.onmessage = function(evt) {
-		var data = evt.data;
-		if (data instanceof ArrayBuffer) {
-			appTerm.write(new Uint8Array(data));
-		} else {
-			appTerm.write(data);
-		}
-	};
-	appWs.onclose = function() {
-		document.getElementById('app-console-status').textContent = 'Disconnected';
-		document.getElementById('app-console-status').className = 'badge badge-offline';
-		if (appTerm) {
-			appTerm.write('\r\n\x1b[31mSession ended.\x1b[0m\r\n');
-		}
-	};
-
-	appTerm.onData(function(data) {
-		if (appWs && appWs.readyState === WebSocket.OPEN) {
-			appWs.send(data);
-		}
-	});
-
-	window._appConsoleResizeHandler = function() {
-		if (!fitAddon || !appWs || appWs.readyState !== WebSocket.OPEN) return;
-		fitAddon.fit();
-		var dims = fitAddon.proposeDimensions();
-		if (dims) {
-			appWs.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
-		}
-	};
-	window.addEventListener('resize', window._appConsoleResizeHandler);
-}
-
-function disconnectAppConsole() {
-	if (window._appConsoleResizeHandler) {
-		window.removeEventListener('resize', window._appConsoleResizeHandler);
-		window._appConsoleResizeHandler = null;
-	}
-	if (appWs) {
-		appWs.close();
-		appWs = null;
-	}
-	if (appTerm) {
-		appTerm.dispose();
-		appTerm = null;
-	}
-	document.getElementById('app-console-status').textContent = 'Disconnected';
-	document.getElementById('app-console-status').className = 'badge badge-offline';
-}
-</script>
 {{template "ui_confirm" (dict "ID" "app-redeploy" "Title" (printf "Redeploy %s?" .App.Name) "Body" "This rebuilds the app and restarts its containers. It is briefly unavailable while it restarts." "Label" "Redeploy" "Action" (printf "apps/%d/redeploy" .App.ID))}}
 {{template "ui_confirm" (dict "ID" "app-rollback" "Title" (printf "Roll back %s?" .App.Name) "Body" "This restores the last successful deployment and replaces the running version." "Label" "Roll back" "Action" (printf "apps/%d/rollback" .App.ID))}}
 {{if eq .App.Status "draft"}}{{template "ui_confirm" (dict "ID" "app-undeploy" "Title" (printf "Delete draft %s?" .App.Name) "Body" "This permanently deletes the draft." "Label" "Delete draft" "Action" (printf "apps/%d/undeploy" .App.ID))}}

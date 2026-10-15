@@ -1,3 +1,13 @@
+var assetV = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
+// Toast for client-side messages (role=status, or role=alert for errors).
+function showToast(msg, isError) {
+  var t = document.createElement("div");
+  t.className = "toast";
+  t.setAttribute("role", isError ? "alert" : "status");
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function () { t.remove(); }, 4000);
+}
 // Sheets (<dialog class="sheet">): openSheet/closeSheet, backdrop click closes, Escape is native.
 function openSheet(id) {
   var d = document.getElementById(id);
@@ -39,18 +49,22 @@ document.addEventListener('click', function (e) {
   if (!b) return;
   var src = document.querySelector(b.getAttribute('data-copy'));
   if (!src) return;
-  var text = src.textContent.trim();
+  var isField = src.tagName === 'INPUT' || src.tagName === 'TEXTAREA';
+  var text = (isField ? src.value : src.textContent).trim();
   function done(ok) {
     var old = b.innerHTML;
     b.textContent = ok ? 'Copied' : 'Copy failed';
     setTimeout(function () { b.innerHTML = old; }, 1500);
   }
   function fallback() {
-    var r = document.createRange();
-    r.selectNodeContents(src);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
+    if (isField) src.select();
+    else {
+      var r = document.createRange();
+      r.selectNodeContents(src);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (err) {}
     done(ok);
@@ -67,7 +81,7 @@ function loadXterm(cb) {
     xtermLoading = new Promise(function (resolve, reject) {
       var l = document.createElement('link');
       l.rel = 'stylesheet';
-      l.href = 'static/xterm.min.css';
+      l.href = 'static/xterm.min.css?v=' + assetV;
       document.head.appendChild(l);
       function add(src, next) {
         var s = document.createElement('script');
@@ -76,7 +90,7 @@ function loadXterm(cb) {
         s.onerror = reject;
         document.head.appendChild(s);
       }
-      add('static/xterm.min.js', function () { add('static/xterm-addon-fit.min.js', resolve); });
+      add('static/xterm.min.js?v=' + assetV, function () { add('static/xterm-addon-fit.min.js?v=' + assetV, resolve); });
     });
   }
   xtermLoading.then(cb, function () { xtermLoading = null; });

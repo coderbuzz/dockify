@@ -1,7 +1,7 @@
 {{define "servers_list"}}
 {{if .Servers}}
 <div data-list>
-{{template "ui_listbar" (dict "Placeholder" "Search name or host" "Chips" (list "online" "offline" "pending"))}}
+{{template "ui_listbar" (dict "Placeholder" "Search name or host" "Chips" (list "online" "offline" "pending" "error"))}}
 <table class="rows">
   <thead>
     <tr>
@@ -21,11 +21,11 @@
         data-ram="{{if .RAMUsage}}{{printf "%.3f" .RAMUsage}}{{else}}0{{end}}"
         data-disk="{{if .DiskUsage}}{{printf "%.3f" .DiskUsage}}{{else}}0{{end}}">
       <td class="c-name"><a href="servers/{{.ID}}">{{.Name}}</a><small class="mono">{{.Host}}:{{.Port}}</small></td>
-      <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "online"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
+      <td class="c-status"><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
       <td class="col-sm-hide">{{.User}}</td>
-      <td class="c-num num" data-label="CPU"{{if .CPUCores}} title="{{.CPUCores}} cores"{{end}}>{{if .CPUUsage}}{{printf "%.1f" .CPUUsage}}%<progress class="bar{{if ge .CPUUsage 85.0}} bar-danger{{else if ge .CPUUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .CPUUsage}}" max="100"></progress>{{else}}-{{end}}</td>
-      <td class="c-num num" data-label="RAM"{{if .RAMMB}} title="{{.RAMMB}} MB"{{end}}>{{if .RAMUsage}}{{printf "%.1f" .RAMUsage}}%<progress class="bar{{if ge .RAMUsage 85.0}} bar-danger{{else if ge .RAMUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .RAMUsage}}" max="100"></progress>{{else}}-{{end}}</td>
-      <td class="c-num num" data-label="Disk"{{if .DiskGB}} title="{{.DiskGB}} GB"{{end}}>{{if .DiskUsage}}{{printf "%.1f" .DiskUsage}}%<progress class="bar{{if ge .DiskUsage 85.0}} bar-danger{{else if ge .DiskUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .DiskUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num num{{if .CPUUsage}} bar-cell{{if ge .CPUUsage 85.0}} bar-danger{{else if ge .CPUUsage 70.0}} bar-warn{{end}}{{end}}" data-label="CPU"{{if .CPUCores}} data-sub="{{.CPUCores}} cores"{{end}}{{if .CPUUsage}} style="--w:{{printf "%.1f" (clamp100 .CPUUsage)}}%"{{end}}>{{if .CPUUsage}}{{printf "%.1f" .CPUUsage}}%{{else}}-{{end}}</td>
+      <td class="c-num num{{if .RAMUsage}} bar-cell{{if ge .RAMUsage 85.0}} bar-danger{{else if ge .RAMUsage 70.0}} bar-warn{{end}}{{end}}" data-label="RAM"{{if .RAMMB}} data-sub="{{.RAMMB}} MB"{{end}}{{if .RAMUsage}} style="--w:{{printf "%.1f" (clamp100 .RAMUsage)}}%"{{end}}>{{if .RAMUsage}}{{printf "%.1f" .RAMUsage}}%{{else}}-{{end}}</td>
+      <td class="c-num num{{if .DiskUsage}} bar-cell{{if ge .DiskUsage 85.0}} bar-danger{{else if ge .DiskUsage 70.0}} bar-warn{{end}}{{end}}" data-label="Disk"{{if .DiskGB}} data-sub="{{.DiskGB}} GB"{{end}}{{if .DiskUsage}} style="--w:{{printf "%.1f" (clamp100 .DiskUsage)}}%"{{end}}>{{if .DiskUsage}}{{printf "%.1f" .DiskUsage}}%{{else}}-{{end}}</td>
     </tr>
     {{end}}
   </tbody>

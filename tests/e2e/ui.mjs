@@ -11,6 +11,7 @@ const OUT = process.argv[3] || process.env.OUT || '/tmp/claude-1000/dockify-ui';
 const RUNS = Number(process.env.UI_RUNS || 5);
 const PW = process.env.PW_PATH || join(homedir(), '.local/share/pw-tools/node_modules/playwright/index.mjs');
 const CSS = join(dirname(fileURLToPath(import.meta.url)), '../../internal/http/static/app.css');
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE)) { console.error('Refusing to run against ' + BASE + ': this script seeds and deletes data, use a local test server.'); process.exit(2); }
 const { chromium } = await import(PW);
 mkdirSync(OUT, { recursive: true });
 
@@ -34,6 +35,10 @@ async function newCtx(opts = {}) {
   return [ctx, p];
 }
 
+let seedState = null; // storage state of a logged-in context, for cleanup
+let servers = [], apps = [];
+let exitCode = 0;
+try {
 // ---------- seed ----------
 async function post(p, path, form) {
   return p.evaluate(async ([u, f]) => (await fetch(u, { method: 'POST', body: new URLSearchParams(f), redirect: 'manual' })).status, [BASE + path, form]);
@@ -43,14 +48,15 @@ async function rows(p, path) {
   return p.evaluate(() => [...document.querySelectorAll('tr[data-name]')].map((r) => ({ name: r.dataset.name, href: r.querySelector('a').getAttribute('href') })));
 }
 let [seedCtx, sp] = await newCtx();
+seedState = await seedCtx.storageState();
 await sp.goto(BASE + '/');
-let servers = (await rows(sp, '/servers')).filter((r) => r.name.startsWith('ZZ Uji'));
+servers = (await rows(sp, '/servers')).filter((r) => r.name.startsWith('ZZ Uji'));
 if (!servers.length) {
   for (const n of [1, 2]) await post(sp, '/servers/add', { name: `ZZ Uji server ${n}`, host: `10.9.0.${n}`, user: 'root', port: '22' });
   servers = (await rows(sp, '/servers')).filter((r) => r.name.startsWith('ZZ Uji'));
   for (const s of servers) await post(sp, '/' + s.href + '/init', {});
 }
-let apps = (await rows(sp, '/apps')).filter((r) => r.name.startsWith('ZZ Uji'));
+apps = (await rows(sp, '/apps')).filter((r) => r.name.startsWith('ZZ Uji'));
 if (!apps.length) {
   const sid = servers[0].href.split('/').pop();
   const base = { port: '3000', server_id: sid, mode: 'simple', image: 'nginx:latest', git_branch: 'main' };
@@ -106,6 +112,35 @@ for (const pal of ['navy', 'teal']) {
   const [, p] = [null, await ctx.newPage()];
   if (process.env.UI_PASS) { await p.goto(BASE + '/login'); if (await p.locator('input[name=user]').count()) { await p.fill('input[name=user]', process.env.UI_USER || 'admin'); await p.fill('input[name=pass]', process.env.UI_PASS); await Promise.all([p.waitForNavigation(), p.click('button[type=submit]')]); } }
   for (const [name, path] of [PAGES[0], PAGES[3]]) { await p.goto(BASE + path); await shot(p, name, 390, 'dark', pal); }
+  await ctx.close();
+}
+
+// ---------- flows with auth on: forms must not hit /logout (regression A1) ----------
+{
+  const [ctx, p] = await newCtx();
+  const sid = servers[0].href.split('/').pop();
+  const sid2 = (servers[1] || servers[0]).href.split('/').pop();
+  const okUrl = (step) => { const u = p.url(); if (/\/login|\/logout/.test(u) || !/\/apps\/\d+(\?.*)?$/.test(u)) fail(`flow ${step} ended at ${u}`); };
+  await p.goto(BASE + '/apps/add');
+  await p.fill('[name=name]', 'ZZ Uji flow');
+  await p.fill('[name=image]', 'nginx:alpine');
+  await p.fill('[name=port]', '8080');
+  await p.selectOption('#server-select', sid);
+  await Promise.all([p.waitForNavigation(), p.click('button:has-text("Save as Draft")')]);
+  okUrl('save-as-draft');
+  const edit = '/' + appRun.href + '/edit';
+  await p.goto(BASE + edit);
+  await p.click('button:has-text("Save & Redeploy")');
+  await Promise.all([p.waitForNavigation(), p.click('#save-redeploy-ok')]);
+  okUrl('save-and-redeploy');
+  await p.goto(BASE + edit);
+  const cur = await p.inputValue('#server-select');
+  await p.selectOption('#server-select', cur === sid ? sid2 : sid);
+  await p.click('button:has-text("Save & Redeploy")');
+  await p.click('#save-redeploy-ok');
+  await p.waitForSelector('#move-modal[open]', { timeout: 5000 }).catch(() => fail('flow move: move sheet did not open'));
+  await Promise.all([p.waitForNavigation(), p.click('button:has-text("Move app")')]);
+  okUrl('move-app');
   await ctx.close();
 }
 
@@ -193,7 +228,6 @@ const a11y = [];
   }
   await ctx.close();
 }
-await br.close();
 
 // ---------- report ----------
 const rep = [`# Dockify UI report\n\nBase: ${BASE} · ${new Date().toISOString()} · runs=${RUNS}\n`,
@@ -205,4 +239,23 @@ const rep = [`# Dockify UI report\n\nBase: ${BASE} · ${new Date().toISOString()
   `\n## Result\n\n${failures.length ? 'FAIL\n\n' + failures.map((f) => '- ' + f).join('\n') : 'PASS'}\n`].join('\n');
 writeFileSync(join(OUT, 'report.md'), rep);
 console.log(rep);
-process.exit(failures.length ? 1 : 0);
+exitCode = failures.length ? 1 : 0;
+} finally {
+  // remove the "ZZ Uji" data even when a check failed
+  try {
+    if (seedState) {
+      const c = await br.newContext({ storageState: seedState });
+      const p = await c.newPage();
+      await p.goto(BASE + '/apps');
+      const list = await p.evaluate(() => [...document.querySelectorAll('tr[data-name]')].filter((r) => r.dataset.name.startsWith('ZZ Uji')).map((r) => r.querySelector('a').getAttribute('href')));
+      for (const href of list) await p.evaluate((u) => fetch(u + '/undeploy', { method: 'POST' }), BASE + '/' + href);
+      await p.waitForTimeout(1500);
+      await p.goto(BASE + '/servers');
+      const sl = await p.evaluate(() => [...document.querySelectorAll('tr[data-name]')].filter((r) => r.dataset.name.startsWith('ZZ Uji')).map((r) => r.querySelector('a').getAttribute('href')));
+      for (const href of sl) await p.evaluate((u) => fetch(u + '/delete', { method: 'POST' }), BASE + '/' + href);
+      await c.close();
+    }
+  } catch (e) { console.error('cleanup failed:', e.message); }
+  await br.close().catch(() => {});
+}
+process.exit(exitCode);
