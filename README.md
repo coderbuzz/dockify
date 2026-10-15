@@ -37,6 +37,8 @@ Worker VM
 
 ## Quick Start
 
+> Setting up a new controller or worker VM for production? Follow the step-by-step [VM setup and security SOP](docs/vm-setup-sop.md) (firewall, loopback bind, key-only SSH, controller-generated worker keys, host-key verification, rollback).
+
 ### Step 1: Install Dockify on Controller VM
 
 Recommended OS: **Debian 12** (minimal, no GUI). All specs are **total VM size** (OS + Dockify).
