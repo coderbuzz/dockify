@@ -242,11 +242,11 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
 
 	envPath := fmt.Sprintf("%s/.env", remoteDir)
+	// Always written, even empty, so removed variables leave the worker; 0600
+	// because it holds the secrets (compose runs as the SSH user).
 	envVars, _ := s.repo.ListSecrets(id)
-	if len(envVars) > 0 {
-		if err := client.WriteFile(envPath, envFile(envVars), 0644); err != nil {
-			log.Printf("Warning: write .env: %v", err)
-		}
+	if err := client.WriteFile(envPath, envFile(envVars), 0600); err != nil {
+		log.Printf("Warning: write .env: %v", err)
 	}
 
 	files, _ := s.repo.ListFiles(id)

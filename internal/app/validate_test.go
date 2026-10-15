@@ -52,10 +52,20 @@ func TestDeployWritesQuotedEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	envPath := fmt.Sprintf("/opt/dockify/apps/app-%d/.env", f.app.ID)
 	f.svc.Deploy(f.app.ID)
-	_, env := f.written(t, fmt.Sprintf("/opt/dockify/apps/app-%d/.env", f.app.ID))
-	if want := "A=\"p\\\"w d$$x#y\"\nB=\"spaced\"\n"; env != want {
-		t.Fatalf(".env = %q, want %q", env, want)
+	mode, env := f.written(t, envPath)
+	if want := "A=\"p\\\"w d$$x#y\"\nB=\"spaced\"\n"; env != want || mode != "600" {
+		t.Fatalf(".env = %q mode %s, want %q mode 600", env, mode, want)
+	}
+
+	// B18: with every variable removed, the next deploy empties the file.
+	f.svc.DeleteSecret(f.app.ID, "A")
+	f.svc.DeleteSecret(f.app.ID, "B")
+	f.cmds = nil
+	f.svc.Deploy(f.app.ID)
+	if mode, env := f.written(t, envPath); env != "" || mode != "600" {
+		t.Fatalf("after removing all variables: .env = %q mode %s, want empty 600", env, mode)
 	}
 }
 
