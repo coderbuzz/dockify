@@ -70,7 +70,7 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	svr, err := h.serverSvc.Get(id)
-	if err != nil {
+	if err != nil || svr == nil {
 		http.Error(w, "server not found", http.StatusNotFound)
 		return
 	}
