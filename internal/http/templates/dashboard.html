@@ -3,7 +3,7 @@
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
-<div class="container">
+<div class="container dash">
   <hgroup>
     <h1>Dashboard</h1>
     <p>VM pool and app overview</p>
@@ -11,10 +11,10 @@
 
   {{if .Stats}}
   <div class="grid kpi-grid">
-    <div class="card stat"><h2>{{.Stats.TotalServers}}</h2><small>Servers</small></div>
-    <div class="card stat"><h2 class="stat-ok">{{.Stats.OnlineServers}}</h2><small>Online servers</small></div>
-    <div class="card stat"><h2>{{.Stats.TotalApps}}</h2><small>Apps</small></div>
-    <div class="card stat"><h2 class="stat-ok">{{.Stats.RunningApps}}</h2><small>Running apps</small></div>
+    <div class="card stat"><small>Servers</small><h2>{{.Stats.TotalServers}}</h2><span class="cap">in pool</span></div>
+    <div class="card stat"><small>Online</small><h2 class="stat-ok">{{.Stats.OnlineServers}}</h2><span class="cap">of {{.Stats.TotalServers}} servers</span></div>
+    <div class="card stat"><small>Apps</small><h2>{{.Stats.TotalApps}}</h2><span class="cap">on {{.Stats.TotalServers}} servers</span></div>
+    <div class="card stat"><small>Running</small><h2 class="stat-ok">{{.Stats.RunningApps}}</h2><span class="cap">of {{.Stats.TotalApps}} apps</span></div>
   </div>
   {{end}}
 
