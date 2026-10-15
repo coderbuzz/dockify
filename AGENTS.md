@@ -46,6 +46,8 @@ Set `DOCKIFY_DEV_MOCK=true` to use mock SSH client — no real VMs needed for UI
 
 ## UI Style Guide
 
+**UI baru atau perubahan UI WAJIB mengikuti `docs/DESIGN-SYSTEM.md`** (token 3 palet × terang/gelap, partial komponen, hierarki aksi, checklist). Rencana revamp: `docs/UI-REVAMP-PLAN.md`. Bagian di bawah ini menjelaskan kondisi sebelum revamp dan akan diganti saat S8.
+
 All styles live in `internal/http/templates/layout.html` (single `<style>` block). Full design tokens and component patterns in `SPEC.md`.
 
 When editing templates or adding new UI:
