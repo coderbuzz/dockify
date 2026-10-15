@@ -346,7 +346,7 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
 
 /* Buttons */
-.btn, [role=button], button {
+[role=button], button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -365,8 +365,17 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
   font-weight: 500;
   box-shadow: var(--shadow-sm);
 }
-.btn:hover, [role=button]:hover, button:hover { border-color: var(--border-hover); background: var(--bg-card); color: var(--text); }
+[role=button]:hover, button:hover { border-color: var(--border-hover); background: var(--bg-card); color: var(--text); }
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  line-height: 1.45;
+  text-decoration: none;
   min-height: 44px;
   padding: 0 16px;
   border-radius: 12px;
@@ -442,7 +451,7 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
 }
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes sheet-pop { from { transform: scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .sheet[open] { animation: none; } .toast { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sheet[open] { animation: none; } }
 
 /* Tables */
 .table-wrap {
@@ -637,6 +646,7 @@ pre {
   box-shadow: var(--shadow);
   animation: toast-life 4s ease-in forwards;
 }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 @keyframes toast-life { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* Console Section */
