@@ -849,7 +849,8 @@ pre.code { margin: 0; padding: 12px; background: var(--sunk); border: 1px solid 
 .seg-radio input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 699px) { .seg-radio span { min-height: 44px; } }
 .group-title { font-size: 12.8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink2); margin: 16px 0 4px; }
-.page-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; }
+.page-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; }
+hgroup .page-actions { margin-top: 4px; }
 /* iOS zooms inputs below 16px: keep mono fields at 16px on phones */
 @media (max-width: 699px) { input.mono, textarea.mono, .secret-row input { font-size: 16px; } }
 .row-domain > input:only-child { grid-column: 1 / -1; }
