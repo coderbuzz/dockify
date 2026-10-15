@@ -193,6 +193,9 @@ const boost = {};
   await cdp.send('Network.enable');
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80, downloadThroughput: -1, uploadThroughput: -1 });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const wsList = [], pageErrors = [];
+  p.on('websocket', (w) => { const o = { closed: false }; wsList.push(o); w.on('close', () => { o.closed = true; }); });
+  p.on('pageerror', (e) => pageErrors.push(e.message));
   await p.goto(BASE + '/servers');
   await p.evaluate(() => {
     window.__hdr = document.querySelector('header.top-nav');
@@ -253,6 +256,23 @@ const boost = {};
   const charts = await p.evaluate(() => ({ cleanups: (window.dockifyCleanups || []).length, line: !!document.querySelector('[id$="-chart-line"]') }));
   if (charts.cleanups < 1) fail('live charts were not initialised after a boosted navigation');
   boost.detail = charts;
+  // Back/Forward (htmx history restore fires no beforeSwap/afterSettle): sockets must close, list scripts must re-init
+  const openWs = () => wsList.filter((w) => !w.closed).length;
+  await p.goBack(); await p.waitForFunction(() => /\/apps$/.test(location.pathname)); await p.waitForTimeout(800);
+  boost.backWs = openWs();
+  if (boost.backWs !== 0) fail(`websocket still open after Back: ${boost.backWs}`);
+  if ((await p.evaluate(() => (window.dockifyCleanups || []).length)) !== 0) fail('dockifyCleanups not empty after Back');
+  await p.fill('[data-list-search]', 'no-such-app-zzzz');
+  const cnt = await p.textContent('[data-list-count]');
+  if (!/^0 of/.test(cnt.trim())) fail(`list filter dead after Back: "${cnt}"`);
+  await p.goForward(); await p.waitForFunction(() => /\/apps\/\d+$/.test(location.pathname)); await p.waitForTimeout(2500);
+  boost.fwdWs = openWs();
+  if (boost.fwdWs !== 1) fail(`expected exactly 1 websocket after Forward, got ${boost.fwdWs}`);
+  // Export: boost off for this form, so the browser must receive a download (not a boosted swap or a 405 page)
+  await p.goto(BASE + '/settings'); await p.goto(BASE + '/export');
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }).catch(() => null), p.click('button:has-text("Download YAML")')]);
+  if (!dl) fail('export did not produce a download');
+  if (pageErrors.length) fail('pageerror: ' + pageErrors.join(' | '));
   // login -> logout -> login again (these are never boosted)
   await p.click('button[aria-label="Sign out"]');
   await p.waitForURL(/\/login$/);

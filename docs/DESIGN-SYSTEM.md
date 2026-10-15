@@ -170,7 +170,16 @@ Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Target sentuh a
 
 ## 7. Performa dan aksesibilitas (diukur, `tests/e2e/ui.mjs`)
 Viewport 390, CPU 4×, latensi 80 ms, median 5 ulangan: navigasi antar halaman utama ≤300 ms (localhost). DOM ≤12 node per baris daftar, <2.500 node untuk 200 baris.
-Garis progres 3px saat navigasi >150 ms (htmx `hx-boost` opsional). Fokus terlihat 3px `accent`; Escape menutup sheet; `aria-pressed`; `aria-labelledby` di dialog.
+Garis progres 3px (`#progress`) saat navigasi boosted >150 ms, hormati reduced-motion. Fokus terlihat 3px `accent`; Escape menutup sheet; `aria-pressed`; `aria-labelledby` di dialog.
+### 7.1 Navigasi boosted (S9)
+- `<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">`. Setiap halaman kerja membungkus **seluruh** isi (konten, sheet, `<template>`, skrip inline) dalam satu `<div class="container" id="main" data-nav="{{.Nav}}">`; header, tab bar, dan head tetap. `login.html` tidak memuat htmx; form logout `hx-boost="false"`.
+- Elemen htmx lain di dalam halaman (stats card, segmented) wajib `hx-target` sendiri dan `hx-select="unset"` agar tidak mewarisi `#main`.
+- Skrip halaman **idempoten**: dipanggil pada `DOMContentLoaded` dan `htmx:afterSettle`, dengan guard `data-init` (lihat `list.js`, `formatTimes` di `app.js`). Listener ke `document`/`window` dari skrip inline dilarang (menumpuk setiap swap): pasang ke `#main` atau elemen di dalamnya. Sumber daya hidup (WebSocket, xterm) mendaftar fungsi pembersih ke `window.dockifyCleanups`; `app.js` memanggilnya pada `htmx:beforeSwap` target `#main`.
+- Form dengan `onsubmit` yang bisa membatalkan harus memvalidasi lagi di `htmx:beforeRequest` (htmx tetap mengirim saat `onsubmit` mengembalikan false).
+- Respons tanpa `#main` (redirect ke login) jatuh ke load penuh; 4xx/5xx boosted tetap di-swap (halaman error).
+- Preload: atribut `preload="mousedown"` (touchstart otomatis) pada nav dan tautan baris; server menjawab permintaan `HX-Preloaded` dengan `Cache-Control: private, max-age=5`.
+- PWA: `static/manifest.webmanifest`, `sw.js?v=AssetVersion` (hanya `/static/*`, cache-first; HTML/API tidak pernah di-cache), `Service-Worker-Allowed: ../`.
+
 Bahasa UI Inggris, label tanpa titik dua, tombol kata kerja spesifik, tanpa emoji.
 
 ## 8. Checklist PR UI

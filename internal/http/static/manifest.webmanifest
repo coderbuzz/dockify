@@ -1,8 +1,9 @@
 {
   "name": "Dockify",
   "short_name": "Dockify",
-  "start_url": ".",
-  "scope": ".",
+  "id": "../",
+  "start_url": "../",
+  "scope": "../",
   "display": "standalone",
   "theme_color": "#f5f7fb",
   "background_color": "#f5f7fb",

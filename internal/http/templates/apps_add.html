@@ -472,6 +472,10 @@ renderEnvVars();
     document.getElementById('advanced-section').hidden = !adv;
   });
 });
+// Boosted submit: htmx sends the request even when onsubmit returned false, so validate again here and cancel.
+document.getElementById('app-form').addEventListener('htmx:beforeRequest', function (e) {
+  if (!validateServer()) e.preventDefault();
+});
 var serverSel = document.getElementById('server-select');
 if (serverSel) serverSel.addEventListener('change', function () { document.getElementById('server-error').hidden = true; });
 (function () {

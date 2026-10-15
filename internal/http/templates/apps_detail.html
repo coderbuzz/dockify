@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<head>{{template "head" .}}</head>
 <body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container" id="main" data-nav="{{.Nav}}">
+<div class="container" id="main" data-nav="{{.Nav}}"{{if or (eq .App.Status "deploying") (eq .App.Status "pending")}} data-poll="2000"{{end}}>
   {{if .Flash}}<div class="toast" role="status">{{.Flash}}</div>{{end}}
   <div class="breadcrumb">
     <a href="apps">Apps</a>
@@ -116,7 +116,6 @@
       }
     }
   });
-  window.addEventListener('beforeunload', appCharts.disconnect);
   </script>
   {{end}}
 

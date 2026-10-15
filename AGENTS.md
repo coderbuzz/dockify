@@ -32,6 +32,8 @@ go mod tidy              # clean dependencies
 # Run once (no auto-reload)
 DOCKIFY_HOST=127.0.0.1 DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
 
+# Boost/PWA: page scripts must be idempotent (docs/DESIGN-SYSTEM.md §7.1); ui.mjs covers boosted navigation
+
 # Verify templates parse
 go test ./internal/http/... -run TestTemplates
 
