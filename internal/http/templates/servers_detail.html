@@ -79,6 +79,15 @@
     {{template "servers_resources_card" .}}
   </div>
 
+  {{if .PublicKey}}
+  <div class="card">
+    <h3>Worker Access</h3>
+    <p style="font-size:0.85em;color:var(--text-dim)">Dockify connects with this public key. To prepare a new worker, run this on it as <strong>{{.Server.User}}</strong> (it installs Docker and adds the key to <code>~/.ssh/authorized_keys</code>), then click <strong>Init Worker</strong>:</p>
+    <pre style="white-space:pre-wrap;word-break:break-all;font-size:0.78em"><code>curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- '{{.PublicKey}}'</code></pre>
+    <small>Public key only: <code style="word-break:break-all">{{.PublicKey}}</code></small>
+  </div>
+  {{end}}
+
   <div class="btn-group">
     <div class="btn-group-left">
       <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>

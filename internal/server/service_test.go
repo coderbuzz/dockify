@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -98,6 +99,40 @@ func TestPruneWorkerDeep(t *testing.T) {
 		t.Fatalf("PruneWorker deep failed: %v", err)
 	}
 	_ = out
+}
+
+// S17: a server added without ssh_key gets a key pair made on the controller;
+// the API returns only the public half.
+func TestCreateGeneratesKey(t *testing.T) {
+	svc, _ := setupTestServerService(t)
+	keyDir := t.TempDir()
+	h := NewHandler(svc, keyDir)
+	r := chi.NewRouter()
+	r.Post("/api/servers", h.Create)
+	r.Get("/api/servers/{id}", h.Get)
+	call := func(method, url, body string) (int, map[string]interface{}) {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(method, url, strings.NewReader(body)))
+		var out map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+
+	code, created := call(http.MethodPost, "/api/servers", `{"name":"w1","host":"10.0.0.9"}`)
+	pub, _ := created["public_key"].(string)
+	if code != http.StatusCreated || !strings.HasPrefix(pub, "ssh-ed25519 ") || created["status"] != StatusPending {
+		t.Fatalf("create: %d %v", code, created)
+	}
+	keyFile := filepath.Join(keyDir, fmt.Sprintf("%v.pem", created["id"]))
+	if st, err := os.Stat(keyFile); err != nil || st.Mode().Perm() != 0600 {
+		t.Fatalf("key file: %v %v", st, err)
+	}
+	if _, got := call(http.MethodGet, fmt.Sprintf("/api/servers/%v", created["id"]), ""); got["public_key"] != pub {
+		t.Fatalf("GET public_key %v, want %q", got["public_key"], pub)
+	}
+	if strings.Contains(fmt.Sprint(created), "PRIVATE KEY") {
+		t.Fatal("private key in the response")
+	}
 }
 
 // The host key store round-trips on servers.host_key, and PATCH forgets the

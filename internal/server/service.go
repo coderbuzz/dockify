@@ -83,6 +83,9 @@ func (s *Service) Create(server *Server) error {
 	if server.User == "" {
 		server.User = "root"
 	}
+	if server.Status == "" {
+		server.Status = StatusPending // stays so until the worker is initialized
+	}
 	if err := s.repo.Create(server); err != nil {
 		return err
 	}
@@ -125,6 +128,13 @@ func (s *Service) Delete(id int64) error {
 	s.refreshCacheLocked()
 	s.serverMu.Unlock()
 	return nil
+}
+
+// connectAndInit is the first contact with a newly added server.
+func (s *Service) connectAndInit(id int64) {
+	s.TestConnection(id)
+	s.InitWorker(id)
+	s.RefreshResources(id)
 }
 
 func (s *Service) TestConnection(id int64) error {

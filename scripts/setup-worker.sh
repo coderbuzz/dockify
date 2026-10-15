@@ -1,9 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Prepare a worker VM for Dockify. Run it as the user Dockify will connect as,
+# with the public key shown on the server's page in Dockify:
+#   curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- 'ssh-ed25519 AAAA... dockify'
+
+PUBKEY="${1:-}"
+case "$PUBKEY" in
+  ssh-*|ecdsa-*) ;;
+  *)
+    echo "Usage: setup-worker.sh '<public key from the Dockify server page>'" >&2
+    echo "  e.g. setup-worker.sh 'ssh-ed25519 AAAA... dockify'" >&2
+    exit 1
+    ;;
+esac
+
 echo "=== Dockify Worker Setup ==="
-echo "Run this script on the worker VM to prepare it for Dockify."
 echo ""
+
+# Authorize the Dockify controller key
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+touch "$HOME/.ssh/authorized_keys"
+chmod 600 "$HOME/.ssh/authorized_keys"
+if grep -qxF "$PUBKEY" "$HOME/.ssh/authorized_keys"; then
+  echo "[SKIP] Public key already in authorized_keys"
+else
+  echo "$PUBKEY" >> "$HOME/.ssh/authorized_keys"
+  echo "[OK] Public key added to authorized_keys"
+fi
 
 # Install Docker
 if command -v docker &>/dev/null; then
@@ -32,47 +57,6 @@ if command -v systemctl &>/dev/null; then
   sudo systemctl start docker 2>/dev/null || true
 fi
 
-# Generate SSH key for Dockify
-KEY_PATH="$HOME/.ssh/dockify"
-if [ -f "$KEY_PATH" ]; then
-  echo "[SKIP] SSH key already exists at $KEY_PATH"
-else
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
-  ssh-keygen -t ed25519 -f "$KEY_PATH" -N "" -C "dockify@$(hostname)" -q
-  echo "[OK] SSH key generated at $KEY_PATH"
-fi
-
-# Authorize itself (public key -> authorized_keys)
-PUBKEY=$(cat "$KEY_PATH.pub")
-if [ -f "$HOME/.ssh/authorized_keys" ] && grep -qF "$PUBKEY" "$HOME/.ssh/authorized_keys" 2>/dev/null; then
-  echo "[SKIP] Public key already in authorized_keys"
-else
-  echo "$PUBKEY" >> "$HOME/.ssh/authorized_keys"
-  chmod 600 "$HOME/.ssh/authorized_keys"
-  echo "[OK] Public key added to authorized_keys"
-fi
-
-echo ""
-echo "============================================"
-echo "  Worker setup complete"
-echo "============================================"
-echo ""
-echo "Worker IP:    $(curl -fsSL ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
-echo ""
-echo "Copy the private key below (including the -----BEGIN/END lines)"
-echo "and paste it into the Dockify Add Server form:"
-echo ""
-cat "$KEY_PATH"
-echo ""
-echo "Then in Dockify UI -> Servers -> Add Server, fill:"
-echo "  Name:       <any label, e.g. worker-01>"
-echo "  Host:       $(curl -fsSL ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
-echo "  User:       ${USER:-root}"
-echo "  SSH Key:    <paste the private key above>"
-echo ""
-echo "After adding, click 'Initialize Worker' to install Caddy."
-
 # Add active non-root user to docker group and setup /opt/dockify permissions
 ACTIVE_USER="${SUDO_USER:-$USER}"
 if [ "$ACTIVE_USER" != "root" ]; then
@@ -90,4 +74,13 @@ sudo chown "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify /opt/dockify/apps
 sudo chown -R "$ACTIVE_USER":"$ACTIVE_USER" /opt/dockify/caddy
 echo "[OK] /opt/dockify prepared with ownership for $ACTIVE_USER"
 
-
+echo ""
+echo "============================================"
+echo "  Worker setup complete"
+echo "============================================"
+echo ""
+echo "Worker IP:    $(curl -fsSL ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo "Worker user:  $(id -un)"
+echo ""
+echo "Check that the server in Dockify uses this host and user, then click"
+echo "'Init Worker' on its page to install Caddy."

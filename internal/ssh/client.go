@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -74,6 +77,33 @@ func Fingerprint(pinned string) string {
 		return ""
 	}
 	return gossh.FingerprintSHA256(key)
+}
+
+// GenerateKey returns a new ed25519 private key in OpenSSH PEM format, made on
+// the controller so the private half never leaves it.
+func GenerateKey() (string, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", err
+	}
+	block, err := gossh.MarshalPrivateKey(priv, "dockify")
+	if err != nil {
+		return "", err
+	}
+	return string(pem.EncodeToMemory(block)), nil
+}
+
+// PublicKey returns the authorized_keys line for the private key at keyPath.
+func PublicKey(keyPath string) (string, error) {
+	b, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", err
+	}
+	signer, err := gossh.ParsePrivateKey(b)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(gossh.MarshalAuthorizedKey(signer.PublicKey()))) + " dockify", nil
 }
 
 func Connect(host string, port int, user, keyPath string, store HostKeyStore) (*Client, error) {

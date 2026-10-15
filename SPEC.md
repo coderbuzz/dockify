@@ -27,7 +27,7 @@ internal/
   model/model.go                 # Shared view types (AppSummary, ChartPoint)
   ssh/
     interface.go                 # Connector interface + Factory (a new SSH connection per remote action)
-    client.go                    # SSH client: exec wrapped in `timeout -k 10 N sh -c`, pipes, heredoc file writes, PTY
+    client.go                    # SSH client: exec wrapped in `timeout -k 10 N sh -c`, pipes, stdin file writes, PTY, TOFU host keys, key generation
     mock.go                      # Mock SSH for dev mode (DOCKIFY_DEV_MOCK=true)
   server/
     model.go                     # Server, ServerStats
@@ -80,7 +80,7 @@ internal/
       error.html                 # Error page
 scripts/
   install.sh                     # One-liner install (3 modes: Docker Compose / Binary / Binary + Caddy)
-  setup-worker.sh                # Generate SSH key on worker, install Docker, output private key
+  setup-worker.sh                # setup-worker.sh '<public key>': authorize the controller key, install Docker, prepare /opt/dockify
   gen-ssh-key.sh                 # Dedicated SSH key for external/agent access to a VM
   update.sh                      # Auto-detect install mode, download & restart latest
   update-latest.sh               # Same, run directly on the host
@@ -122,7 +122,7 @@ Foreign keys are enforced (`foreign_keys=ON`). `ON DELETE CASCADE` exists only o
 | `host` | TEXT NOT NULL | IP or hostname |
 | `port` | INTEGER DEFAULT 22 | SSH port |
 | `user` | TEXT DEFAULT 'root' | SSH user |
-| `ssh_key` | TEXT NOT NULL | SSH private key content |
+| `ssh_key` | TEXT NOT NULL | Path to the private key file (`0600`, `$DOCKIFY_SSH_KEY_DIR/<id>.pem`) |
 | `status` | TEXT DEFAULT 'pending' | pending, online, offline, error, initializing |
 | `cpu_cores` | INTEGER | Total CPU cores |
 | `ram_mb` | INTEGER | Total RAM in MB |
@@ -134,6 +134,7 @@ Foreign keys are enforced (`foreign_keys=ON`). `ON DELETE CASCADE` exists only o
 | `registry_host` | TEXT DEFAULT '' | Registry for `docker login` (empty → `ghcr.io`) |
 | `registry_user` | TEXT DEFAULT '' | Registry username (empty = no credential) |
 | `registry_token` | TEXT DEFAULT '' | Path to registry token file (`0600`, `$DOCKIFY_SSH_KEY_DIR/<id>.registry-token`); never serialized to the API |
+| `host_key` | TEXT DEFAULT '' | Pinned SSH host key (base64 wire format), learned on first connect; empty = not pinned yet; never serialized to the API |
 | `created_at` | DATETIME | Creation timestamp |
 | `updated_at` | DATETIME | Last update timestamp |
 
@@ -261,9 +262,9 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/servers` | List servers |
-| POST | `/api/servers` | Create server |
-| GET | `/api/servers/:id` | Get server details |
-| PATCH | `/api/servers/:id` | Partial update (host, port, user, ssh_key, registry_host, registry_user, registry_token, registry_clear) |
+| POST | `/api/servers` | Create server `{name, host, port?, user?, ssh_key?, registry_*?}`; without `ssh_key` an ed25519 key pair is generated on the controller (the worker is then not initialized automatically). Response includes `public_key` |
+| GET | `/api/servers/:id` | Get server details, including `public_key` (authorized_keys line of the server's key) |
+| PATCH | `/api/servers/:id` | Partial update (host, port, user, ssh_key, registry_host, registry_user, registry_token, registry_clear, host_key_clear); a host or port change also clears the pinned host key |
 | DELETE | `/api/servers/:id` | Delete server |
 | POST | `/api/servers/:id/init` | Initialize worker (Docker + Caddy) |
 | POST | `/api/servers/:id/refresh` | Refresh resource metrics |
@@ -307,10 +308,10 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | DELETE | `/api/apps/:id/deployments` | Clear deployment history |
 | GET | `/api/apps/:id/logs` | Stream logs (`docker compose logs --tail=N`) |
 | GET | `/api/apps/:id/secrets` | List secrets |
-| POST | `/api/apps/:id/secrets` | Set env var `{key, value, is_secret?}`; `is_secret` omitted keeps the stored flag (new keys: not secret) |
+| POST | `/api/apps/:id/secrets` | Set env var `{key, value, is_secret?}`; `is_secret` omitted keeps the stored flag (new keys: not secret); key must match `[A-Za-z_][A-Za-z0-9_]*` |
 | DELETE | `/api/apps/:id/secrets/:key` | Delete secret |
 | GET | `/api/apps/:id/files` | List config files |
-| POST | `/api/apps/:id/files` | Set config file `{path, content}` |
+| POST | `/api/apps/:id/files` | Set config file `{path, content}`; path validated (see Input validation) |
 | DELETE | `/api/apps/:id/files/:path` | Delete config file |
 | GET | `/api/apps/:id/console` | WebSocket upgrade → shell in the app's first service container |
 | GET | `/api/apps/:id/stats` | Latest container stats |
@@ -364,7 +365,7 @@ When an app is deployed (create/redeploy):
 2. Select target server (manual or auto-scheduler — `server_id=0` = auto-select)
 3. Ensure `dockify` Docker network exists on worker
 4. SSH → write `docker-compose.yml` to `/opt/dockify/apps/app-{id}/`
-5. Write app secrets as `.env` file to `/opt/dockify/apps/app-{id}/.env`
+5. Write app secrets as `.env` file to `/opt/dockify/apps/app-{id}/.env` (mode `0600`, written on every deploy, empty when the app has no variables, so removed variables disappear). One `KEY="value"` line per variable: the value is trimmed, then `\` → `\\`, `"` → `\"`, newline → `\n`, CR → `\r`, `$` → `$$`. Config files removed in the UI are not deleted from the worker
 6. Write config files to `/opt/dockify/apps/app-{id}/{path}`
 7. If the server has a registry credential: SSH → `docker login <host> -u <user> --password-stdin` with the token on stdin; on failure record `registry login failed: …` (token redacted) and stop
 8. SSH → `docker compose pull`, then `docker compose up -d` (auto-detects `docker-compose` vs `docker compose`)
@@ -377,6 +378,16 @@ When an app is deployed (create/redeploy):
 15. Update app status → running
 
 Undeploy runs `docker compose down --volumes --rmi all` for the app only; worker-wide pruning happens only through the Prune action.
+
+## Worker Setup
+
+1. Add the server (UI or `POST /api/servers`) without a key: Dockify generates an ed25519 key pair, stores the private key as `<id>.pem` (`0600`) and shows the public key with the setup command on the server page. Pasting an existing private key remains possible (advanced).
+2. On the worker, as the user Dockify connects as: `curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- '<public key>'`. The script appends the key to `~/.ssh/authorized_keys` (`600`, no duplicates), installs Docker and the compose plugin, prepares `/opt/dockify` and prints the worker IP and user. Without an argument it prints usage and exits 1.
+3. Click **Init Worker**.
+
+### SSH host keys (trust on first use)
+
+Every SSH connection (deploys, monitor, console, live stats) goes through one factory that checks the worker's host key against `servers.host_key` (looked up by host and port). The first connection stores the presented key and logs `pinned host key for host:port (SHA256:…)`; later connections fail with `host key mismatch for host:port` if the key differs. The server page shows the fingerprint (or "not pinned yet"). After reinstalling a worker, tick **Forget pinned host key** on the edit form or send `host_key_clear: true`; changing host or port clears it too.
 
 ## Worker Init Flow
 
@@ -527,7 +538,10 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 
 - Worker Caddy Admin API bound to `127.0.0.1:2019` — no external access
 - Controller ↔ Worker communication only via SSH (encrypted)
-- SSH private keys stored in `DOCKIFY_DATA_DIR/keys/` with `0600` permissions
+- SSH private keys stored in `DOCKIFY_DATA_DIR/keys/` with `0600` permissions; generated on the controller, only the public key is shown or returned by the API
+- SSH host keys pinned on first use (see Worker Setup)
+- Files are written to workers by piping the content to `cat` over SSH stdin with shell-quoted paths; no user content is parsed by the shell
+- Input validation at the trust boundary (API, web forms, backup import; 400 or a rejected import naming the value): domains are lowercased and trimmed, then must match `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`; config file paths are cleaned and must be relative, without `..`, made of `[A-Za-z0-9._/-]`; env keys must match `^[A-Za-z_][A-Za-z0-9_]*$`. The simple-mode compose is generated with a YAML encoder, not string concatenation
 - Registry tokens stored the same way (`<id>.registry-token`, `0600`); DB holds only the path. Sent to `docker login --password-stdin` over SSH stdin (never in the command line), redacted from deploy logs and errors, never returned by the API
 - Cloudflare API token requires minimal scope: Zone:DNS:Edit
 - App containers on internal `dockify` Docker network only — no public port exposure except via Caddy

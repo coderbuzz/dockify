@@ -3,6 +3,8 @@ package ssh
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -27,6 +29,25 @@ func newHostKey(t *testing.T) gossh.PublicKey {
 		t.Fatal(err)
 	}
 	return k
+}
+
+// S17: a generated key parses back and yields an authorized_keys line.
+func TestGenerateKey(t *testing.T) {
+	priv, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "1.pem")
+	if err := os.WriteFile(path, []byte(priv), 0600); err != nil {
+		t.Fatal(err)
+	}
+	pub, err := PublicKey(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, _, err := gossh.ParseAuthorizedKey([]byte(pub)); err != nil || !strings.HasPrefix(pub, "ssh-ed25519 ") {
+		t.Fatalf("public key %q: %v", pub, err)
+	}
 }
 
 func TestPinHostKey(t *testing.T) {

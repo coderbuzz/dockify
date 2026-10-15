@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/coderbuzz/dockify/internal/model"
+	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -51,9 +52,18 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Name == "" || input.Host == "" || input.SSHKey == "" {
-		JSON(w, http.StatusBadRequest, map[string]string{"error": "name, host, and ssh_key are required"})
+	if input.Name == "" || input.Host == "" {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "name and host are required"})
 		return
+	}
+	generated := input.SSHKey == ""
+	if generated {
+		key, err := ssh.GenerateKey()
+		if err != nil {
+			JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		input.SSHKey = key
 	}
 	if (input.RegistryUser == "") != (input.RegistryToken == "") {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": errRegistryPair.Error()})
@@ -89,13 +99,24 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func(id int64) {
-		h.service.TestConnection(id)
-		h.service.InitWorker(id)
-		h.service.RefreshResources(id)
-	}(server.ID)
+	// A generated key is not on the worker yet: the operator runs
+	// setup-worker.sh with the public key, then initializes the worker.
+	if !generated {
+		go h.service.connectAndInit(server.ID)
+	}
 
-	JSON(w, http.StatusCreated, server)
+	JSON(w, http.StatusCreated, withPublicKey(server))
+}
+
+// serverView adds the public half of the server's SSH key to the API output.
+type serverView struct {
+	*Server
+	PublicKey string `json:"public_key"`
+}
+
+func withPublicKey(s *Server) serverView {
+	pub, _ := ssh.PublicKey(s.SSHKey)
+	return serverView{s, pub}
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +132,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSON(w, http.StatusOK, server)
+	JSON(w, http.StatusOK, withPublicKey(server))
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -386,12 +407,24 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 	name := strings.TrimSpace(r.FormValue("name"))
 	host := strings.TrimSpace(r.FormValue("host"))
 
-	if name == "" || host == "" || keyContent == "" {
+	if name == "" || host == "" {
 		render(w, r, http.StatusBadRequest, "servers_add.html", map[string]interface{}{
 			"Title": "Add Server",
-			"Error": "name, host, and ssh_key are required",
+			"Error": "name and host are required",
 		})
 		return
+	}
+	generated := keyContent == ""
+	if generated {
+		key, err := ssh.GenerateKey()
+		if err != nil {
+			render(w, r, http.StatusInternalServerError, "servers_add.html", map[string]interface{}{
+				"Title": "Add Server",
+				"Error": err.Error(),
+			})
+			return
+		}
+		keyContent = key
 	}
 
 	registryHost := strings.TrimSpace(r.FormValue("registry_host"))
@@ -446,13 +479,11 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		return
 	}
 
-	go func(id int64) {
-		h.service.TestConnection(id)
-		h.service.InitWorker(id)
-		h.service.RefreshResources(id)
-	}(server.ID)
+	if !generated {
+		go h.service.connectAndInit(server.ID)
+	}
 
-	http.Redirect(w, r, "/servers", http.StatusSeeOther)
+	http.Redirect(w, r, "/servers/"+strconv.FormatInt(server.ID, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerEditPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -582,11 +613,13 @@ func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, re
 	}
 
 	apps, _ := h.appSvc.ListByServer(id)
+	pub, _ := ssh.PublicKey(server.SSHKey)
 
 	render(w, r, http.StatusOK, "servers_detail.html", map[string]interface{}{
-		"Title":  server.Name,
-		"Server": server,
-		"Apps":   apps,
+		"Title":     server.Name,
+		"Server":    server,
+		"Apps":      apps,
+		"PublicKey": pub,
 	})
 }
 

@@ -145,50 +145,33 @@ curl -X POST -H "Authorization: Bearer $DOCKIFY_API_TOKEN" https://dockify.examp
 
 The login page is at `/login`. Webhook endpoints (`/api/webhook/github`, `/api/webhook/gitlab`) and health check (`/health`) do not require authentication.
 
-### Step 2: Prepare a Worker VM
+### Step 2: Add a worker
 
 Fresh Ubuntu/Debian VM. Zero dependencies needed — Dockify installs everything.
 
-**Option A: One-liner script (run on the worker VM)**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash
-```
-
-The script will:
-1. Generate an SSH key pair at `/root/.ssh/dockify`
-2. Add the public key to `/root/.ssh/authorized_keys`
-3. Install Docker + Docker Compose plugin (if not present)
-4. Output the **private key content** — copy this
-
-Then paste the private key into the Dockify Add Server form. No `ssh-copy-id` needed.
-
-**Option B: Manual (generate elsewhere)**
-
-Generate an SSH key pair anywhere (laptop, controller VM, etc.):
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/dockify -N ""
-```
-
-Copy the public key to the worker VM:
-
-```bash
-ssh-copy-id -i ~/.ssh/dockify.pub root@<worker-ip>
-```
-
-> The private key content (`cat ~/.ssh/dockify`) is then pasted into the Dockify web UI form — not a file path, but the key material itself.
-
-### Step 3: Register + Initialize in Web UI
-
-1. Go to **Servers** → **Add Server**
-2. Fill in:
+1. In Dockify go to **Servers** → **Add Server** and fill in:
    - **Name:** `worker-01`
    - **Host:** `<worker-ip>`
-   - **User:** `root`
-   - **SSH Private Key:** Paste the content of `~/.ssh/dockify` (the private key file, `cat ~/.ssh/dockify`)
-3. Click **Add Server** → redirects to server detail. Dockify auto-tests the connection and starts initialization in the background.
-4. Click **Initialize Worker** (if not already auto-initialized)
+   - **User:** the SSH user Dockify connects as (`root`, or a user in the `docker` group)
+2. Leave the SSH key empty and click **Add Server**. Dockify generates an ed25519 key pair on the controller; the private key never leaves it. The server page shows the public key and the command to run on the worker.
+3. On the worker VM, as that user, run the command from the server page:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- 'ssh-ed25519 AAAA... dockify'
+   ```
+
+   The script adds the key to `~/.ssh/authorized_keys`, installs Docker + the Docker Compose plugin (if not present), prepares `/opt/dockify` and prints the worker IP and user. Run without an argument it only prints its usage.
+4. Back in Dockify, click **Init Worker** on the server page.
+
+The `public_key` is also returned by `POST /api/servers` (send no `ssh_key`) and `GET /api/servers/{id}`.
+
+**Advanced: existing key.** Under *Advanced* on the Add Server form you can paste an existing private key instead (the key material, not a file path); then Dockify tests the connection and initializes the worker right away.
+
+**Host keys.** The first connection to a worker pins its SSH host key; the fingerprint is on the server page. If the worker presents a different key later, every connection fails with "host key mismatch". After reinstalling a worker, tick **Forget pinned host key** on its edit page (or `PATCH /api/servers/{id}` with `{"host_key_clear": true}`); changing host or port also forgets it.
+
+> Workers set up with an older `setup-worker.sh` still hold the private key `~/.ssh/dockify` (and `~/.ssh/dockify.pub`). Dockify keeps its own copy, so both files can be deleted on the worker; keep the matching line in `~/.ssh/authorized_keys`, Dockify still logs in with that key.
+
+### Step 3: Initialize the worker
 
 **What "Initialize Worker" does automatically:**
 1. SSH connect + verify
@@ -233,7 +216,7 @@ The **Servers** page lists all worker VMs with connection status and live resour
 
 ### Add, Edit, Delete
 
-Servers can be added via the web form (name, host, port, user, SSH private key) and edited after creation — update host, port, user, or SSH key without deleting and re-adding.
+Servers can be added via the web form (name, host, port, user; Dockify generates the SSH key pair, or you paste an existing private key) and edited after creation — update host, port, user, or SSH key without deleting and re-adding.
 
 ### Private Registry Credential
 
@@ -345,7 +328,7 @@ Each app's environment variables are managed through a **unified editor** with p
 
 **Multi-line support** — values can span multiple lines (useful for private keys, certificates, etc.) using resizable textareas.
 
-On deploy, **all** variables (plain + secret) are written to a `.env` file at `/opt/dockify/apps/<name>/.env` on the worker VM. In Simple mode, the compose file auto-generates `${KEY}` environment variable references, so containers can access all variables without manual compose editing.
+On deploy, **all** variables (plain + secret) are written to a `.env` file at `/opt/dockify/apps/<name>/.env` on the worker VM (mode `0600`, rewritten on every deploy so removed variables disappear). Each value is trimmed and written double-quoted (`KEY="value"`), so quotes, spaces, `#` and `$` reach the app unchanged and multi-line values arrive as written. Keys must match `[A-Za-z_][A-Za-z0-9_]*`. In Simple mode, the compose file auto-generates `${KEY}` environment variable references, so containers can access all variables without manual compose editing.
 
 **Editing secrets:** On the edit page, secret values are shown as empty (like GitHub Actions). Leave empty to keep the existing value. Type a new value to override.
 
@@ -353,7 +336,7 @@ On deploy, **all** variables (plain + secret) are written to a `.env` file at `/
 
 ### Config Files
 
-Each app can have arbitrary config files. Files are written to `/opt/dockify/apps/<name>/<path>` on the worker VM. Upload files directly from the browser (FileReader API) or paste content. Manage them inline on the app detail page.
+Each app can have arbitrary config files. Files are written to `/opt/dockify/apps/<name>/<path>` on the worker VM. Paths are relative to the app folder, without `..`, and use only `A-Z a-z 0-9 . _ / -`. Removing a file in Dockify does not delete it from the worker. Upload files directly from the browser (FileReader API) or paste content. Manage them inline on the app detail page.
 
 ### HTTP Basic Auth
 
@@ -589,7 +572,7 @@ The script will:
 3. Configure `KexAlgorithms` in `/etc/ssh/sshd_config` (requires `sudo`)
 4. Output the **private key content** — copy this into your agentic-AI / SSH client config
 
-The key is generic and separate from Dockify's `/root/.ssh/dockify` automation key.
+The key is generic and separate from the key Dockify itself connects with.
 To revoke access later: `rm ~/.ssh/remote-access*` and remove its line from
 `~/.ssh/authorized_keys`.
 
