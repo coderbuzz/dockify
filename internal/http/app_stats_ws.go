@@ -103,9 +103,17 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 			}
 		}()
 	} else {
+		// docker stats ends when a container restarts: start it again.
 		go func() {
-			if err := h.appSvc.StreamStats(ctx, client, a, snapCh); err != nil {
-				log.Printf("app stats stream error for app %d: %v", id, err)
+			for {
+				if err := h.appSvc.StreamStats(ctx, client, a, snapCh); err != nil {
+					log.Printf("app stats stream error for app %d: %v", id, err)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
 			}
 		}()
 
