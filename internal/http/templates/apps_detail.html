@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
-  {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
+  {{if .Flash}}<div class="toast" role="status">{{.Flash}}</div>{{end}}
   <div class="breadcrumb">
     <a href="apps">Apps</a>
     <span>/</span>
@@ -177,13 +177,13 @@
     <div class="btn-group-left">
       {{if eq .App.Status "draft"}}
       <form method="POST" action="apps/{{.App.ID}}/deploy" style="display:inline">
-        <button type="submit" class="btn btn-danger"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
+        <button type="submit" class="btn btn-primary"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
       </form>
-      <a href="apps/{{.App.ID}}/edit" class="btn">Edit</a>
+      <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
       {{else}}
       {{if eq .App.Status "running"}}
       <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
-        <button type="submit" class="btn">Stop</button>
+        <button type="submit" class="btn btn-secondary">Stop</button>
       </form>
       {{end}}
       {{if eq .App.Status "stopped"}}
@@ -194,23 +194,15 @@
       {{if eq .App.Status "running"}}
       <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
       {{else}}
-      <a href="apps/{{.App.ID}}/edit" class="btn">Edit</a>
+      <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
       {{end}}
-      <form method="POST" action="apps/{{.App.ID}}/redeploy" style="display:inline">
-        <button type="submit" class="btn btn-danger">Redeploy</button>
-      </form>
-      <form method="POST" action="apps/{{.App.ID}}/rollback" style="display:inline"
-            onsubmit="return confirm('Rollback to the last successful deployment?')">
-        <button type="submit" class="btn btn-danger">Rollback</button>
-      </form>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-redeploy')">Redeploy</button>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-rollback')">Rollback</button>
       <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
       {{end}}
     </div>
     <div class="btn-group-right">
-      <form method="POST" action="apps/{{.App.ID}}/undeploy" style="display:inline"
-            onsubmit="return confirm('{{if eq .App.Status "draft"}}Delete draft {{.App.Name}}?{{else}}Undeploy {{.App.Name}}? This will stop and remove the app.{{end}}')">
-        <button type="submit" class="btn btn-red">{{if eq .App.Status "draft"}}Delete Draft{{else}}Undeploy{{end}}</button>
-      </form>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete Draft{{else}}Undeploy{{end}}</button>
     </div>
   </div>
 
@@ -218,7 +210,7 @@
     <div id="app-console-container" class="console-container" style="display:none">
       <div class="console-toolbar">
         <span class="badge badge-online" id="app-console-status">Connected</span>
-        <button class="btn btn-ghost btn-red" id="app-console-disconnect" onclick="toggleAppConsole()">Disconnect</button>
+        <button class="btn btn-ghost btn-sm" id="app-console-disconnect" onclick="toggleAppConsole()">Disconnect</button>
       </div>
       <div id="app-terminal"></div>
     </div>
@@ -228,9 +220,7 @@
   <div class="card" style="margin-top:1em">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8em">
       <h3 style="margin:0">Deployment History</h3>
-      <form method="POST" action="apps/{{.App.ID}}/clear-deployments" onsubmit="return confirm('Clear deployment history? This cannot be undone.')">
-        <button type="submit" class="btn btn-ghost btn-red" style="font-size:0.8em;padding:0.2em 0.6em">Clear History</button>
-      </form>
+      <button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-clear-history')">Clear History</button>
     </div>
     <div class="table-wrap"><table style="font-size:0.85em">
       <thead>
@@ -388,6 +378,11 @@ function disconnectAppConsole() {
 	document.getElementById('app-console-status').className = 'badge badge-offline';
 }
 </script>
+{{template "ui_confirm" (dict "ID" "app-redeploy" "Title" (printf "Redeploy %s?" .App.Name) "Body" "This rebuilds the app and restarts its containers. It is briefly unavailable while it restarts." "Label" "Redeploy" "Action" (printf "apps/%d/redeploy" .App.ID))}}
+{{template "ui_confirm" (dict "ID" "app-rollback" "Title" (printf "Roll back %s?" .App.Name) "Body" "This restores the last successful deployment and replaces the running version." "Label" "Roll back" "Action" (printf "apps/%d/rollback" .App.ID))}}
+{{if eq .App.Status "draft"}}{{template "ui_confirm" (dict "ID" "app-undeploy" "Title" (printf "Delete draft %s?" .App.Name) "Body" "This permanently deletes the draft." "Label" "Delete draft" "Action" (printf "apps/%d/undeploy" .App.ID))}}
+{{else}}{{template "ui_confirm" (dict "ID" "app-undeploy" "Title" (printf "Undeploy %s?" .App.Name) "Body" (printf "This stops and removes the app from %s." .ServerName) "Label" "Undeploy" "Action" (printf "apps/%d/undeploy" .App.ID))}}{{end}}
+{{template "ui_confirm" (dict "ID" "app-clear-history" "Title" "Clear deployment history?" "Body" "This permanently removes all deployment records for this app and cannot be undone." "Label" "Clear history" "Action" (printf "apps/%d/clear-deployments" .App.ID))}}
 {{template "scripts" .}}
 </body>
 </html>

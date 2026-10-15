@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
@@ -26,8 +26,8 @@
       Latest:  <strong id="lat-ver">-</strong>
     </p>
     <div class="btn-group">
-      <button class="btn" onclick="checkUpdate()">Check for Updates</button>
-      <button class="btn btn-primary" id="update-btn" style="display:none" onclick="runUpdate()">Update Now</button>
+      <button class="btn btn-secondary" onclick="checkUpdate()">Check for Updates</button>
+      <button class="btn btn-destructive-outline" id="update-btn" style="display:none" onclick="openSheet('update-confirm')">Update Now</button>
     </div>
     <pre id="update-log" style="display:none;margin-top:0.5em;font-size:0.8em;max-height:200px;overflow:auto"></pre>
   </div>
@@ -35,12 +35,14 @@
   <div class="card" style="margin-top:1em">
     <h3>Sponsor & Donation</h3>
     <p>Dockify is open source and free to use. If you find it useful, consider supporting the project via GitHub Sponsors.</p>
-    <a href="https://github.com/sponsors/coderbuzz" class="btn" target="_blank" rel="noopener">Sponsor on GitHub</a>
+    <a href="https://github.com/sponsors/coderbuzz" class="btn btn-secondary" target="_blank" rel="noopener">Sponsor on GitHub</a>
   </div>
 
   <p style="text-align:center;color:var(--text-muted);margin-top:2em;font-size:0.85em">Version {{.Version}}</p>
 </div>
+{{template "ui_confirm" (dict "ID" "update-confirm" "Title" "Update Dockify now?" "Body" "The server restarts to apply the update and is unavailable for a short time." "Label" "Update")}}
 <script>
+document.getElementById('update-confirm-ok').addEventListener('click', function () { runUpdate(); });
 function checkUpdate() {
   var btn = event.target;
   btn.disabled = true;
@@ -63,7 +65,7 @@ function checkUpdate() {
   });
 }
 function runUpdate() {
-  if (!confirm('Update Dockify now? The server will restart.')) return;
+  closeSheet('update-confirm');
   var btn = document.getElementById('update-btn');
   btn.disabled = true;
   btn.textContent = 'Updating...';

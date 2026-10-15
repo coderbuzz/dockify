@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,7 +8,7 @@
 {{template "theme_head" .}}
 </head>
 <body class="login-page">
-<button class="theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme">☀</button>
+<button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
 <div class="login-card">
   <div class="brand-header">
     <span class="brand-icon">D</span>
@@ -21,7 +21,7 @@
     <input type="text" id="user" name="user" required autofocus autocomplete="username">
     <label for="pass">Password</label>
     <input type="password" id="pass" name="pass" required autocomplete="current-password">
-    <button type="submit" class="btn-primary">Sign in</button>
+    <button type="submit" class="btn btn-primary btn-lg">Sign in</button>
   </form>
 </div>
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
@@ -20,7 +20,7 @@
              style="flex:1 1 200px;font-family:monospace;font-size:0.85em;min-width:0;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
       <button class="btn btn-ghost" onclick="toggleSecret()" style="font-size:0.85em" id="toggle-btn">Show</button>
       <button class="btn btn-ghost" onclick="copySecret()" style="font-size:0.85em">Copy</button>
-      <button class="btn btn-ghost" onclick="rollSecret()" style="font-size:0.85em">Roll</button>
+      <button class="btn btn-destructive-outline" onclick="openSheet('roll-confirm')" style="font-size:0.85em">Roll</button>
     </div>
     <div style="margin-top:1em;font-size:0.8em;color:var(--text-muted)">
       <strong>GitHub Actions workflow snippet:</strong>
@@ -44,7 +44,7 @@
       Export all servers and apps configuration to a YAML file.
       SSH keys are <strong>not</strong> exported.
     </p>
-    <a href="export" class="btn btn-primary">Export (with passphrase)</a>
+    <a href="export" class="btn btn-secondary">Export (with passphrase)</a>
   </div>
 
   <div class="card" style="margin-top:1em">
@@ -53,10 +53,12 @@
       Import servers and apps from a previously exported YAML file.
       Supports merge and replace modes.
     </p>
-    <a href="import" class="btn btn-primary">Go to Import Page</a>
+    <a href="import" class="btn btn-secondary">Go to Import Page</a>
   </div>
 </div>
+{{template "ui_confirm" (dict "ID" "roll-confirm" "Title" "Roll webhook secret?" "Body" "The old secret stops working immediately. Update your CI secrets right after." "Label" "Roll secret")}}
 <script>
+document.getElementById('roll-confirm-ok').addEventListener('click', function () { rollSecret(); });
 var visible = false;
 function toggleSecret() {
   var el = document.getElementById('wh-secret');
@@ -69,7 +71,7 @@ function copySecret() {
   navigator.clipboard.writeText(document.getElementById('wh-secret').value);
 }
 function rollSecret() {
-  if (!confirm('Generate a new webhook secret? The old one will stop working immediately. Update your CI secrets.')) return;
+  closeSheet('roll-confirm');
   fetch('api/settings/webhook-secret/roll', {method:'POST'})
     .then(r => r.json())
     .then(d => {

@@ -213,6 +213,13 @@ var funcMap = template.FuncMap{
 	"div":             div,
 	"mul":             mul,
 	"clamp100":        clamp100,
+	"dict": func(kv ...interface{}) map[string]interface{} {
+		m := make(map[string]interface{}, len(kv)/2)
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i].(string)] = kv[i+1]
+		}
+		return m
+	},
 	"nl2br": func(s string) template.HTML {
 		return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(s), "\n", "<br>"))
 	},

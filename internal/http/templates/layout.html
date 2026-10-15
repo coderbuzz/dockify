@@ -8,7 +8,7 @@
     var old = localStorage.getItem('dockify-theme');
     if (old) { if (!localStorage.getItem('dockify_theme')) localStorage.setItem('dockify_theme', old); localStorage.removeItem('dockify-theme'); }
   } catch (e) {}
-  var MODES = ['light', 'dark', 'system'], ICONS = { light: '\u2600', dark: '\u263E', system: '\u2B1A' };
+  var MODES = ['light', 'dark', 'system'];
   function apply() {
     var mode = get('dockify_theme', 'system', MODES);
     d.setAttribute('data-palette', get('dockify_palette', 'indigo', ['indigo', 'navy', 'teal']));
@@ -19,7 +19,8 @@
     var b = document.getElementById('theme-toggle');
     if (b) {
       var next = MODES[(MODES.indexOf(mode) + 1) % 3];
-      b.textContent = ICONS[mode];
+      var ics = b.querySelectorAll('[data-theme-icon]');
+      for (var i = 0; i < ics.length; i++) ics[i].hidden = ics[i].getAttribute('data-theme-icon') !== mode;
       b.setAttribute('aria-label', 'Theme: ' + mode + '. Switch to ' + next);
       b.title = 'Theme: ' + mode;
     }
@@ -48,6 +49,7 @@
 <title>{{.Title}} - Dockify</title>
 {{template "theme_head" .}}
 <script src="static/htmx.min.js"></script>
+<script src="static/app.js?v={{.AssetVersion}}"></script>
 <link rel="stylesheet" href="static/xterm.min.css">
 <script src="static/xterm.min.js"></script>
 <script src="static/xterm-addon-fit.min.js"></script>
@@ -61,14 +63,14 @@
     <span class="logo-icon">D</span>
     Dockify
   </a>
-  <button class="mobile-nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation">☰</button>
+  <button class="mobile-nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation">{{template "ui_icon" "menu"}}</button>
   <div class="nav-links" id="nav-links">
     <a href="." id="nav-dashboard">Dashboard</a>
     <a href="servers" id="nav-servers">Servers</a>
     <a href="apps" id="nav-apps">Apps</a>
     <a href="settings" id="nav-settings">Settings</a>
     <a href="about" id="nav-about">About</a>
-    <button class="theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme">☀</button>
+    <button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
   </div>
 </nav>
 {{end}}

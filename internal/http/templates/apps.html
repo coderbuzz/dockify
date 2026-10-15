@@ -1,22 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
-  {{if .Flash}}<div class="flash-banner">{{.Flash}}</div>{{end}}
+  {{if .Flash}}<div class="toast" role="status">{{.Flash}}</div>{{end}}
   <hgroup>
     <h1>Apps</h1>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em">
-      <a href="apps/add" class="btn btn-primary">Deploy App</a>
-      <form method="POST" action="apps/redeploy-all" style="margin:0"
-            onsubmit="return confirm('Redeploy all running apps?')">
-        <button type="submit" class="btn btn-red">Redeploy All</button>
-      </form>
+      <a href="apps/add" class="btn btn-brand">Deploy App</a>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('redeploy-all')">Redeploy All</button>
     </div>
   </hgroup>
 
   {{template "apps_list" .}}
+  {{template "ui_confirm" (dict "ID" "redeploy-all" "Title" "Redeploy all apps?" "Body" "This rebuilds and restarts every running app. Each app is briefly unavailable while it restarts." "Label" "Redeploy all" "Action" "apps/redeploy-all")}}
 </div>
 {{template "scripts" .}}
 </body>
