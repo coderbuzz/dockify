@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/app"
-	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 )
@@ -65,18 +64,13 @@ func (h *StatsHandler) ServeLiveAppStats(w http.ResponseWriter, r *http.Request)
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("app stats ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"SSH connection failed"}`))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("app stats ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"SSH connection failed"}`))
+		return
 	}
+	defer client.Close()
 
 	currentRange := "realtime"
 	sendAppChartData(conn, h.appSvc, id, currentRange)

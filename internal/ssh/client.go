@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -16,13 +18,64 @@ import (
 )
 
 type Client struct {
-	conn  *gossh.Client
-	Host  string
-	Port  int
-	User  string
+	conn *gossh.Client
+	Host string
+	Port int
+	User string
 }
 
-func Connect(host string, port int, user, keyPath string) (*Client, error) {
+// HostKeyStore holds the pinned SSH host key (base64 wire format) per host and port.
+type HostKeyStore interface {
+	HostKey(host string, port int) (string, error)
+	SaveHostKey(host string, port int, key string) error
+}
+
+// pinHostKey trusts the key presented on first use and stores it; afterwards
+// only that key is accepted.
+func pinHostKey(store HostKeyStore, host string, port int) gossh.HostKeyCallback {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	return func(hostname string, remote net.Addr, key gossh.PublicKey) error {
+		pinned, err := store.HostKey(host, port)
+		if err != nil {
+			return fmt.Errorf("load host key for %s: %w", addr, err)
+		}
+		if pinned == "" {
+			if err := store.SaveHostKey(host, port, base64.StdEncoding.EncodeToString(key.Marshal())); err != nil {
+				return fmt.Errorf("save host key for %s: %w", addr, err)
+			}
+			log.Printf("pinned host key for %s (%s)", addr, gossh.FingerprintSHA256(key))
+			return nil
+		}
+		raw, err := base64.StdEncoding.DecodeString(pinned)
+		if err != nil {
+			return fmt.Errorf("decode pinned host key for %s: %w", addr, err)
+		}
+		want, err := gossh.ParsePublicKey(raw)
+		if err != nil {
+			return fmt.Errorf("parse pinned host key for %s: %w", addr, err)
+		}
+		if gossh.FixedHostKey(want)(hostname, remote, key) != nil {
+			return fmt.Errorf("host key mismatch for %s — if the server was reinstalled, clear its host key in the server settings", addr)
+		}
+		return nil
+	}
+}
+
+// Fingerprint returns the SHA256 fingerprint of a pinned host key, or "" when
+// none is pinned or it cannot be parsed.
+func Fingerprint(pinned string) string {
+	raw, err := base64.StdEncoding.DecodeString(pinned)
+	if err != nil || pinned == "" {
+		return ""
+	}
+	key, err := gossh.ParsePublicKey(raw)
+	if err != nil {
+		return ""
+	}
+	return gossh.FingerprintSHA256(key)
+}
+
+func Connect(host string, port int, user, keyPath string, store HostKeyStore) (*Client, error) {
 	keyBytes, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("read SSH key: %w", err)
@@ -38,7 +91,7 @@ func Connect(host string, port int, user, keyPath string) (*Client, error) {
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(signer),
 		},
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: pinHostKey(store, host, port),
 		Timeout:         10 * time.Second,
 	}
 
@@ -294,12 +347,11 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func RealFactory() Factory {
+func RealFactory(store HostKeyStore) Factory {
 	return func(host string, port int, user, keyPath string) (Connector, error) {
-		return Connect(host, port, user, keyPath)
+		return Connect(host, port, user, keyPath, store)
 	}
 }
-
 
 func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error) {
 	session, err := c.conn.NewSession()

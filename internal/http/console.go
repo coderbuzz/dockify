@@ -88,20 +88,13 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		var err error
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("console ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("console ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
+		return
 	}
+	defer client.Close()
 
 	outCh, inCh, err := client.Shell(ctx, 24, 80)
 	if err != nil {
@@ -189,19 +182,13 @@ func (h *ConsoleHandler) ServeAppContainerWS(w http.ResponseWriter, r *http.Requ
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("container console ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("container console ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
+		return
 	}
+	defer client.Close()
 
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", appData.ID)
 	composeCmd := app.DockerComposeCmd(client)

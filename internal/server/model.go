@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/model"
+	"github.com/coderbuzz/dockify/internal/ssh"
 )
 
 // DefaultRegistryHost is used for registry login when a credential has no host.
@@ -27,7 +28,7 @@ type Server struct {
 	RegistryHost       string    `json:"registry_host"`
 	RegistryUser       string    `json:"registry_user"`
 	RegistryToken      string    `json:"-"` // path to 0600 token file, never serialized
-	HostKey            string    `json:"-"` // pinned SSH host key (base64), set by Wave 3 TOFU
+	HostKey            string    `json:"-"` // pinned SSH host key (base64 wire format), learned on first connect
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -45,3 +46,8 @@ type ServerStats struct {
 }
 
 type ChartPoint = model.ChartPoint
+
+// HostKeyFingerprint is the SHA256 fingerprint of the pinned host key, "" if none.
+func (s Server) HostKeyFingerprint() string {
+	return ssh.Fingerprint(s.HostKey)
+}

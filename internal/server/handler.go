@@ -137,6 +137,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		RegistryUser  string `json:"registry_user"`
 		RegistryToken string `json:"registry_token"`
 		RegistryClear bool   `json:"registry_clear"`
+		HostKeyClear  bool   `json:"host_key_clear"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -144,6 +145,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	oldHost, oldPort := server.Host, server.Port
 	if input.Name != "" {
 		server.Name = input.Name
 	}
@@ -155,6 +157,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if input.User != "" {
 		server.User = input.User
+	}
+	if input.HostKeyClear || server.Host != oldHost || server.Port != oldPort {
+		server.HostKey = ""
 	}
 	if input.SSHKey != "" {
 		path, err := saveKeyFile(h.sshKeyDir, id, input.SSHKey)
@@ -512,6 +517,9 @@ func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, rend
 		user = "root"
 	}
 
+	if r.FormValue("host_key_clear") != "" || host != server.Host || port != server.Port {
+		server.HostKey = ""
+	}
 	server.Name = name
 	server.Host = host
 	server.Port = port

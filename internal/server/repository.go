@@ -132,6 +132,21 @@ func (r *Repository) Update(s *Server) error {
 	return err
 }
 
+// HostKey and SaveHostKey implement ssh.HostKeyStore on servers.host_key.
+func (r *Repository) HostKey(host string, port int) (string, error) {
+	var key sql.NullString
+	err := r.db.QueryRow("SELECT host_key FROM servers WHERE host=? AND port=? LIMIT 1", host, port).Scan(&key)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return key.String, err
+}
+
+func (r *Repository) SaveHostKey(host string, port int, key string) error {
+	_, err := r.db.Exec("UPDATE servers SET host_key=? WHERE host=? AND port=?", key, host, port)
+	return err
+}
+
 func (r *Repository) CountApps(id int64) (int, error) {
 	var n int
 	err := r.db.QueryRow("SELECT COUNT(*) FROM apps WHERE server_id = ?", id).Scan(&n)

@@ -74,7 +74,7 @@ func NewService(repo *Repository, serverRepo *server.Repository, cf *cloudflare.
 		serverRepo:  serverRepo,
 		cf:          cf,
 		scheduler:   sch,
-		connFactory: ssh.RealFactory(),
+		connFactory: ssh.RealFactory(serverRepo),
 		statsCache:  make(map[int64]*StatsOverview),
 	}
 }

@@ -53,19 +53,13 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("stats ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"SSH connection failed"}`))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("stats ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"SSH connection failed"}`))
+		return
 	}
+	defer client.Close()
 
 	cpuCores, _ := parseCPUCountLive(client)
 	ramMB, _ := parseRAMLive(client)

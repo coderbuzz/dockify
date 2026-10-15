@@ -29,12 +29,18 @@ type Service struct {
 func NewService(repo *Repository) *Service {
 	return &Service{
 		repo:        repo,
-		connFactory: ssh.RealFactory(),
+		connFactory: ssh.RealFactory(repo),
 	}
 }
 
 func (s *Service) SetConnFactory(f ssh.Factory) {
 	s.connFactory = f
+}
+
+// Connect opens an SSH connection to the server through the service's factory:
+// pinned host keys in production, the mock client in dev mode.
+func (s *Service) Connect(svr *Server) (ssh.Connector, error) {
+	return s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 }
 
 func (s *Service) refreshCacheLocked() {
@@ -130,7 +136,7 @@ func (s *Service) TestConnection(id int64) error {
 		return fmt.Errorf("server not found")
 	}
 
-	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.Connect(server)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
 		return fmt.Errorf("SSH connect failed: %w", err)
@@ -157,7 +163,7 @@ func (s *Service) PruneWorker(id int64, removeAll bool, removeVolumes bool) (str
 		return "", fmt.Errorf("server not found")
 	}
 
-	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.Connect(server)
 	if err != nil {
 		return "", fmt.Errorf("SSH connect failed: %w", err)
 	}
@@ -197,7 +203,7 @@ func (s *Service) InitWorker(id int64) error {
 
 	s.repo.UpdateStatus(id, "initializing")
 
-	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.Connect(server)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusError)
 		return fmt.Errorf("SSH connect: %w", err)
@@ -321,7 +327,7 @@ func (s *Service) RefreshResources(id int64) error {
 		return err
 	}
 
-	client, err := s.connFactory(server.Host, server.Port, server.User, server.SSHKey)
+	client, err := s.Connect(server)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
 		s.serverMu.Lock()
