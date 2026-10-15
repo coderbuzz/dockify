@@ -130,9 +130,28 @@
   {{template "ui_sheet_end"}}
   {{template "ui_confirm" (dict "ID" "server-init" "Title" (printf "Init worker %s?" .Server.Name) "Body" "This re-runs the worker setup over SSH and may restart Docker and Caddy on this server." "Label" "Init worker" "Action" (printf "servers/%d/init" .Server.ID))}}
   {{template "ui_confirm" (dict "ID" "server-remove" "Title" (printf "Remove %s?" .Server.Name) "Body" "This removes the server from Dockify and deletes its SSH key. It cannot be undone. Undeploy or move its apps first." "Label" "Remove server" "Action" (printf "servers/%d/delete" .Server.ID))}}
-  {{range .Apps}}{{if ne .Status "draft"}}{{template "ui_confirm" (dict "ID" (printf "undeploy-%d" .ID) "Title" (printf "Undeploy %s?" .Name) "Body" (printf "This stops and removes the app from %s." $.Server.Name) "Label" "Undeploy" "Action" (printf "apps/%d/undeploy" .ID))}}{{else}}{{template "ui_confirm" (dict "ID" (printf "undeploy-%d" .ID) "Title" (printf "Delete draft %s?" .Name) "Body" "This permanently deletes the draft." "Label" "Delete draft" "Action" (printf "apps/%d/undeploy" .ID))}}{{end}}{{end}}
+  {{template "ui_confirm" (dict "ID" "undeploy-confirm" "Title" "Undeploy?" "Body" "" "Label" "Undeploy")}}
+  <form method="POST" id="undeploy-form" hidden></form>
 
   <script>
+  (function () {
+    var pending = null;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-undeploy]');
+      if (!b) return;
+      var draft = b.getAttribute('data-status') === 'draft', name = b.getAttribute('data-name');
+      pending = b.getAttribute('data-action');
+      document.getElementById('undeploy-confirm-title').textContent = (draft ? 'Delete draft ' : 'Undeploy ') + name + '?';
+      document.getElementById('undeploy-confirm-desc').textContent = draft ? 'This permanently deletes the draft.' : 'This stops and removes the app from {{.Server.Name}}.';
+      document.getElementById('undeploy-confirm-ok').textContent = draft ? 'Delete draft' : 'Undeploy';
+      openSheet('undeploy-confirm');
+    });
+    document.getElementById('undeploy-confirm-ok').addEventListener('click', function () {
+      var f = document.getElementById('undeploy-form');
+      f.action = pending;
+      f.submit();
+    });
+  })();
   function togglePruneOptions(isDeep) {
     var chkAll = document.getElementById('chk-all');
     var chkVol = document.getElementById('chk-volumes');
@@ -172,7 +191,7 @@
           <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
           <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
           <td style="width:1%;white-space:nowrap">
-            <button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('undeploy-{{.ID}}')">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
+            <button type="button" class="btn btn-destructive-outline btn-sm" data-undeploy data-action="apps/{{.ID}}/undeploy" data-name="{{.Name}}" data-status="{{.Status}}">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
           </td>
         </tr>
       {{end}}

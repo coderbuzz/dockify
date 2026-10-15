@@ -1,0 +1,6 @@
+{{/* Search + status chips + "N of M" meta for a [data-list] container (static/list.js). dict: Placeholder, Chips. */}}
+{{define "ui_listbar"}}<div class="listbar">
+<div class="search">{{template "ui_icon" "search"}}<input type="search" data-list-search placeholder="{{.Placeholder}}" aria-label="{{.Placeholder}}" autocomplete="off"></div>
+<div class="chips" role="group" aria-label="Filter by status"><button type="button" class="chip" data-chip="" aria-pressed="true">All</button>{{range .Chips}}<button type="button" class="chip" data-chip="{{.}}" aria-pressed="false">{{.}}</button>{{end}}</div>
+<p class="list-meta"><span data-list-count></span><button type="button" class="btn btn-link" data-list-reset hidden>Reset</button></p>
+</div>{{end}}

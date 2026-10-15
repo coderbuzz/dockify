@@ -1,114 +1,42 @@
 {{define "servers_list"}}
 {{if .Servers}}
-<input type="text" id="server-filter" placeholder="Filter servers by name, host or user..." style="margin-bottom:1.2rem;font-size:0.85em">
-<div class="table-wrap"><table id="servers-table" style="font-size:0.85em">
+<div data-list>
+{{template "ui_listbar" (dict "Placeholder" "Search name or host" "Chips" (list "online" "offline" "pending"))}}
+<table class="rows">
   <thead>
     <tr>
-      <th data-sort="name" data-type="string" style="cursor:pointer;user-select:none">Name <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="host" data-type="string" style="cursor:pointer;user-select:none">Host <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="user" data-type="string" style="cursor:pointer;user-select:none">User <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="status" data-type="string" style="cursor:pointer;user-select:none">Status <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="cpu" data-type="number" style="cursor:pointer;user-select:none">CPU <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="ram" data-type="number" style="cursor:pointer;user-select:none">RAM <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-      <th data-sort="disk" data-type="number" style="cursor:pointer;user-select:none">Disk <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
+      <th aria-sort="none"><button type="button" class="th-sort" data-sort="name" data-type="string">Name{{template "ui_icon" "chevron-down"}}</button></th>
+      <th aria-sort="none"><button type="button" class="th-sort" data-sort="status" data-type="string">Status{{template "ui_icon" "chevron-down"}}</button></th>
+      <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="user" data-type="string">User{{template "ui_icon" "chevron-down"}}</button></th>
+      <th aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
+      <th aria-sort="none"><button type="button" class="th-sort" data-sort="ram" data-type="number">RAM{{template "ui_icon" "chevron-down"}}</button></th>
+      <th aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
     </tr>
   </thead>
   <tbody>
     {{range .Servers}}
-    <tr data-name="{{.Name}}"
-        data-host="{{.Host}}"
+    <tr data-name="{{.Name}}" data-status="{{.Status}}" data-search="{{lower (printf "%s %s %s" .Name .Host .User)}}"
         data-user="{{.User}}"
-        data-sort-status="{{.Status}}"
         data-cpu="{{if .CPUUsage}}{{printf "%.3f" .CPUUsage}}{{else}}0{{end}}"
         data-ram="{{if .RAMUsage}}{{printf "%.3f" .RAMUsage}}{{else}}0{{end}}"
         data-disk="{{if .DiskUsage}}{{printf "%.3f" .DiskUsage}}{{else}}0{{end}}">
-      <td style="white-space:nowrap; font-weight: 600;"><a href="servers/{{.ID}}">{{.Name}}</a></td>
-      <td class="mono">{{.Host}}:{{.Port}}</td>
-      <td>{{.User}}</td>
-      <td><span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span></td>
-      <td>{{if .CPUCores}}{{.CPUCores}} cores{{if .CPUUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .CPUUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .CPUUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .CPUUsage}}%</span>{{end}}{{else}}-{{end}}</td>
-      <td>{{if .RAMMB}}{{.RAMMB}} MB{{if .RAMUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .RAMUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .RAMUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .RAMUsage}}%</span>{{end}}{{else}}-{{end}}</td>
-      <td>{{if .DiskGB}}{{.DiskGB}} GB{{if .DiskUsage}} <span class="badge" style="font-size:0.75em;margin-left:0.3em;{{if gt .DiskUsage 85.0}}background:var(--red-subtle);color:var(--red){{else if gt .DiskUsage 70.0}}background:var(--yellow-subtle);color:var(--yellow){{end}}">{{printf "%.1f" .DiskUsage}}%</span>{{end}}{{else}}-{{end}}</td>
+      <td class="c-name"><a href="servers/{{.ID}}">{{.Name}}</a><small class="mono">{{.Host}}:{{.Port}}</small></td>
+      <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "online"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
+      <td class="col-sm-hide">{{.User}}</td>
+      <td class="c-num" data-label="CPU"{{if .CPUCores}} title="{{.CPUCores}} cores"{{end}}>{{if .CPUUsage}}{{printf "%.1f" .CPUUsage}}%<progress class="bar{{if ge .CPUUsage 85.0}} bar-danger{{else if ge .CPUUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .CPUUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num" data-label="RAM"{{if .RAMMB}} title="{{.RAMMB}} MB"{{end}}>{{if .RAMUsage}}{{printf "%.1f" .RAMUsage}}%<progress class="bar{{if ge .RAMUsage 85.0}} bar-danger{{else if ge .RAMUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .RAMUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num" data-label="Disk"{{if .DiskGB}} title="{{.DiskGB}} GB"{{end}}>{{if .DiskUsage}}{{printf "%.1f" .DiskUsage}}%<progress class="bar{{if ge .DiskUsage 85.0}} bar-danger{{else if ge .DiskUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .DiskUsage}}" max="100"></progress>{{else}}-{{end}}</td>
     </tr>
     {{end}}
   </tbody>
-</table></div>
-<div id="server-filter-empty" class="empty-state" style="display:none">
-  <p>No servers match your filter.</p>
+</table>
+<p class="empty-note" data-list-empty hidden>No servers match your filter.</p>
 </div>
-<script>
-(function(){
-  var input = document.getElementById('server-filter');
-  if (input) {
-    input.addEventListener('input', function(){
-      var q = input.value.trim().toLowerCase();
-      var rows = document.querySelectorAll('#servers-table tbody tr[data-name]');
-      var matchCount = 0;
-      rows.forEach(function(r){
-        var name = (r.getAttribute('data-name') || '').toLowerCase();
-        var host = (r.getAttribute('data-host') || '').toLowerCase();
-        var user = (r.getAttribute('data-user') || '').toLowerCase();
-        var hit = q === '' || name.indexOf(q) > -1 || host.indexOf(q) > -1 || user.indexOf(q) > -1;
-        r.style.display = hit ? '' : 'none';
-        if (hit) matchCount++;
-      });
-      var empty = document.getElementById('server-filter-empty');
-      if (empty) empty.style.display = matchCount > 0 ? 'none' : 'block';
-    });
-  }
-
-  var table = document.getElementById('servers-table');
-  if (table) {
-    var currentSort = null;
-    var currentDir = 'asc';
-    var headers = table.querySelectorAll('th[data-sort]');
-    headers.forEach(function(th){
-      th.addEventListener('click', function(){
-        var key = th.getAttribute('data-sort');
-        var type = th.getAttribute('data-type') || 'string';
-        var attrName = 'data-' + key;
-        if (key === 'status') attrName = 'data-sort-status';
-
-        if (currentSort === key) {
-          currentDir = currentDir === 'asc' ? 'desc' : 'asc';
-        } else {
-          currentSort = key;
-          currentDir = type === 'number' ? 'desc' : 'asc';
-        }
-
-        headers.forEach(function(h){
-          var arrow = h.querySelector('.sort-arrow');
-          if (arrow) arrow.textContent = '';
-        });
-        var arrow = th.querySelector('.sort-arrow');
-        if (arrow) arrow.textContent = currentDir === 'asc' ? '▲' : '▼';
-
-        var tbody = table.querySelector('tbody');
-        var rows = Array.from(tbody.querySelectorAll('tr[data-name]'));
-
-        rows.sort(function(a, b){
-          var valA = a.getAttribute(attrName) || '';
-          var valB = b.getAttribute(attrName) || '';
-
-          if (type === 'number') {
-            var numA = parseFloat(valA) || 0;
-            var numB = parseFloat(valB) || 0;
-            return currentDir === 'asc' ? numA - numB : numB - numA;
-          } else {
-            return currentDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-          }
-        });
-
-        rows.forEach(function(r){ tbody.appendChild(r); });
-      });
-    });
-  }
-})();
-</script>
 {{else}}
 <div class="empty-state">
+  <span class="empty-icon">{{template "ui_icon" "server"}}</span>
   <p>No servers registered yet.</p>
-  <a href="servers/add" class="btn btn-primary">Add Your First Server</a>
+  {{if eq .Nav "dashboard"}}<a href="servers/add" class="btn btn-primary">Add Your First Server</a>{{end}}
 </div>
 {{end}}
 {{end}}

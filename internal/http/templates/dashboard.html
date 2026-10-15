@@ -10,30 +10,18 @@
   </hgroup>
 
   {{if .Stats}}
-  <div class="grid kpi-grid" style="margin-bottom: 1.5em;">
-    <div class="card stat">
-      <h2>{{.Stats.TotalServers}}</h2>
-      <small>Servers</small>
-    </div>
-    <div class="card stat">
-      <h2 style="color: var(--green);">{{.Stats.OnlineServers}}</h2>
-      <small>Online Servers</small>
-    </div>
-    <div class="card stat">
-      <h2>{{.Stats.TotalApps}}</h2>
-      <small>Apps</small>
-    </div>
-    <div class="card stat">
-      <h2 style="color: var(--green);">{{.Stats.RunningApps}}</h2>
-      <small>Running Apps</small>
-    </div>
+  <div class="grid kpi-grid">
+    <div class="card stat"><h2>{{.Stats.TotalServers}}</h2><small>Servers</small></div>
+    <div class="card stat"><h2 class="stat-ok">{{.Stats.OnlineServers}}</h2><small>Online servers</small></div>
+    <div class="card stat"><h2>{{.Stats.TotalApps}}</h2><small>Apps</small></div>
+    <div class="card stat"><h2 class="stat-ok">{{.Stats.RunningApps}}</h2><small>Running apps</small></div>
   </div>
   {{end}}
 
-  <h2 style="margin-top:1.5rem">Servers ({{len .Servers}})</h2>
+  <div class="section-head"><h2>Servers</h2><span class="count">{{len .Servers}}</span><a href="servers" class="btn btn-link">View all</a></div>
   {{template "servers_list" .}}
 
-  <h2 style="margin-top:2rem">Apps ({{len .Apps}})</h2>
+  <div class="section-head"><h2>Apps</h2><span class="count">{{len .Apps}}</span><a href="apps" class="btn btn-link">View all</a></div>
   {{template "apps_list" .}}
 </div>
 {{template "scripts" .}}
