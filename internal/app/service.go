@@ -1159,33 +1159,22 @@ func (s *Service) GetStatsOverview(appID int64) *StatsOverview {
 	}
 }
 
-func (s *Service) UpdateStatsCache(appID int64, update *StatsOverview) {
+// updateDiskCache sets an app's cached disk usage, leaving the live fields alone.
+func (s *Service) updateDiskCache(appID, bytes int64) {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
 	if s.statsCache == nil {
 		s.statsCache = make(map[int64]*StatsOverview)
 	}
-	existing, ok := s.statsCache[appID]
-	if !ok {
-		cp := *update
-		s.statsCache[appID] = &cp
-		return
-	}
-	if update.CPUPercent > 0 || update.MemUsageBytes > 0 || update.MemPercent > 0 {
-		existing.CPUPercent = update.CPUPercent
-		existing.MemPercent = update.MemPercent
-		existing.MemUsageBytes = update.MemUsageBytes
-		existing.MemLimitBytes = update.MemLimitBytes
-		existing.NetIORxBytes = update.NetIORxBytes
-		existing.NetIOTxBytes = update.NetIOTxBytes
-		existing.BlockIORead = update.BlockIORead
-		existing.BlockIOWrite = update.BlockIOWrite
-	}
-	if update.DiskUsageBytes > 0 {
-		existing.DiskUsageBytes = update.DiskUsageBytes
+	if existing, ok := s.statsCache[appID]; ok {
+		existing.DiskUsageBytes = bytes
+	} else {
+		s.statsCache[appID] = &StatsOverview{DiskUsageBytes: bytes}
 	}
 }
 
+// UpdateStatsCacheBatch stores the latest sample per app, all-zero (idle) ones
+// included; the cached disk usage is kept when a sample carries none.
 func (s *Service) UpdateStatsCacheBatch(stats map[int64]*StatsOverview) {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
@@ -1193,25 +1182,11 @@ func (s *Service) UpdateStatsCacheBatch(stats map[int64]*StatsOverview) {
 		s.statsCache = make(map[int64]*StatsOverview)
 	}
 	for appID, st := range stats {
-		existing, ok := s.statsCache[appID]
-		if !ok {
-			cp := *st
-			s.statsCache[appID] = &cp
-			continue
+		cp := *st
+		if existing, ok := s.statsCache[appID]; ok && cp.DiskUsageBytes <= 0 {
+			cp.DiskUsageBytes = existing.DiskUsageBytes
 		}
-		if st.CPUPercent > 0 || st.MemUsageBytes > 0 || st.MemPercent > 0 {
-			existing.CPUPercent = st.CPUPercent
-			existing.MemPercent = st.MemPercent
-			existing.MemUsageBytes = st.MemUsageBytes
-			existing.MemLimitBytes = st.MemLimitBytes
-			existing.NetIORxBytes = st.NetIORxBytes
-			existing.NetIOTxBytes = st.NetIOTxBytes
-			existing.BlockIORead = st.BlockIORead
-			existing.BlockIOWrite = st.BlockIOWrite
-		}
-		if st.DiskUsageBytes > 0 {
-			existing.DiskUsageBytes = st.DiskUsageBytes
-		}
+		s.statsCache[appID] = &cp
 	}
 }
 
