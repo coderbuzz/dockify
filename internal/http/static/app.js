@@ -203,3 +203,13 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('static/sw.js?v=' + assetV, { scope: './' }).catch(function () {});
   });
 }
+
+// Log output is plain text: show empty results and HTTP errors instead of a silent black box.
+document.addEventListener('htmx:afterSwap', function (e) {
+  var t = e.detail.target;
+  if (t && t.classList.contains('log-content') && !t.textContent.trim()) t.textContent = '(no output)';
+});
+document.addEventListener('htmx:responseError', function (e) {
+  var t = e.detail.target;
+  if (t && t.classList.contains('log-content')) t.textContent = 'Error ' + e.detail.xhr.status + ': ' + (e.detail.xhr.responseText || '').slice(0, 2000);
+});
