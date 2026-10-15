@@ -244,6 +244,20 @@ func GetDevMock(r *http.Request) bool {
 // assetVersion busts the browser cache of /static/app.css on upgrade; set by NewRouter.
 var assetVersion string
 
+// navSection maps the request path to the active main-nav item.
+func navSection(r *http.Request) string {
+	p := "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, strings.TrimSuffix(web.GetBasePath(r), "/")), "/")
+	switch {
+	case strings.HasPrefix(p, "/servers"):
+		return "servers"
+	case strings.HasPrefix(p, "/apps"):
+		return "apps"
+	case strings.HasPrefix(p, "/settings"), strings.HasPrefix(p, "/about"):
+		return "settings"
+	}
+	return "dashboard"
+}
+
 type RenderFunc func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})
 
 func Render(w http.ResponseWriter, r *http.Request, status int, name string, data interface{}) {
@@ -258,6 +272,7 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 		m["BasePath"] = web.GetBasePath(r)
 		m["DevMock"] = GetDevMock(r)
 		m["AssetVersion"] = assetVersion
+		m["Nav"] = navSection(r)
 	}
 
 	var buf bytes.Buffer

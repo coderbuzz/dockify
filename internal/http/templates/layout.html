@@ -58,52 +58,26 @@
 
 {{define "nav"}}
 {{if .DevMock}}<div class="dev-mock-bar">⚠ Dev Mock Mode — All SSH operations are simulated</div>{{end}}
-<nav class="top-nav">
-  <a href="." class="logo">
-    <span class="logo-icon">D</span>
-    Dockify
-  </a>
-  <button class="mobile-nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation">{{template "ui_icon" "menu"}}</button>
-  <div class="nav-links" id="nav-links">
-    <a href="." id="nav-dashboard">Dashboard</a>
-    <a href="servers" id="nav-servers">Servers</a>
-    <a href="apps" id="nav-apps">Apps</a>
-    <a href="settings" id="nav-settings">Settings</a>
-    <a href="about" id="nav-about">About</a>
-    <button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
+<header class="top-nav">
+  <div class="top-bar">
+    <a href="." class="logo"><span class="logo-icon">D</span>Dockify</a>
+    <div class="top-actions">
+      <button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
+      <form method="POST" action="logout"><button type="submit" class="btn btn-secondary btn-icon" aria-label="Sign out" title="Sign out">{{template "ui_icon" "logout"}}</button></form>
+    </div>
   </div>
-</nav>
+  <nav class="main-nav" aria-label="Main">
+    <a href="."{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>{{template "ui_icon" "layout-dashboard"}}<span>Dashboard</span></a>
+    <a href="servers"{{if eq .Nav "servers"}} aria-current="page"{{end}}>{{template "ui_icon" "server"}}<span>Servers</span></a>
+    <a href="apps"{{if eq .Nav "apps"}} aria-current="page"{{end}}>{{template "ui_icon" "box"}}<span>Apps</span></a>
+    <a href="settings"{{if eq .Nav "settings"}} aria-current="page"{{end}}>{{template "ui_icon" "settings"}}<span>Settings</span></a>
+  </nav>
+</header>
 {{end}}
 
 {{define "scripts"}}
 <script>
-(function() {
-  // Highlight active nav link based on current path
-  var path = window.location.pathname;
-  var links = {
-    'servers': 'nav-servers',
-    'apps': 'nav-apps',
-    'settings': 'nav-settings',
-    'about': 'nav-about'
-  };
-  var matched = false;
-  for (var k in links) {
-    if (path.indexOf('/' + k) !== -1 || path === k) {
-      var el = document.getElementById(links[k]);
-      if (el) { el.classList.add('active'); matched = true; }
-      break;
-    }
-  }
-  if (!matched) {
-    var dash = document.getElementById('nav-dashboard');
-    if (dash) dash.classList.add('active');
-  }
-})();
 
-function toggleMobileNav() {
-  var nav = document.getElementById('nav-links');
-  if (nav) nav.classList.toggle('open');
-}
 
 document.querySelectorAll('time[datetime]').forEach(function(el){
   var d = new Date(el.getAttribute('datetime'));
