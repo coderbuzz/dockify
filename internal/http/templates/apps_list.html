@@ -29,7 +29,7 @@
           data-memory="{{with $st := index $.AppStats .ID}}{{$st.MemUsageBytes}}{{end}}"
           data-disk="{{with $st := index $.AppStats .ID}}{{$st.DiskUsageBytes}}{{end}}"
           data-port="{{.Port}}">
-        <td class="c-name"><a href="apps/{{.ID}}">{{.Name}}</a>{{if .Domain}}<small class="mono"><a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></small>{{end}}</td>
+        <td class="c-name"><a href="apps/{{.ID}}" preload="mousedown">{{.Name}}</a>{{if .Domain}}<small class="mono"><a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></small>{{end}}</td>
         <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "running"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
         <td class="col-sm-hide mono">{{if .Domain}}<a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a>{{else}}-{{end}}</td>
         <td class="c-num num" data-label="CPU">{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>

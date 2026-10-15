@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   <div class="breadcrumb">
     <span>Settings</span>
   </div>
@@ -66,7 +66,6 @@
     <a href="import" class="btn btn-secondary">Go to import page</a>
   </div>
   <p><a href="about" class="btn btn-link">About Dockify</a></p>
-</div>
 {{template "ui_confirm" (dict "ID" "roll-confirm" "Title" "Roll webhook secret?" "Body" "The old secret stops working immediately. Update your CI secrets right after." "Label" "Roll secret")}}
 <script>
 document.getElementById('roll-confirm-ok').addEventListener('click', function () { rollSecret(); });
@@ -98,7 +97,7 @@ function syncAppearance() {
   [].forEach.call(document.querySelectorAll('[data-palette]'), function (b) { if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === pal)); });
   [].forEach.call(document.querySelectorAll('[data-theme-mode]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-mode') === mode)); });
 }
-document.addEventListener('click', function (e) {
+document.getElementById('main').addEventListener('click', function (e) {
   var b = e.target.closest && e.target.closest('button[data-palette], [data-theme-mode]');
   if (!b) return;
   try {
@@ -119,6 +118,6 @@ function rollSecret() {
     });
 }
 </script>
-{{template "scripts" .}}
+</div>
 </body>
 </html>

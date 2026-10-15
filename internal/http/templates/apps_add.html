@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   <hgroup>
     <h1>{{if .IsEdit}}Edit App{{else}}Deploy App{{end}}</h1>
     <p>{{if .IsEdit}}Update configuration and redeploy{{else}}Deploy a Docker container to a worker VM{{end}}</p>
@@ -185,7 +185,6 @@
       {{end}}
     </div>
   </form>
-</div>
 
 <template id="icon-eye">{{template "ui_icon" "eye"}}</template><template id="icon-eye-off">{{template "ui_icon" "eye-off"}}</template><template id="icon-x">{{template "ui_icon" "x"}}</template><template id="icon-trash">{{template "ui_icon" "trash"}}</template>
 {{if and .IsEdit (ne .App.Status "draft")}}{{template "ui_confirm" (dict "ID" "save-redeploy" "Title" (printf "Save and redeploy %s?" .App.Name) "Body" "This restarts the app with the new configuration." "Label" "Save & Redeploy")}}{{end}}
@@ -480,6 +479,6 @@ if (serverSel) serverSel.addEventListener('change', function () { document.getEl
   if (ok) ok.addEventListener('click', function () { closeSheet('save-redeploy'); var f = document.getElementById('app-form'); if (f.requestSubmit) f.requestSubmit(); else if (validateServer()) f.submit(); });
 })();
 </script>
-{{template "scripts" .}}
+</div>
 </body>
 </html>

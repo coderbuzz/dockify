@@ -40,7 +40,8 @@ function dockifyConsole(cfg) {
     if (term) { term.dispose(); term = null; }
     setStatus('Disconnected', 'badge-offline');
   }
-  return {
+  var api = {
+    disconnect: disconnect,
     toggle: function () {
       var box = el(cfg.container), btn = el(cfg.toggle);
       if (box.hidden) {
@@ -54,6 +55,7 @@ function dockifyConsole(cfg) {
       }
     },
   };
+  return api;
 }
 var serverConsole = null, appConsole = null;
 function toggleConsole() {
@@ -110,3 +112,8 @@ function toggleAppConsole() {
       } });
   appConsole.toggle();
 }
+// A boosted navigation replaces #main; close any open console so its socket does not leak.
+(window.dockifyCleanups = window.dockifyCleanups || []).push(function () {
+  if (serverConsole) { serverConsole.disconnect(); serverConsole = null; }
+  if (appConsole) { appConsole.disconnect(); appConsole = null; }
+});

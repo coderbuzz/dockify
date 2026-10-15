@@ -260,7 +260,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	return r
 }
 
-//go:embed static/*.js static/*.css
+//go:embed static/*.js static/*.css static/*.png static/*.webmanifest
 var staticFS embed.FS
 
 // serveStatic serves the vendored browser assets (see static/SOURCES.md); no directory listing.
@@ -270,8 +270,15 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// ponytail: a week, not immutable — file names do not change when an asset is upgraded.
-	w.Header().Set("Cache-Control", "public, max-age=604800")
+	if name == "sw.js" {
+		// The worker script must always be revalidated; it controls the whole app path (scope ".").
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Service-Worker-Allowed", "../")
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	} else {
+		// ponytail: a week, not immutable — file names do not change when an asset is upgraded.
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+	}
 	http.ServeFileFS(w, r, staticFS, "static/"+name)
 }
 
@@ -286,6 +293,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
+		// htmx preload (hover/touch prefetch) relies on the browser cache: let the prefetched page live a few seconds.
+		if r.Method == http.MethodGet && r.Header.Get("HX-Preloaded") == "true" {
+			h.Set("Cache-Control", "private, max-age=5")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

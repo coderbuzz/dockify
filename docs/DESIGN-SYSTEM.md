@@ -15,7 +15,7 @@ Tanpa framework CSS, tanpa Node saat build/runtime. Font: Plus Jakarta Sans 400/
 - Preferensi di `localStorage`: `dockify_palette` (`indigo` default) dan `dockify_theme` (`light|dark|system`, **default `system`**). Kunci lama `dockify-theme` dibaca sekali lalu dihapus.
 - Skrip bootstrap **inline di `<head>`** (sebelum CSS) menulis kedua atribut + `<meta name="theme-color">`; selama `system`, ikuti `matchMedia('(prefers-color-scheme: dark)')` dan perubahannya. Tanpa `@media (prefers-color-scheme)` di CSS.
 - CSS: lapis 2 didefinisikan per kombinasi: `:root[data-palette=indigo]`, `:root[data-palette=indigo][data-theme=dark]`, dst. (6 blok). Komponen hanya memakai token lapis 2 (`var(--ink)`, `var(--accent-fill)`...), tidak pernah hex.
-- Kontrol: tombol ikon di header (siklus terang → gelap → sistem, ikon matahari/bulan/monitor, `aria-label` menyebut mode berikutnya) dan di **Settings → Appearance**: segmented "Palette" (Indigo / Navy / Teal) dan segmented "Theme" (Light / Dark / System). Halaman login ikut preferensi yang sama.
+- Kontrol: tombol ikon di header (terang → gelap → sistem → lawan dari tema efektif saat itu, supaya setiap klik terlihat berubah; ikon matahari/bulan/monitor, `aria-label` menyebut mode berikutnya) dan di **Settings → Appearance**: segmented "Palette" (Indigo / Navy / Teal) dan segmented "Theme" (Light / Dark / System). Halaman login ikut preferensi yang sama.
 
 ## 3. Token lapis 2 (nama tetap, nilai per palet)
 Kegunaan tiap token sama dengan standar §3: `bg` latar halaman, `surface` kartu/header/sheet, `sunk` permukaan cekung (pill netral, wadah segmented),

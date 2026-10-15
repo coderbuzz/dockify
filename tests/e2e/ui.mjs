@@ -115,7 +115,7 @@ for (const pal of ['navy', 'teal']) {
   await ctx.close();
 }
 
-// ---------- flows with auth on: forms must not hit /logout (regression A1) ----------
+// ---------- flows with auth on: forms must not hit /logout (regression A1); boosted, so wait for the URL, not a document navigation ----------
 {
   const [ctx, p] = await newCtx();
   const sid = servers[0].href.split('/').pop();
@@ -126,12 +126,12 @@ for (const pal of ['navy', 'teal']) {
   await p.fill('[name=image]', 'nginx:alpine');
   await p.fill('[name=port]', '8080');
   await p.selectOption('#server-select', sid);
-  await Promise.all([p.waitForNavigation(), p.click('button:has-text("Save as Draft")')]);
+  await Promise.all([p.waitForURL((u) => /\/apps\/\d+$/.test(u.pathname)) , p.click('button:has-text("Save as Draft")')]);
   okUrl('save-as-draft');
   const edit = '/' + appRun.href + '/edit';
   await p.goto(BASE + edit);
   await p.click('button:has-text("Save & Redeploy")');
-  await Promise.all([p.waitForNavigation(), p.click('#save-redeploy-ok')]);
+  await Promise.all([p.waitForURL((u) => /\/apps\/\d+$/.test(u.pathname)) , p.click('#save-redeploy-ok')]);
   okUrl('save-and-redeploy');
   await p.goto(BASE + edit);
   const cur = await p.inputValue('#server-select');
@@ -139,7 +139,7 @@ for (const pal of ['navy', 'teal']) {
   await p.click('button:has-text("Save & Redeploy")');
   await p.click('#save-redeploy-ok');
   await p.waitForSelector('#move-modal[open]', { timeout: 5000 }).catch(() => fail('flow move: move sheet did not open'));
-  await Promise.all([p.waitForNavigation(), p.click('button:has-text("Move app")')]);
+  await Promise.all([p.waitForURL((u) => /\/apps\/\d+$/.test(u.pathname)) , p.click('button:has-text("Move app")')]);
   okUrl('move-app');
   await ctx.close();
 }
@@ -181,6 +181,85 @@ const timing = {};
     }
     timing[name] = { dcl: median(dcl), load: median(load) };
   }
+  await ctx.close();
+}
+
+// ---------- boosted navigation (S9): tab click -> htmx swap of #main, no full reload ----------
+const boost = {};
+{
+  const [ctx, p] = await newCtx();
+  const cdp = await ctx.newCDPSession(p);
+  // CDP network emulation (not page.route) so the HTTP cache still works for the preload check.
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80, downloadThroughput: -1, uploadThroughput: -1 });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await p.goto(BASE + '/servers');
+  await p.evaluate(() => {
+    window.__hdr = document.querySelector('header.top-nav');
+    window.__t = {};
+    document.addEventListener('htmx:beforeRequest', (e) => { if (!(e.detail.requestConfig.headers || {})['HX-Preloaded']) window.__t.start = performance.now(); });
+    document.addEventListener('htmx:afterSettle', () => { window.__t.end = performance.now(); });
+  });
+  const state = () => p.evaluate(() => ({
+    title: document.title, cur: document.querySelector('.main-nav [aria-current]')?.getAttribute('data-nav'),
+    path: location.pathname, hdr: window.__hdr.isConnected, nodes: document.querySelectorAll('*').length, y: scrollY,
+  }));
+  async function go(tab, preload) { // returns ms from htmx:beforeRequest to htmx:afterSettle
+    await p.evaluate(() => { window.__t = {}; });
+    const sel = `.main-nav a[data-nav=${tab}]`;
+    if (preload) { await p.dispatchEvent(sel, 'touchstart'); await p.waitForTimeout(700); }
+    await p.evaluate((q) => document.querySelector(q).click(), sel);
+    await p.waitForFunction(() => window.__t.end, null, { timeout: 8000 });
+    return p.evaluate(() => Math.round(window.__t.end - window.__t.start));
+  }
+  for (const preload of [false, true]) {
+    const t = [];
+    for (let i = 0; i < RUNS; i++) { await go('servers', false); t.push(await go('apps', preload)); }
+    boost[preload ? 'preload' : 'plain'] = median(t);
+  }
+  if (boost.preload > 150) fail(`boosted nav with preload ${boost.preload} ms > 150`);
+  if (boost.plain > 250) fail(`boosted nav without preload ${boost.plain} ms > 250`);
+  // state after a boosted swap
+  await go('servers', false); await p.evaluate(() => scrollTo(0, 400));
+  await go('apps', false);
+  const st = await state();
+  if (st.cur !== 'apps' || !/^Apps/.test(st.title) || !/\/apps$/.test(st.path)) fail(`boost state wrong: ${JSON.stringify(st)}`);
+  if (!st.hdr) fail('header was re-rendered by boosted navigation');
+  if (st.y !== 0) fail(`boost did not scroll to top (y=${st.y})`);
+  // back / forward
+  await p.goBack(); await p.waitForFunction(() => /\/servers$/.test(location.pathname)); await p.waitForTimeout(400);
+  const back = await state();
+  if (back.cur !== 'servers' || !/^Servers/.test(back.title)) fail(`back: ${JSON.stringify(back)}`);
+  await p.goForward(); await p.waitForFunction(() => /\/apps$/.test(location.pathname)); await p.waitForTimeout(400);
+  const fwd = await state();
+  if (fwd.cur !== 'apps') fail(`forward: ${JSON.stringify(fwd)}`);
+  // leak check: 10x list <-> app detail (live charts + WebSocket) must not grow the DOM or the cleanup list
+  await go('apps', false);
+  const before = (await state()).nodes;
+  for (let i = 0; i < 10; i++) {
+    await p.evaluate((h) => document.querySelector(`a[href="${h}"]`).click(), appRun.href);
+    await p.waitForSelector('#app-stats-body, .gauge', { timeout: 8000 });
+    await p.waitForTimeout(300);
+    await go('apps', false);
+  }
+  const after = await state();
+  const live = await p.evaluate(() => (window.dockifyCleanups || []).length);
+  boost.leak = { before, after: after.nodes, cleanups: live };
+  if (after.nodes > before + 5) fail(`DOM nodes grew after 10 boosted round trips: ${before} -> ${after.nodes}`);
+  if (live > 0) fail(`dockifyCleanups not empty on a list page: ${live}`);
+  // detail page: charts script still ran after the swap
+  await p.evaluate((h) => document.querySelector(`a[href="${h}"]`).click(), appRun.href);
+  await p.waitForTimeout(2500);
+  const charts = await p.evaluate(() => ({ cleanups: (window.dockifyCleanups || []).length, line: !!document.querySelector('[id$="-chart-line"]') }));
+  if (charts.cleanups < 1) fail('live charts were not initialised after a boosted navigation');
+  boost.detail = charts;
+  // login -> logout -> login again (these are never boosted)
+  await p.click('button[aria-label="Sign out"]');
+  await p.waitForURL(/\/login$/);
+  await p.fill('input[name=user]', process.env.UI_USER || 'admin');
+  await p.fill('input[name=pass]', process.env.UI_PASS || '');
+  await Promise.all([p.waitForURL((u) => !/\/login/.test(u.pathname)), p.click('button[type=submit]')]);
+  boost.relogin = await p.evaluate(() => document.title);
   await ctx.close();
 }
 
@@ -232,6 +311,8 @@ const a11y = [];
 // ---------- report ----------
 const rep = [`# Dockify UI report\n\nBase: ${BASE} · ${new Date().toISOString()} · runs=${RUNS}\n`,
   '## Navigation (CPU 4x, +80 ms per request, median)\n', md(['page', 'DOMContentLoaded ms', 'load ms'], Object.entries(timing).map(([k, v]) => [k, v.dcl, v.load])),
+  '\n## Boosted navigation (S9, tab click, CPU 4x, +80 ms, median)\n', md(['case', 'ms'], [['with preload (touchstart first)', boost.preload], ['without preload', boost.plain]]),
+  `\nLeak check (10 round trips list <-> detail): nodes ${boost.leak?.before} -> ${boost.leak?.after}, cleanups left ${boost.leak?.cleanups}\n`,
   '\n## Transfer (cold, on the wire) and DOM nodes @390\n', md(['page', 'KB', 'requests', 'DOM nodes', 'nodes/row'], Object.keys(nodes).map((k) => [k, transfer[k]?.kb ?? '-', transfer[k]?.reqs ?? '-', nodes[k].n, nodes[k].row])),
   `\n## Overflow @360/390\n\n${overflow.length ? overflow.join(', ') : 'none (0)'}\n`,
   '\n## Contrast (WCAG, 19 pairs)\n', md(['palette', 'theme', 'pass'], contrast),

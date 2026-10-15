@@ -50,7 +50,13 @@
     });
     apply();
   }
-  document.addEventListener('DOMContentLoaded', function () {
-    [].forEach.call(document.querySelectorAll('[data-list]'), initList);
-  });
+  // Idempotent: runs on load and after every htmx swap; data-init guards against double wiring.
+  function init() {
+    [].forEach.call(document.querySelectorAll('[data-list]:not([data-init])'), function (r) {
+      r.setAttribute('data-init', '1');
+      initList(r);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('htmx:afterSettle', init);
 })();

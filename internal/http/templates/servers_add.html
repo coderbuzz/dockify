@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   <hgroup>
     <h1>Add Server</h1>
     <p>Register a new VM in the pool</p>
@@ -43,6 +43,5 @@
     </div>
   </form>
 </div>
-{{template "scripts" .}}
 </body>
 </html>

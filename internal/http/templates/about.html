@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container" id="about-page">
+<div class="container" id="main" data-nav="{{.Nav}}">
   <div class="breadcrumb">
     <span>About</span>
   </div>
@@ -38,7 +38,6 @@
     <a href="https://github.com/sponsors/coderbuzz" class="btn btn-secondary" target="_blank" rel="noopener">Sponsor on GitHub</a>
   </div>
 
-</div>
 {{template "ui_confirm" (dict "ID" "update-confirm" "Title" "Update Dockify now?" "Body" "The server restarts to apply the update and is unavailable for a short time." "Label" "Update")}}
 <script>
 document.getElementById('update-confirm-ok').addEventListener('click', function () { runUpdate(); });
@@ -114,6 +113,6 @@ function runUpdate() {
   });
 }
 </script>
-{{template "scripts" .}}
+</div>
 </body>
 </html>

@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}<script src="static/htmx.min.js?v={{.AssetVersion}}"></script><script src="static/charts.js?v={{.AssetVersion}}"></script><script src="static/console.js?v={{.AssetVersion}}"></script>{{if eq .Server.Status "initializing"}}<meta http-equiv="refresh" content="2">{{end}}</head>
-<body>
+<head>{{template "head" .}}{{if eq .Server.Status "initializing"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   <div class="breadcrumb">
     <a href="servers">Servers</a>
     <span>/</span>
@@ -66,7 +66,7 @@
       </div>
     </div>
     <hr class="stats-divider">
-    <div id="server-stats-body" data-range="realtime" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
+    <div id="server-stats-body" data-range="realtime" hx-target="this" hx-select="unset" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
       <p class="muted-note">Loading charts&hellip;</p>
     </div>
   </div>
@@ -120,7 +120,6 @@
     </div>
   </div>
 
-</div>
 
   {{template "ui_sheet_start" (dict "ID" "prune-modal" "Title" (printf "Prune worker disk (%s)" .Server.Name))}}
       <p class="sheet-text">Remove Docker cache, unused images and leftover data on this worker to free disk space.</p>
@@ -158,7 +157,8 @@
   <script>
   (function () {
     var pending = null;
-    document.addEventListener('click', function (e) {
+    // Bound to #main (replaced on every boosted swap) so listeners do not pile up.
+    document.getElementById('main').addEventListener('click', function (e) {
       var b = e.target.closest('[data-undeploy]');
       if (!b) return;
       var draft = b.getAttribute('data-status') === 'draft', name = b.getAttribute('data-name');
@@ -231,6 +231,6 @@
   window.addEventListener('beforeunload', serverCharts.disconnect);
   </script>
   {{end}}
-  {{template "scripts" .}}
+</div>
 </body>
 </html>
