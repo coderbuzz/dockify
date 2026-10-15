@@ -899,4 +899,5 @@ hgroup .page-actions { margin-top: 4px; }
 }
 
 /* Lencana di tabel/daftar lebih kecil dari lencana judul (umpan balik produksi 2026-10-15) */
-.rows .badge, .group-head .badge { font-size: 9px; font-weight: 700; padding: 2px 5px; letter-spacing: 0.02em; }
+/* 8px dengan tinggi kotak = line-height agar teks tepat di tengah (diukur: selisih 0,13px) */
+.rows .badge, .group-head .badge { font-size: 8px; font-weight: 700; height: 16px; line-height: 16px; padding: 0 5px; letter-spacing: 0.02em; }
