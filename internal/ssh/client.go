@@ -283,14 +283,22 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 	outCh := make(chan Output, 64)
 	inCh := make(chan Input, 64)
 
-	session.Stdout = channelWriter{outCh}
-	session.Stderr = channelWriter{outCh}
+	session.Stdout = channelWriter{outCh, ctx.Done()}
+	session.Stderr = channelWriter{outCh, ctx.Done()}
 
 	if err := session.Start(cmd); err != nil {
 		session.Close()
 		return nil, nil, fmt.Errorf("exec pty: %w", err)
 	}
 
+	pump(ctx, session, wIn, outCh, inCh)
+	return outCh, inCh, nil
+}
+
+// pump runs an interactive session until the remote side exits or ctx ends.
+// The caller closes inCh when done sending; outCh ends with Closed and is
+// closed once the session's output is fully drained.
+func pump(ctx context.Context, session *gossh.Session, wIn io.WriteCloser, outCh chan Output, inCh chan Input) {
 	// Forward input channel → SSH stdin
 	go func() {
 		defer wIn.Close()
@@ -305,11 +313,16 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 		}
 	}()
 
-	// Wait for remote exit
+	// Wait for remote exit. Wait returns after the output copies finished, so
+	// nothing writes to outCh once it is closed.
 	go func() {
 		session.Wait()
 		session.Close()
-		outCh <- Output{Closed: true}
+		select {
+		case outCh <- Output{Closed: true}:
+		case <-ctx.Done():
+		}
+		close(outCh)
 	}()
 
 	// Context cancellation → kill session
@@ -317,8 +330,6 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 		<-ctx.Done()
 		session.Close()
 	}()
-
-	return outCh, inCh, nil
 }
 
 func (c *Client) Close() error {
@@ -358,51 +369,30 @@ func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan
 	outCh := make(chan Output, 64)
 	inCh := make(chan Input, 64)
 
-	session.Stdout = channelWriter{outCh}
-	session.Stderr = channelWriter{outCh}
+	session.Stdout = channelWriter{outCh, ctx.Done()}
+	session.Stderr = channelWriter{outCh, ctx.Done()}
 
 	if err := session.Shell(); err != nil {
 		session.Close()
 		return nil, nil, fmt.Errorf("shell: %w", err)
 	}
 
-	// Forward input channel → SSH stdin
-	go func() {
-		defer wIn.Close()
-		for input := range inCh {
-			if input.Resize != nil {
-				session.WindowChange(input.Resize.Height, input.Resize.Width)
-				continue
-			}
-			if len(input.Data) > 0 {
-				wIn.Write([]byte(input.Data))
-			}
-		}
-	}()
-
-	// Wait for remote exit
-	go func() {
-		session.Wait()
-		session.Close()
-		outCh <- Output{Closed: true}
-	}()
-
-	// Context cancellation → kill session
-	go func() {
-		<-ctx.Done()
-		session.Close()
-	}()
-
+	pump(ctx, session, wIn, outCh, inCh)
 	return outCh, inCh, nil
 }
 
+// channelWriter hands session output to the console; once done is closed (the
+// console went away) it fails instead of blocking the session forever.
 type channelWriter struct {
-	ch chan<- Output
+	ch   chan<- Output
+	done <-chan struct{}
 }
 
 func (w channelWriter) Write(p []byte) (int, error) {
-	data := make([]byte, len(p))
-	copy(data, p)
-	w.ch <- Output{Data: data}
-	return len(p), nil
+	select {
+	case w.ch <- Output{Data: bytes.Clone(p)}:
+		return len(p), nil
+	case <-w.done:
+		return 0, io.ErrClosedPipe
+	}
 }

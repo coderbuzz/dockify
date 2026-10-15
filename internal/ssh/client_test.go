@@ -27,6 +27,26 @@ func TestWrapTimeout(t *testing.T) {
 	}
 }
 
+// B13: a console writer must not block once nobody reads its output.
+func TestChannelWriterDone(t *testing.T) {
+	done := make(chan struct{})
+	close(done)
+	w := channelWriter{make(chan Output), done} // unbuffered, never read
+	finished := make(chan error, 1)
+	go func() {
+		_, err := w.Write([]byte("x"))
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err == nil {
+			t.Fatal("Write succeeded without a reader")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Write blocked after done was closed")
+	}
+}
+
 // writeFileCmd must store content byte for byte, whatever the path or the
 // content contain, and apply the mode.
 func TestWriteFileCmd(t *testing.T) {
