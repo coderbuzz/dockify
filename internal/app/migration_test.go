@@ -242,6 +242,19 @@ func TestMoveAppDirectSuccess(t *testing.T) {
 	}
 }
 
+// Undeploy and a purge remove only the app's own containers, volumes and images;
+// worker-wide pruning (other apps' volumes) stays behind the explicit Prune button.
+func TestUndeployAndPurgeDoNotPruneWorker(t *testing.T) {
+	f := newMoveFixture(t)
+	f.svc.CleanupFromServer(f.app.ID, f.src.ID, true)
+	if err := f.svc.Undeploy(f.app.ID); err != nil {
+		t.Fatal(err)
+	}
+	if !f.ranOn(f.src, "down --volumes --rmi all") || f.ranOn(f.src, "prune") {
+		t.Errorf("want compose down --volumes --rmi all and no prune; commands: %v", f.cmds)
+	}
+}
+
 func TestDockerVolumes(t *testing.T) {
 	compose := `services:
   db:
