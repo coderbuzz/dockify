@@ -15,12 +15,10 @@
     <h1>Dockify</h1>
   </div>
   <p>Sign in to continue</p>
-  {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+  {{if .Error}}<div class="alert alert-danger" role="alert">{{template "ui_icon" "alert"}}<div class="alert-text"><div class="alert-title">{{.Error}}</div></div></div>{{end}}
   <form method="POST" action="login">
-    <label for="user">Username</label>
-    <input type="text" id="user" name="user" required autofocus autocomplete="username">
-    <label for="pass">Password</label>
-    <input type="password" id="pass" name="pass" required autocomplete="current-password">
+    <label class="field" for="user"><span class="field-label">Username</span><input type="text" id="user" name="user" required autofocus autocomplete="username"></label>
+    <label class="field" for="pass"><span class="field-label">Password</span><input type="password" id="pass" name="pass" required autocomplete="current-password"></label>
     <button type="submit" class="btn btn-primary btn-lg">Sign in</button>
   </form>
 </div>

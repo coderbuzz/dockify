@@ -246,6 +246,9 @@ func GetDevMock(r *http.Request) bool {
 // assetVersion busts the browser cache of /static/app.css on upgrade; set by NewRouter.
 var assetVersion string
 
+// noAuth hides the Sign out button when no admin password is configured; set by NewRouter.
+var noAuth bool
+
 // navSection maps the request path to the active main-nav item.
 func navSection(r *http.Request) string {
 	p := "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, strings.TrimSuffix(web.GetBasePath(r), "/")), "/")
@@ -275,6 +278,7 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 		m["DevMock"] = GetDevMock(r)
 		m["AssetVersion"] = assetVersion
 		m["Nav"] = navSection(r)
+		m["NoAuth"] = noAuth
 	}
 
 	var buf bytes.Buffer

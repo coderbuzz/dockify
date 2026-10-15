@@ -18,6 +18,7 @@ import (
 
 func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock, trustProxy bool) *chi.Mux {
 	assetVersion = version
+	noAuth = cfgPass == ""
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)

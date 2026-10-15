@@ -13,47 +13,30 @@
   <hgroup><h1>Import Configuration</h1></hgroup>
 
   {{if .Error}}
-  <div class="card" style="color:var(--danger);margin-bottom:1em">{{.Error}}</div>
+  {{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" .Error "Sub" "")}}
   {{end}}
   {{if .Message}}
-  <div class="card" style="color:var(--ok);margin-bottom:1em">{{.Message}}</div>
+  {{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" .Message "Sub" "")}}
   {{end}}
 
   <form method="POST" action="api/backup/import" enctype="multipart/form-data">
     <div class="card">
-      <h3>Upload Export File</h3>
-      <label style="display:block;margin-bottom:1em">
-        <input type="file" name="file" accept=".yaml,.yml" style="display:block;margin-top:0.3em">
-      </label>
-
-      <label style="display:block;margin-bottom:1em">
-        <span style="font-size:0.85em;color:var(--ink2)">Passphrase (if encrypted)</span>
-        <input type="text" name="passphrase" placeholder="Enter passphrase from export" style="display:block;margin-top:0.3em;font-family:ui-monospace,monospace">
-      </label>
-
-      <fieldset style="border:1px solid var(--line);border-radius:4px;padding:1em;margin:0 0 1em">
-        <legend style="text-transform:uppercase;font-size:0.78em;color:var(--ink2);font-weight:600;letter-spacing:0.05em">Import Mode</legend>
-        <label style="display:inline-flex;align-items:center;margin-bottom:0">
-          <input type="radio" name="mode" value="merge" checked style="margin:0 0.7em 0 0">
-          <strong>Merge</strong>&nbsp;
-          <span style="color:var(--ink2)">— Add new servers/apps, skip existing by name</span>
-        </label>
-        <br>
-        <label style="display:inline-flex;align-items:center;margin-bottom:0">
-          <input type="radio" name="mode" value="replace" style="margin:0 0.7em 0 0">
-          <strong>Replace</strong>&nbsp;
-          <span style="color:var(--danger)">— Delete ALL existing servers and apps first, then import (every app must be stopped or a draft)</span>
-        </label>
+      <h3>Upload export file</h3>
+      <label class="field"><span class="field-label">YAML file</span><input type="file" name="file" accept=".yaml,.yml"></label>
+      <label class="field"><span class="field-label">Passphrase (if encrypted)</span><input type="text" class="mono" name="passphrase" placeholder="Enter passphrase from export"></label>
+      <fieldset class="opt-group">
+        <legend>Import mode</legend>
+        <label class="check"><input type="radio" name="mode" value="merge" checked><span><strong>Merge</strong><small class="field-hint">Add new servers and apps, skip existing ones by name.</small></span></label>
+        <label class="check"><input type="radio" name="mode" value="replace"><span><strong>Replace</strong><small class="field-hint t-danger">Delete ALL existing servers and apps first, then import. Every app must be stopped or a draft.</small></span></label>
       </fieldset>
-
       <button type="submit" class="btn btn-primary">Import</button>
     </div>
   </form>
 
   {{if .Log}}
-  <div class="card" style="margin-top:1em">
-    <h3>Import Log</h3>
-    <pre style="max-height:400px;overflow:auto;font-size:0.85em">{{.Log}}</pre>
+  <div class="card">
+    <h3>Import log</h3>
+    <pre class="code">{{.Log}}</pre>
   </div>
   {{end}}
 </div>

@@ -25,6 +25,7 @@
       b.title = 'Theme: ' + mode;
     }
   }
+  window.dockifyApplyTheme = apply;
   window.dockifyCycleTheme = function () {
     var mode = get('dockify_theme', 'system', MODES);
     try { localStorage.setItem('dockify_theme', MODES[(MODES.indexOf(mode) + 1) % 3]); } catch (e) {}
@@ -64,7 +65,7 @@
     <a href="." class="logo"><span class="logo-icon">D</span>Dockify</a>
     <div class="top-actions">
       <button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
-      <form method="POST" action="logout"><button type="submit" class="btn btn-secondary btn-icon" aria-label="Sign out" title="Sign out">{{template "ui_icon" "logout"}}</button></form>
+      {{if not .NoAuth}}<form method="POST" action="logout"><button type="submit" class="btn btn-secondary btn-icon" aria-label="Sign out" title="Sign out">{{template "ui_icon" "logout"}}</button></form>{{end}}
     </div>
   </div>
   <nav class="main-nav" aria-label="Main">

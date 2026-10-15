@@ -10,68 +10,67 @@
   </hgroup>
 
   {{if .Error}}
-  <div class="card" style="color:var(--danger)">{{.Error}}</div>
+  {{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" .Error "Sub" "")}}
   {{end}}
 
   <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}" onsubmit="return validateServer()">
     {{if and .IsEdit (eq .App.Status "draft")}}<input type="hidden" name="draft" value="1">{{end}}
     <div class="card">
       <h3>Basic</h3>
-      <div class="grid-2" style="align-items:start">
-        <div style="display:flex;flex-direction:column;gap:0.8em">
-          <label>App Name<input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
-          <label>Port<input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small>Internal container port (optional)</small></label>
-          <label>Server
-            <select name="server_id">
+      <div class="grid-2">
+        <div>
+          <label class="field"><span class="field-label">App name</span><input type="text" name="name" placeholder="my-web-app" value="{{if .App}}{{.App.Name}}{{end}}" required autofocus></label>
+          <label class="field"><span class="field-label">Port</span><input type="number" name="port" placeholder="80" value="{{if .App}}{{.App.Port}}{{end}}"><small class="field-hint">Internal container port (optional)</small></label>
+          <label class="field"><span class="field-label">Server</span>
+            <span class="select-wrap"><select class="select" name="server_id" id="server-select" aria-describedby="server-error">
               <option value="">Select a server...</option>
               <option value="0">Auto-select (least loaded)</option>
               {{$selected := 0}}{{if .App}}{{$selected = .App.ServerID}}{{end}}
               {{range .Servers}}<option value="{{.ID}}" {{if eq .ID $selected}}selected{{end}}>{{.Name}} ({{.Status}})</option>{{end}}
-            </select>
+            </select>{{template "ui_icon" "chevron-down"}}</span>
+            <span class="field-error" id="server-error" role="alert" hidden>Select a server, or save as draft.</span>
           </label>
         </div>
         <div>
-          <label>Domains
+          <div class="field">
+            <span class="field-label">Domains</span>
             <div id="domains-list">
-              <div id="domains-list">
-                {{if .Domains}}
-                {{range $i, $d := .Domains}}
-                <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
-                  <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" style="margin-bottom:0;flex:1">
-                  {{if $i}}<button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove domain" onclick="removeDomainRow(this)">{{template "ui_icon" "x"}}</button>{{end}}
-                </div>
-                {{end}}
-                {{else}}
-                <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
-                  <input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}" style="margin-bottom:0;flex:1">
-                </div>
-                {{end}}
+              {{if .Domains}}
+              {{range $i, $d := .Domains}}
+              <div class="domain-row row-grid row-domain">
+                <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" aria-label="Domain">
+                {{if $i}}<button type="button" class="btn btn-ghost btn-icon" aria-label="Remove domain" onclick="removeDomainRow(this)">{{template "ui_icon" "x"}}</button>{{end}}
               </div>
+              {{end}}
+              {{else}}
+              <div class="domain-row row-grid row-domain">
+                <input type="text" name="domain" placeholder="app.example.com" value="{{if .App}}{{.App.Domain}}{{end}}" aria-label="Domain">
+              </div>
+              {{end}}
             </div>
-            <button type="button" class="btn btn-ghost" onclick="addDomainRow()" style="margin-top:0.2em;font-size:0.85em">+ Add Domain</button>
-            <small>First domain is primary. Leave empty for internal services.</small>
-          </label>
+            <div><button type="button" class="btn btn-ghost btn-sm" onclick="addDomainRow()">{{template "ui_icon" "plus"}}Add domain</button></div>
+            <small class="field-hint">First domain is primary. Leave empty for internal services.</small>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h3>Compose Mode</h3>
-      <div style="display:flex;gap:1em;margin-bottom:0.6em">
-        <label style="display:inline-flex;align-items:center;cursor:pointer"><input type="radio" name="mode" value="simple" {{if not .IsEdit}}checked{{else if eq .App.ComposeMode "simple"}}checked{{end}} onclick="document.getElementById('simple-section').style.display='';document.getElementById('advanced-section').style.display='none'" style="margin:0 0.3em 0 0"> Simple</label>
-        <label style="display:inline-flex;align-items:center;cursor:pointer"><input type="radio" name="mode" value="advanced" {{if and .IsEdit (eq .App.ComposeMode "advanced")}}checked{{end}} onclick="document.getElementById('simple-section').style.display='none';document.getElementById('advanced-section').style.display=''" style="margin:0 0.3em 0 0"> Advanced</label>
+      <h3>Compose mode</h3>
+      <div class="seg seg-form" role="radiogroup" aria-label="Compose mode">
+        <label class="seg-radio"><input type="radio" name="mode" value="simple" {{if not .IsEdit}}checked{{else if eq .App.ComposeMode "simple"}}checked{{end}}><span>Simple</span></label>
+        <label class="seg-radio"><input type="radio" name="mode" value="advanced" {{if and .IsEdit (eq .App.ComposeMode "advanced")}}checked{{end}}><span>Advanced</span></label>
       </div>
 
-      <div id="simple-section" {{if and .IsEdit (eq .App.ComposeMode "advanced")}}style="display:none"{{end}}>
-        <label>Docker Image<input type="text" name="image" placeholder="nginx:alpine" value="{{if .IsEdit}}{{.Image}}{{end}}"></label>
-        <label>Command<input type="text" name="command" placeholder="npm start" value="{{if .IsEdit}}{{.Command}}{{end}}"><small>Override container entrypoint (optional)</small></label>
-        <label>Ports<textarea name="ports" rows="2" placeholder="27017:27017&#10;6379:6379">{{if .IsEdit}}{{.Ports}}{{end}}</textarea><small>One port mapping per line (host:container)</small></label>
-        <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small>One volume mount per line (host:container)</small></label>
-        <div style="margin-top:1em">
-          <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.85em">(optional)</span></h4>
-          <div class="grid-2" style="gap:0.6em">
-            <label>Memory Limit
-              <select name="memory_limit">
+      <div id="simple-section"{{if and .IsEdit (eq .App.ComposeMode "advanced")}} hidden{{end}}>
+        <label class="field"><span class="field-label">Docker image</span><input type="text" name="image" placeholder="nginx:alpine" value="{{if .IsEdit}}{{.Image}}{{end}}"></label>
+        <label class="field"><span class="field-label">Command</span><input type="text" name="command" placeholder="npm start" value="{{if .IsEdit}}{{.Command}}{{end}}"><small class="field-hint">Override container entrypoint (optional)</small></label>
+        <label class="field"><span class="field-label">Ports</span><textarea name="ports" rows="2" placeholder="27017:27017&#10;6379:6379">{{if .IsEdit}}{{.Ports}}{{end}}</textarea><small class="field-hint">One port mapping per line (host:container)</small></label>
+        <label class="field"><span class="field-label">Volumes</span><textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small class="field-hint">One volume mount per line (host:container)</small></label>
+        <h4 class="group-title">Resource limits</h4>
+        <p class="card-sub">Optional</p>
+        <div class="grid-2">
+            <label class="field"><span class="field-label">Memory Limit</span><span class="select-wrap"><select class="select" name="memory_limit">
                 <option value="">-</option>
                 <option value="128m"{{if eq $.MemLimit "128m"}} selected{{end}}>128m</option>
                 <option value="256m"{{if eq $.MemLimit "256m"}} selected{{end}}>256m</option>
@@ -79,103 +78,100 @@
                 <option value="1g"{{if eq $.MemLimit "1g"}} selected{{end}}>1g</option>
                 <option value="2g"{{if eq $.MemLimit "2g"}} selected{{end}}>2g</option>
                 <option value="4g"{{if eq $.MemLimit "4g"}} selected{{end}}>4g</option>
-              </select>
+              </select>{{template "ui_icon" "chevron-down"}}</span>
             </label>
-            <label>CPU Limit
-              <select name="cpu_limit">
+            <label class="field"><span class="field-label">CPU Limit</span><span class="select-wrap"><select class="select" name="cpu_limit">
                 <option value="">-</option>
                 <option value="0.25"{{if eq $.CpuLimit "0.25"}} selected{{end}}>0.25</option>
                 <option value="0.5"{{if eq $.CpuLimit "0.5"}} selected{{end}}>0.5</option>
                 <option value="1.0"{{if eq $.CpuLimit "1.0"}} selected{{end}}>1.0</option>
                 <option value="2.0"{{if eq $.CpuLimit "2.0"}} selected{{end}}>2.0</option>
                 <option value="4.0"{{if eq $.CpuLimit "4.0"}} selected{{end}}>4.0</option>
-              </select>
+              </select>{{template "ui_icon" "chevron-down"}}</span>
             </label>
-            <label>Log Max Size
-              <select name="log_max_size">
+            <label class="field"><span class="field-label">Log Max Size</span><span class="select-wrap"><select class="select" name="log_max_size">
                 <option value="">-</option>
                 <option value="10m"{{if eq $.LogMaxSize "10m"}} selected{{end}}>10m</option>
                 <option value="50m"{{if eq $.LogMaxSize "50m"}} selected{{end}}>50m</option>
                 <option value="100m"{{if eq $.LogMaxSize "100m"}} selected{{end}}>100m</option>
                 <option value="500m"{{if eq $.LogMaxSize "500m"}} selected{{end}}>500m</option>
                 <option value="1g"{{if eq $.LogMaxSize "1g"}} selected{{end}}>1g</option>
-              </select>
+              </select>{{template "ui_icon" "chevron-down"}}</span>
             </label>
-            <label>Log Max File
-              <select name="log_max_file">
+            <label class="field"><span class="field-label">Log Max File</span><span class="select-wrap"><select class="select" name="log_max_file">
                 <option value="">-</option>
                 <option value="1"{{if eq $.LogMaxFile "1"}} selected{{end}}>1</option>
                 <option value="3"{{if eq $.LogMaxFile "3"}} selected{{end}}>3</option>
                 <option value="5"{{if eq $.LogMaxFile "5"}} selected{{end}}>5</option>
                 <option value="10"{{if eq $.LogMaxFile "10"}} selected{{end}}>10</option>
-              </select>
+              </select>{{template "ui_icon" "chevron-down"}}</span>
             </label>
-            <label>Ulimits (nofile)
-              <select name="ulimits_nofile">
+            <label class="field"><span class="field-label">Ulimits (nofile)</span><span class="select-wrap"><select class="select" name="ulimits_nofile">
                 <option value="">-</option>
                 <option value="65536"{{if eq $.UlimitsNofile "65536"}} selected{{end}}>65536</option>
                 <option value="131072"{{if eq $.UlimitsNofile "131072"}} selected{{end}}>131072</option>
                 <option value="262144"{{if eq $.UlimitsNofile "262144"}} selected{{end}}>262144</option>
                 <option value="524288"{{if eq $.UlimitsNofile "524288"}} selected{{end}}>524288</option>
                 <option value="1048576"{{if eq $.UlimitsNofile "1048576"}} selected{{end}}>1048576</option>
-              </select>
+              </select>{{template "ui_icon" "chevron-down"}}</span>
             </label>
           </div>
-        </div>
       </div>
 
-      <div id="advanced-section" {{if or (not .IsEdit) (eq .App.ComposeMode "simple")}}style="display:none"{{end}}>
-        <label>Docker Compose<textarea name="compose" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify">{{if .App}}{{.App.Compose}}{{end}}</textarea><small>Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small></label>
+      <div id="advanced-section"{{if or (not .IsEdit) (eq .App.ComposeMode "simple")}} hidden{{end}}>
+        <label class="field"><span class="field-label">Docker Compose</span><textarea class="mono" name="compose" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:alpine&#10;    restart: unless-stopped&#10;    networks:&#10;      - dockify">{{if .App}}{{.App.Compose}}{{end}}</textarea><small class="field-hint">Full docker-compose.yml for multi-service stacks. Make sure to add <code>networks: [dockify]</code>.</small></label>
       </div>
     </div>
 
     <div class="card">
-      <h3>Environment Variables <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(referenced in compose as <code>${KEY}</code>)</span></h3>
+      <h3>Environment variables</h3>
+      <p class="card-sub">Referenced in compose as <code>${KEY}</code></p>
       <div id="env-list">
-        <p id="no-env-msg" style="color:var(--ink2);font-size:0.85em">No variables added yet.</p>
+        <p id="no-env-msg" class="muted-note">No variables added yet.</p>
       </div>
-      <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center">
-        <button type="button" class="btn btn-secondary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
-        <button type="button" class="btn btn-ghost" onclick="openImportModal()" style="white-space:nowrap">Import</button>
-        <button type="button" class="btn btn-ghost" onclick="openExportModal()" style="white-space:nowrap">Export</button>
+      <div class="inline-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addEnvVar()">{{template "ui_icon" "plus"}}Add variable</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="openImportModal()">Import</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="openExportModal()">Export</button>
       </div>
       <div id="env-hidden-fields"></div>
     </div>
 
     <div class="card">
-      <h3>Config Files <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — mount via <code>./filename:/container/path</code> in compose)</span></h3>
-      {{if .Files}}
+      <h3>Config files</h3>
+      <p class="card-sub">Optional. Mount via <code>./filename:/container/path</code> in compose.</p>
       {{range .Files}}
-      <div style="display:flex;gap:0.5em;align-items:center;margin-bottom:0.4em">
-        <input type="text" name="file_path" value="{{.Path}}" placeholder="filename" autocomplete="off" style="margin-bottom:0;flex:1">
+      <div class="row-grid row-file">
+        <input type="text" name="file_path" value="{{.Path}}" placeholder="filename" autocomplete="off" aria-label="File name">
         <input type="hidden" name="file_content" value="{{.Content}}">
-        <input type="file" style="display:none" onchange="uploadToFileRow(this)">
-        <button type="button" class="btn btn-ghost" style="margin-bottom:0;white-space:nowrap" onclick="uploadClick(this)">Upload</button>
+        <input type="file" hidden onchange="uploadToFileRow(this)">
+        <button type="button" class="btn btn-secondary" onclick="uploadClick(this)">Upload</button>
         <button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove file" onclick="this.parentElement.remove()">{{template "ui_icon" "trash"}}</button>
       </div>
       {{end}}
-      {{end}}
       <div id="file-rows"></div>
-      <button type="button" class="btn btn-ghost" onclick="addFileRow()" style="margin-top:0.3em">+ Add File</button>
+      <div class="inline-actions"><button type="button" class="btn btn-ghost btn-sm" onclick="addFileRow()">{{template "ui_icon" "plus"}}Add file</button></div>
     </div>
 
     <div class="card">
-      <h3>Git <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — for auto-deploy on push)</span></h3>
+      <h3>Git</h3>
+      <p class="card-sub">Optional. For auto-deploy on push.</p>
       <div class="grid">
-        <label>Git Repo URL<input type="text" name="git_repo" placeholder="https://github.com/user/repo.git" value="{{if .App}}{{.App.GitRepo}}{{end}}"></label>
-        <label>Branch<input type="text" name="git_branch" value="{{if .App}}{{.App.GitBranch}}{{else}}main{{end}}" placeholder="main"></label>
+        <label class="field"><span class="field-label">Git repo URL</span><input type="text" name="git_repo" placeholder="https://github.com/user/repo.git" value="{{if .App}}{{.App.GitRepo}}{{end}}"></label>
+        <label class="field"><span class="field-label">Branch</span><input type="text" name="git_branch" value="{{if .App}}{{.App.GitBranch}}{{else}}main{{end}}" placeholder="main"></label>
       </div>
     </div>
 
     <div class="card">
-      <h3>Basic Auth <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — protects the app with a username/password)</span></h3>
+      <h3>Basic auth</h3>
+      <p class="card-sub">Optional. Protects the app with a username and password.</p>
       <div class="grid">
-        <label>Username<input type="text" name="auth_user" placeholder="admin" autocomplete="off" value="{{if .App}}{{.App.AuthUser}}{{end}}"></label>
-        <label>Password<input type="password" name="auth_pass" placeholder="password" autocomplete="new-password" value="{{if .App}}{{.App.AuthPass}}{{end}}"></label>
+        <label class="field"><span class="field-label">Username</span><input type="text" name="auth_user" placeholder="admin" autocomplete="off" value="{{if .App}}{{.App.AuthUser}}{{end}}"></label>
+        <label class="field"><span class="field-label">Password</span><input type="password" name="auth_pass" placeholder="password" autocomplete="new-password" value="{{if .App}}{{.App.AuthPass}}{{end}}"></label>
       </div>
     </div>
 
-    <div style="display:flex;gap:0.6em;align-items:center">
+    <div class="form-actions">
       {{if .IsEdit}}
         {{if eq .App.Status "draft"}}
           <button type="submit" class="btn btn-secondary">Save as Draft</button>
@@ -191,7 +187,7 @@
   </form>
 </div>
 
-<template id="icon-x">{{template "ui_icon" "x"}}</template><template id="icon-trash">{{template "ui_icon" "trash"}}</template>
+<template id="icon-eye">{{template "ui_icon" "eye"}}</template><template id="icon-eye-off">{{template "ui_icon" "eye-off"}}</template><template id="icon-x">{{template "ui_icon" "x"}}</template><template id="icon-trash">{{template "ui_icon" "trash"}}</template>
 {{if and .IsEdit (ne .App.Status "draft")}}{{template "ui_confirm" (dict "ID" "save-redeploy" "Title" (printf "Save and redeploy %s?" .App.Name) "Body" "This restarts the app with the new configuration." "Label" "Save & Redeploy")}}{{end}}
 {{template "ui_sheet_start" (dict "ID" "import-modal" "Title" "Import")}}
   <p class="sheet-text">Paste KEY=VALUE pairs below. Each line will be added as a new variable.</p>
@@ -235,6 +231,8 @@
 <script>
 var ICON_X = document.getElementById('icon-x').innerHTML;
 var ICON_TRASH = document.getElementById('icon-trash').innerHTML;
+var ICON_EYE = document.getElementById('icon-eye').innerHTML;
+var ICON_EYE_OFF = document.getElementById('icon-eye-off').innerHTML;
 var pendingEnvVars = [];
 {{if .SecretsJSON}}
 var initialEnvVars = {{.SecretsJSON}};
@@ -274,22 +272,16 @@ function toggleEnvType(index) {
 function renderEnvVars() {
   var list = document.getElementById('env-list');
   var msg = document.getElementById('no-env-msg');
-  if (msg) msg.style.display = pendingEnvVars.length ? 'none' : '';
+  if (msg) msg.hidden = pendingEnvVars.length > 0;
   var existing = list.querySelectorAll('.env-row');
   existing.forEach(function(r){ r.remove(); });
   pendingEnvVars.forEach(function(ev, i){
     var div = document.createElement('div');
-    div.className = 'env-row';
-    div.style.cssText = 'display:flex;gap:0.4em;margin-bottom:0.45em;align-items:flex-start';
+    div.className = 'env-row row-grid row-env';
     var typeLabel = ev.isSecret ? 'Secret' : 'Plain';
-    var valDisplay = ev.value.length > 60 ? ev.value.substring(0, 60) + '...' : ev.value;
-    if (!ev.value) valDisplay = '';
-    var svgEye = ev.isSecret
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
-      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-    div.innerHTML = '<input type="text" class="env-key-input" value="' + escapeAttr(ev.key) + '" placeholder="KEY" autocomplete="off" style="margin-bottom:0;width:25%;min-width:120px" onchange="updateEnvKey(' + i + ', this.value)">'
-      + '<textarea class="env-val-input" rows="1" placeholder="value" style="margin-bottom:0;flex:1;min-width:160px;resize:vertical" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
-      + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '" aria-label="Toggle secret">' + svgEye + '</button>'
+    div.innerHTML = '<input type="text" class="env-key-input mono" value="' + escapeAttr(ev.key) + '" placeholder="KEY" autocomplete="off" aria-label="Variable name" onchange="updateEnvKey(' + i + ', this.value)">'
+      + '<textarea class="env-val-input mono" rows="1" placeholder="value" aria-label="Variable value" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
+      + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '" aria-label="Toggle secret" aria-pressed="' + (ev.isSecret ? 'true' : 'false') + '">' + (ev.isSecret ? ICON_EYE_OFF : ICON_EYE) + '</button>'
       + '<button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove variable" onclick="removeEnvVar(' + i + ')">' + ICON_TRASH + '</button>';
     list.appendChild(div);
   });
@@ -316,7 +308,7 @@ function syncEnvHiddenFields() {
     k.value = ev.key;
     var v = document.createElement('textarea');
     v.name = 'env_val';
-    v.style.display = 'none';
+    v.hidden = true;
     v.textContent = ev.value;
     var t = document.createElement('input');
     t.type = 'hidden';
@@ -394,10 +386,9 @@ function escapeAttr(s) {
 function addDomainRow() {
   var list = document.getElementById('domains-list');
   var div = document.createElement('div');
-  div.className = 'domain-row';
-  div.style.cssText = 'display:flex;gap:0.4em;margin-bottom:0.35em';
-  div.innerHTML = '<input type="text" name="domain" placeholder="app.example.com" style="margin-bottom:0;flex:1">'
-    + '<button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove domain" onclick="removeDomainRow(this)">' + ICON_X + '</button>';
+  div.className = 'domain-row row-grid row-domain';
+  div.innerHTML = '<input type="text" name="domain" placeholder="app.example.com" aria-label="Domain">'
+    + '<button type="button" class="btn btn-ghost btn-icon" aria-label="Remove domain" onclick="removeDomainRow(this)">' + ICON_X + '</button>';
   list.appendChild(div);
 }
 function removeDomainRow(btn) {
@@ -407,11 +398,11 @@ function removeDomainRow(btn) {
 }
 function addFileRow() {
   var div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:0.5em;align-items:center;margin-bottom:0.4em';
-  div.innerHTML = '<input type="text" name="file_path" placeholder="filename" autocomplete="off" style="margin-bottom:0;flex:1">'
+  div.className = 'row-grid row-file';
+  div.innerHTML = '<input type="text" name="file_path" placeholder="filename" autocomplete="off" aria-label="File name">'
     + '<input type="hidden" name="file_content">'
-    + '<input type="file" style="display:none" onchange="uploadToFileRow(this)">'
-    + '<button type="button" class="btn btn-ghost" style="margin-bottom:0;white-space:nowrap" onclick="uploadClick(this)">Upload</button>'
+    + '<input type="file" hidden onchange="uploadToFileRow(this)">'
+    + '<button type="button" class="btn btn-secondary" onclick="uploadClick(this)">Upload</button>'
     + '<button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove file" onclick="this.parentElement.remove()">' + ICON_TRASH + '</button>';
   document.getElementById('file-rows').appendChild(div);
 }
@@ -445,7 +436,9 @@ var moveModalConfirmed = false;
 function validateServer() {
   if (document.querySelector('input[name="draft"]')) return true;
   var sel = document.querySelector('select[name="server_id"]');
-  if (!sel.value) { alert('Please select a server or save as draft.'); return false; }
+  var err = document.getElementById('server-error');
+  err.hidden = !!sel.value;
+  if (!sel.value) { sel.focus(); return false; }
   if (isEdit && initialServerId && initialServerId !== "0" && sel.value !== initialServerId && !moveModalConfirmed) {
     openSheet('move-modal');
     return false;
@@ -478,6 +471,15 @@ function confirmMoveServer() {
 }
 
 renderEnvVars();
+[].forEach.call(document.querySelectorAll('input[name=mode]'), function (r) {
+  r.addEventListener('change', function () {
+    var adv = document.querySelector('input[name=mode]:checked').value === 'advanced';
+    document.getElementById('simple-section').hidden = adv;
+    document.getElementById('advanced-section').hidden = !adv;
+  });
+});
+var serverSel = document.getElementById('server-select');
+if (serverSel) serverSel.addEventListener('change', function () { document.getElementById('server-error').hidden = true; });
 (function () {
   var ok = document.getElementById('save-redeploy-ok');
   if (ok) ok.addEventListener('click', function () { closeSheet('save-redeploy'); document.querySelector('form').requestSubmit(); });

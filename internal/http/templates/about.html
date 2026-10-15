@@ -19,26 +19,25 @@
     <p>Built with Go, HTMX, SQLite, and a fully custom CSS interface — no JavaScript frameworks, no build steps.</p>
   </div>
 
-  <div class="card" style="margin-top:1em">
+  <div class="card">
     <h3>Update</h3>
-    <p style="color:var(--ink2);margin-top:0">
-      Current: <strong id="cur-ver">v{{.Version}}</strong><br>
-      Latest:  <strong id="lat-ver">-</strong>
-    </p>
-    <div class="btn-group">
-      <button class="btn btn-secondary" onclick="checkUpdate()">Check for Updates</button>
-      <button class="btn btn-destructive-outline" id="update-btn" style="display:none" onclick="openSheet('update-confirm')">Update Now</button>
+    <dl class="detail-grid">
+      <div><dt>Current</dt><dd class="mono" id="cur-ver">v{{.Version}}</dd></div>
+      <div><dt>Latest</dt><dd class="mono" id="lat-ver">-</dd></div>
+    </dl>
+    <div class="inline-actions">
+      <button class="btn btn-secondary" onclick="checkUpdate()">Check for updates</button>
+      <button class="btn btn-destructive-outline" id="update-btn" hidden onclick="openSheet('update-confirm')">Update now</button>
     </div>
-    <pre id="update-log" style="display:none;margin-top:0.5em;font-size:0.8em;max-height:200px;overflow:auto"></pre>
+    <pre class="code" id="update-log" hidden></pre>
   </div>
 
-  <div class="card" style="margin-top:1em">
+  <div class="card">
     <h3>Sponsor & Donation</h3>
     <p>Dockify is open source and free to use. If you find it useful, consider supporting the project via GitHub Sponsors.</p>
     <a href="https://github.com/sponsors/coderbuzz" class="btn btn-secondary" target="_blank" rel="noopener">Sponsor on GitHub</a>
   </div>
 
-  <p style="text-align:center;color:var(--ink2);margin-top:2em;font-size:0.85em">Version {{.Version}}</p>
 </div>
 {{template "ui_confirm" (dict "ID" "update-confirm" "Title" "Update Dockify now?" "Body" "The server restarts to apply the update and is unavailable for a short time." "Label" "Update")}}
 <script>
@@ -52,16 +51,16 @@ function checkUpdate() {
     if (d.latest) {
       document.getElementById('lat-ver').textContent = d.latest;
       if (d.has_update) {
-        document.getElementById('update-btn').style.display = 'inline-block';
+        document.getElementById('update-btn').hidden = false;
         document.getElementById('update-btn').textContent = 'Update to ' + d.latest;
       } else {
-        document.getElementById('update-btn').style.display = 'none';
+        document.getElementById('update-btn').hidden = true;
       }
     } else {
       document.getElementById('lat-ver').textContent = d.error || 'failed';
     }
     btn.disabled = false;
-    btn.textContent = 'Check for Updates';
+    btn.textContent = 'Check for updates';
   });
 }
 function runUpdate() {
@@ -70,7 +69,7 @@ function runUpdate() {
   btn.disabled = true;
   btn.textContent = 'Updating...';
   var log = document.getElementById('update-log');
-  log.style.display = 'block';
+  log.hidden = false;
   log.textContent = 'Starting update...\n';
   var versionOnPage = '{{.Version}}';
   fetch('api/settings/update/run', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
