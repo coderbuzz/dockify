@@ -213,6 +213,7 @@ var funcMap = template.FuncMap{
 	"div":             div,
 	"mul":             mul,
 	"clamp100":        clamp100,
+	"list":            func(v ...string) []string { return v },
 	"dict": func(kv ...interface{}) map[string]interface{} {
 		m := make(map[string]interface{}, len(kv)/2)
 		for i := 0; i+1 < len(kv); i += 2 {

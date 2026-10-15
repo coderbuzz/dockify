@@ -1,151 +1,52 @@
 {{define "apps_list"}}
 {{if .Apps}}
-<input type="text" id="app-filter" placeholder="Filter apps by name or domain..." style="margin-bottom:1.2rem;font-size:0.85em">
+<div data-list>
+{{template "ui_listbar" (dict "Placeholder" "Search name or domain" "Chips" (list "running" "stopped" "draft" "failed"))}}
 {{range .ServerGroups}}
-<div class="app-group" style="margin-bottom:1.5rem">
-  <h3 style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
-    {{if .ServerID}}<a href="servers/{{.ServerID}}" style="text-decoration:none">{{.ServerName}}</a>{{else}}{{.ServerName}}{{end}}
-    {{if .Host}}<small style="color:var(--text-dim);font-weight:400;margin-left:0.3em">{{.Host}}</small>{{end}}
-    {{if .Status}}<span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span>{{end}}
-    <small style="color:var(--text-muted);font-weight:400">— {{len .Apps}} app(s)</small>
-  </h3>
-    <div class="table-wrap"><table style="font-size:0.85em">
-      <thead>
-        <tr>
-          <th data-sort="name" data-type="string" style="cursor:pointer;user-select:none">Name <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="status" data-type="string" style="cursor:pointer;user-select:none">Status <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="cpu" data-type="number" style="cursor:pointer;user-select:none">CPU <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="memory" data-type="number" style="cursor:pointer;user-select:none">Memory <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="disk" data-type="number" style="cursor:pointer;user-select:none">Disk <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="domain" data-type="string" style="cursor:pointer;user-select:none">Domain <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-          <th data-sort="port" data-type="number" style="cursor:pointer;user-select:none">Port <span class="sort-arrow" style="font-size:0.8em;opacity:0.6"></span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Apps}}
-        <tr data-name="{{.Name}}"
-            data-domain="{{.Domain}}"
-            data-sort-status="{{.Status}}"
-            data-cpu="{{with $st := index $.AppStats .ID}}{{printf "%.3f" $st.CPUPercent}}{{end}}"
-            data-memory="{{with $st := index $.AppStats .ID}}{{$st.MemUsageBytes}}{{end}}"
-            data-disk="{{with $st := index $.AppStats .ID}}{{$st.DiskUsageBytes}}{{end}}"
-            data-port="{{.Port}}">
-          <td style="white-space:nowrap; font-weight: 600;"><a href="apps/{{.ID}}">{{.Name}}</a></td>
-          <td><span class="badge badge-{{.Status}}"><span class="badge-dot"></span>{{.Status}}</span></td>
-          <td>{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
-          <td>{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
-          <td>{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>
-          <td style="white-space:nowrap">{{if .Domain}}<a href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a>{{else}}-{{end}}</td>
-          <td>{{.Port}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table></div>
-  </div>
+<section class="app-group" data-group>
+  <header class="group-head">
+    <h3>{{if .ServerID}}<a href="servers/{{.ServerID}}">{{.ServerName}}</a>{{else}}{{.ServerName}}{{end}}</h3>
+    {{if .Host}}<span class="mono">{{.Host}}</span>{{end}}
+    {{if .Status}}<span class="badge badge-{{.Status}}">{{.Status}}</span>{{end}}
+    <span class="group-count">{{len .Apps}} {{if eq (len .Apps) 1}}app{{else}}apps{{end}}</span>
+  </header>
+  <table class="rows">
+    <thead>
+      <tr>
+        <th aria-sort="none"><button type="button" class="th-sort" data-sort="name" data-type="string">Name{{template "ui_icon" "chevron-down"}}</button></th>
+        <th aria-sort="none"><button type="button" class="th-sort" data-sort="status" data-type="string">Status{{template "ui_icon" "chevron-down"}}</button></th>
+        <th aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
+        <th aria-sort="none"><button type="button" class="th-sort" data-sort="memory" data-type="number">Memory{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="port" data-type="number">Port{{template "ui_icon" "chevron-down"}}</button></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Apps}}
+      <tr data-name="{{.Name}}" data-status="{{if eq .Status "error"}}failed{{else}}{{.Status}}{{end}}" data-search="{{lower (printf "%s %s" .Name .Domain)}}"
+          data-cpu="{{with $st := index $.AppStats .ID}}{{printf "%.3f" $st.CPUPercent}}{{end}}"
+          data-memory="{{with $st := index $.AppStats .ID}}{{$st.MemUsageBytes}}{{end}}"
+          data-disk="{{with $st := index $.AppStats .ID}}{{$st.DiskUsageBytes}}{{end}}"
+          data-port="{{.Port}}">
+        <td class="c-name"><a href="apps/{{.ID}}">{{.Name}}</a>{{if .Domain}}<small class="mono"><a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></small>{{end}}</td>
+        <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "running"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
+        <td class="c-num" data-label="CPU">{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
+        <td class="c-num" data-label="Memory">{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
+        <td class="c-num col-sm-hide">{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>
+        <td class="col-sm-hide">{{.Port}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
 {{end}}
-<div id="app-filter-empty" class="empty-state" style="display:none">
-  <p>No apps match your filter.</p>
+<p class="empty-note" data-list-empty hidden>No apps match your filter.</p>
 </div>
-<script>
-(function(){
-  var input = document.getElementById('app-filter');
-  if (input) {
-    input.addEventListener('input', function(){
-      var q = input.value.trim().toLowerCase();
-      var groups = document.querySelectorAll('.app-group');
-      var anyVisible = false;
-      groups.forEach(function(g){
-        var rows = g.querySelectorAll('tr[data-name]');
-        var matchCount = 0;
-        rows.forEach(function(r){
-          var name = (r.getAttribute('data-name') || '').toLowerCase();
-          var domain = (r.getAttribute('data-domain') || '').toLowerCase();
-          var hit = q === '' || name.indexOf(q) > -1 || domain.indexOf(q) > -1;
-          r.style.display = hit ? '' : 'none';
-          if (hit) matchCount++;
-        });
-        g.style.display = matchCount > 0 ? '' : 'none';
-        if (matchCount > 0) anyVisible = true;
-      });
-      var empty = document.getElementById('app-filter-empty');
-      if (empty) empty.style.display = anyVisible ? 'none' : 'block';
-    });
-  }
-
-  // Client-side table sorting per server group
-  var tables = document.querySelectorAll('.app-group table');
-  tables.forEach(function(table){
-    var currentSort = null;
-    var currentDir = 'asc';
-
-    var headers = table.querySelectorAll('th[data-sort]');
-    headers.forEach(function(th){
-      th.addEventListener('click', function(){
-        var key = th.getAttribute('data-sort');
-        var type = th.getAttribute('data-type') || 'string';
-        var attrName = key === 'name' ? 'data-name' : (key === 'domain' ? 'data-domain' : 'data-' + key);
-        if (key === 'status') attrName = 'data-sort-status';
-
-        if (currentSort === key) {
-          currentDir = currentDir === 'asc' ? 'desc' : 'asc';
-        } else {
-          currentSort = key;
-          currentDir = type === 'number' ? 'desc' : 'asc';
-        }
-
-        // Update indicators
-        headers.forEach(function(h){
-          var arrow = h.querySelector('.sort-arrow');
-          if (arrow) arrow.textContent = '';
-        });
-        var activeArrow = th.querySelector('.sort-arrow');
-        if (activeArrow) activeArrow.textContent = currentDir === 'asc' ? ' ▲' : ' ▼';
-
-        var tbody = table.querySelector('tbody');
-        if (!tbody) return;
-        var rows = Array.from(tbody.querySelectorAll('tr'));
-
-        rows.sort(function(a, b){
-          var valA = a.getAttribute(attrName);
-          var valB = b.getAttribute(attrName);
-
-          var hasA = valA !== null && valA !== '';
-          var hasB = valB !== null && valB !== '';
-
-          // Missing values sink to bottom regardless of direction
-          if (!hasA && !hasB) return 0;
-          if (!hasA) return 1;
-          if (!hasB) return -1;
-
-          var res = 0;
-          if (type === 'number') {
-            var numA = parseFloat(valA);
-            var numB = parseFloat(valB);
-            var validA = !isNaN(numA);
-            var validB = !isNaN(numB);
-            if (!validA && !validB) return 0;
-            if (!validA) return 1;
-            if (!validB) return -1;
-            res = numA - numB;
-          } else {
-            res = valA.localeCompare(valB, undefined, { sensitivity: 'base' });
-          }
-
-          return currentDir === 'asc' ? res : -res;
-        });
-
-        rows.forEach(function(row){
-          tbody.appendChild(row);
-        });
-      });
-    });
-  });
-})();
-</script>
 {{else}}
 <div class="empty-state">
+  <span class="empty-icon">{{template "ui_icon" "box"}}</span>
   <p>No apps deployed yet.</p>
-  <a href="apps/add" class="btn btn-primary">Deploy Your First App</a>
+  {{if eq .Nav "dashboard"}}<a href="apps/add" class="btn btn-primary">Deploy Your First App</a>{{end}}
 </div>
 {{end}}
 {{end}}
