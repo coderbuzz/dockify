@@ -1,8 +1,11 @@
 package config
 
 import (
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -18,7 +21,8 @@ type Config struct {
 	CloudflareAPIToken string
 	CloudflareZoneID   string
 
-	DevMock bool
+	AllowNoAuth bool
+	DevMock     bool
 }
 
 func Load() *Config {
@@ -34,7 +38,8 @@ func Load() *Config {
 		CloudflareAPIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),
 		CloudflareZoneID:   os.Getenv("CLOUDFLARE_ZONE_ID"),
 
-		DevMock: os.Getenv("DOCKIFY_DEV_MOCK") == "true",
+		AllowNoAuth: os.Getenv("DOCKIFY_ALLOW_NO_AUTH") == "true",
+		DevMock:     os.Getenv("DOCKIFY_DEV_MOCK") == "true",
 	}
 
 	os.MkdirAll(cfg.DataDir, 0700)
@@ -53,6 +58,18 @@ func (c *Config) Addr() string {
 
 func (c *Config) AuthEnabled() bool {
 	return c.AdminPass != ""
+}
+
+// CheckAuth refuses a passwordless UI on a non-loopback bind unless the
+// operator opted in with DOCKIFY_ALLOW_NO_AUTH=true.
+func (c *Config) CheckAuth() error {
+	h := strings.Trim(c.Host, "[]")
+	if c.AdminPass != "" || c.AllowNoAuth || h == "localhost" || net.ParseIP(h).IsLoopback() {
+		return nil
+	}
+	return errors.New("refusing to start: no DOCKIFY_ADMIN_PASSWORD set and DOCKIFY_HOST=" + c.Host +
+		" is reachable from the network. Set DOCKIFY_ADMIN_PASSWORD, bind to DOCKIFY_HOST=127.0.0.1," +
+		" or set DOCKIFY_ALLOW_NO_AUTH=true to run without authentication")
 }
 
 func getEnv(key, defaultVal string) string {

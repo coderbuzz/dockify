@@ -75,13 +75,15 @@ curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/inst
 cd /opt/dockify && docker compose up -d
 ```
 
+The image binds `DOCKIFY_HOST=0.0.0.0`, so the container needs `DOCKIFY_ADMIN_PASSWORD` in `/opt/dockify/.env` (the installer asks for it) or it exits at start; `DOCKIFY_ALLOW_NO_AUTH=true` overrides this.
+
 **Option D: Build from source (development)**
 
 ```bash
 git clone https://github.com/coderbuzz/dockify.git
 cd dockify
 go build -o dockify ./cmd/dockify
-./dockify serve
+DOCKIFY_HOST=127.0.0.1 ./dockify serve   # or set DOCKIFY_ADMIN_PASSWORD
 ```
 
 **All installation methods share the same architecture for worker VMs:**
@@ -106,7 +108,8 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOCKIFY_SSH_KEY_DIR` | `/var/lib/dockify/keys` | No | Per-server SSH private key storage |
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
-| `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. If not set, the web UI has **no authentication** |
+| `DOCKIFY_ADMIN_PASSWORD` | — | Yes, unless bound to loopback | Web UI password. Without it Dockify refuses to start on a non-loopback `DOCKIFY_HOST` |
+| `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | `true` lets Dockify start without a password on a non-loopback bind (web UI open to anyone who can reach it) |
 | `DOCKIFY_API_TOKEN` | — | No | Bearer token for scripts/agents calling `/api/*` (needs `DOCKIFY_ADMIN_PASSWORD` set) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
@@ -127,7 +130,7 @@ DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
 ```
 
 - **Default username:** `admin` (configurable via `DOCKIFY_ADMIN_USER`)
-- **No password set:** Web UI has **no authentication** (open to anyone)
+- **No password set:** Dockify refuses to start unless it binds to loopback (`DOCKIFY_HOST=127.0.0.1`, `::1` or `localhost`) or `DOCKIFY_ALLOW_NO_AUTH=true` is set; in both cases the web UI has **no authentication**
 - **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
 - **Session:** Cookie-based (`HttpOnly`, `SameSite=Lax`, `Secure` behind HTTPS), expires after 24 hours
 - **Cross-site requests:** a form or script on another site cannot change anything (`403`). Behind a reverse proxy, forward the original `Host` header (Caddy does this by default)

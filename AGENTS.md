@@ -30,7 +30,7 @@ go vet ./...             # lint
 go mod tidy              # clean dependencies
 
 # Run once (no auto-reload)
-DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
+DOCKIFY_HOST=127.0.0.1 DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
 
 # Verify templates parse
 go test ./internal/http/... -run TestTemplates

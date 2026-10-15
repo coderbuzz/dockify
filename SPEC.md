@@ -102,7 +102,8 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOCKIFY_SSH_KEY_DIR` | `$DATA_DIR/keys` | No | Per-server SSH private key files |
 | `DOMAIN` | — | Mode 1 | Domain for Caddy reverse proxy (auto HTTPS) |
 | `DOCKIFY_ADMIN_USER` | `admin` | No | Web UI login username |
-| `DOCKIFY_ADMIN_PASSWORD` | — | No | Web UI password. Not set = no authentication |
+| `DOCKIFY_ADMIN_PASSWORD` | — | Unless loopback | Web UI password. Not set = no authentication, and `serve` exits unless `DOCKIFY_HOST` is loopback or `DOCKIFY_ALLOW_NO_AUTH=true` |
+| `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | Allow a passwordless UI on a non-loopback bind |
 | `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
 | `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`) |

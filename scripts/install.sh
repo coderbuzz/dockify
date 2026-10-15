@@ -28,12 +28,13 @@ prompt() {
 }
 
 prompt_secret() {
-  local var="$1" msg="$2"
+  local var="$1" msg="$2" required="$3"
   local val="${!var}"
   if [ -z "$val" ] && [ -n "$TTY" ]; then
     read -s -p "$msg" val < "$TTY" || true
     echo ""
   fi
+  if [ -z "$val" ] && [ -n "$required" ]; then echo "Error: $msg is required"; exit 1; fi
   printf -v "$var" "%s" "$val"
 }
 
@@ -42,9 +43,9 @@ prompt MODE "Install mode (1=Docker Compose with Caddy, 2=Binary only, 3=Binary 
 if [ "$MODE" = "2" ] || [ "$MODE" = "3" ]; then
   INSTALL_BIN="${INSTALL_BIN:-/usr/local/bin}"
   echo ""
-  echo "Admin credentials (optional - empty password = no auth)"
+  echo "Admin credentials"
   prompt ADMIN_USER "Admin username [admin]: " admin
-  prompt_secret ADMIN_PASS "Admin password (optional, Enter to skip): "
+  prompt_secret ADMIN_PASS "Admin password: " required
   prompt CF_TOKEN "Cloudflare API Token (optional): "
   prompt CF_ZONE  "Cloudflare Zone ID (optional): "
   prompt BASE_PATH "Base path (optional): "
@@ -160,9 +161,9 @@ else
   prompt CF_TOKEN "Cloudflare API Token: "
   prompt CF_ZONE  "Cloudflare Zone ID: "
   echo ""
-  echo "Admin credentials (optional - empty password = no auth)"
+  echo "Admin credentials"
   prompt ADMIN_USER "Admin username [admin]: " admin
-  prompt_secret ADMIN_PASS "Admin password: "
+  prompt_secret ADMIN_PASS "Admin password: " required
   prompt BASE_PATH "Base path: "
 
   echo ""

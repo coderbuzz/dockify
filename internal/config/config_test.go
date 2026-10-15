@@ -69,3 +69,23 @@ func TestDBPath(t *testing.T) {
 		t.Errorf("DBPath: expected /var/lib/dockify/dockify.db, got %s", cfg.DBPath())
 	}
 }
+
+func TestCheckAuth(t *testing.T) {
+	cases := []struct {
+		cfg Config
+		ok  bool
+	}{
+		{Config{Host: "0.0.0.0"}, false},
+		{Config{Host: "10.0.0.5"}, false},
+		{Config{Host: "0.0.0.0", AdminPass: "x"}, true},
+		{Config{Host: "0.0.0.0", AllowNoAuth: true}, true},
+		{Config{Host: "127.0.0.1"}, true},
+		{Config{Host: "::1"}, true},
+		{Config{Host: "localhost"}, true},
+	}
+	for _, c := range cases {
+		if err := c.cfg.CheckAuth(); (err == nil) != c.ok {
+			t.Errorf("%+v: got err=%v, want ok=%v", c.cfg, err, c.ok)
+		}
+	}
+}
