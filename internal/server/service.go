@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -357,9 +358,9 @@ func (s *Service) RefreshResources(id int64) error {
 	return nil
 }
 
-func (s *Service) StartMonitor() {
+func (s *Service) StartMonitor(ctx context.Context) {
 	s.monitor = NewMonitor(s)
-	go s.monitor.Run()
+	go s.monitor.Run(ctx)
 }
 
 func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]interface{} {
@@ -467,7 +468,7 @@ func NewMonitor(svc *Service) *Monitor {
 	return &Monitor{service: svc}
 }
 
-func (m *Monitor) Run() {
+func (m *Monitor) Run(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -476,6 +477,8 @@ func (m *Monitor) Run() {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			m.refreshAll()
 		case <-pruneTicker.C:

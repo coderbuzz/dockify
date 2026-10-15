@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -46,9 +47,20 @@ func main() {
 	}
 	defer database.Close()
 
+	appRepo := app.NewRepository(database)
+	if n, err := appRepo.FailInterrupted(); err != nil {
+		log.Fatalf("failed to recover interrupted deploys: %v", err)
+	} else if n > 0 {
+		log.Printf("Marked %d app(s) failed: deploy interrupted by restart", n)
+	}
+
+	// Cancelled on SIGINT/SIGTERM: stops the background loops, then the server.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	serverRepo := server.NewRepository(database)
 	svc := server.NewService(serverRepo)
-	svc.StartMonitor()
+	svc.StartMonitor(ctx)
 
 	var cfClient *cloudflare.Client
 	if cfg.CloudflareAPIToken != "" && cfg.CloudflareZoneID != "" {
@@ -60,7 +72,6 @@ func main() {
 
 	sch := scheduler.New(serverRepo)
 
-	appRepo := app.NewRepository(database)
 	appSvc := app.NewService(appRepo, serverRepo, cfClient, sch)
 
 	if cfg.DevMock {
@@ -69,7 +80,7 @@ func main() {
 		log.Println("DEV MOCK MODE: using mock SSH client")
 	}
 
-	appSvc.StartStatsCollector()
+	appSvc.StartStatsCollector(ctx)
 
 	settingsSvc := settings.NewService(database, version)
 	settingsHandler := settings.NewHandler(settingsSvc)
@@ -96,9 +107,6 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		log.Printf("Dockify v%s starting on %s", version, cfg.Addr())
 		log.Printf("Open: http://localhost:%s", cfg.Port)
@@ -108,9 +116,15 @@ func main() {
 		}
 	}()
 
-	<-quit
+	<-ctx.Done()
 	log.Println("Shutting down...")
-	srv.Close()
+	// Websockets are hijacked and not waited for; deploys still running are
+	// cut off and marked failed by FailInterrupted on the next start.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Shutdown: %v", err)
+	}
 }
 
 type serverLister struct {

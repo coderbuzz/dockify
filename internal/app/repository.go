@@ -207,6 +207,28 @@ func (r *Repository) UpdateStatus(id int64, status string) error {
 	return err
 }
 
+// FailInterrupted marks apps a restart left in 'deploying' as failed and
+// records why in their deployment history. Run once at startup.
+func (r *Repository) FailInterrupted() (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+		INSERT INTO deployments (app_id, server_id, status, log)
+		SELECT id, server_id, 'failed', 'interrupted by Dockify restart' FROM apps WHERE status = 'deploying'
+	`); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`UPDATE apps SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE status = 'deploying'`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
+}
+
 func (r *Repository) Delete(id int64) error {
 	_, err := r.db.Exec("DELETE FROM apps WHERE id = ?", id)
 	return err
