@@ -128,42 +128,105 @@ func generateCompose(image string, port int, volumes string, appName string, mem
 	return b.String()
 }
 
+// ensureDockifyNetwork attaches the services to the external "dockify" network
+// Caddy proxies through and declares that network. When some service already
+// lists dockify the services are left alone: the others are kept off the
+// shared network on purpose (a "db" alias there would collide across apps).
+// It edits the YAML node tree, so comments and key order survive, and returns
+// the input unchanged when nothing is missing.
 func ensureDockifyNetwork(compose string) string {
-	if strings.Contains(compose, "dockify") {
+	var doc yaml.Node
+	if yaml.Unmarshal([]byte(compose), &doc) != nil || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return compose
+	}
+	root := doc.Content[0]
+	services := mapValue(root, "services")
+	if services == nil || services.Kind != yaml.MappingNode {
 		return compose
 	}
 
-	var doc map[string]interface{}
-	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
-		return compose
-	}
-
-	services, ok := doc["services"].(map[string]interface{})
-	if !ok {
-		return compose
-	}
-
-	for name := range services {
-		svc, _ := services[name].(map[string]interface{})
-		if svc == nil {
-			svc = make(map[string]interface{})
-			services[name] = svc
+	var missing []*yaml.Node
+	for i := 1; i < len(services.Content); i += 2 {
+		svc := services.Content[i]
+		if svc.Kind != yaml.MappingNode || mapValue(svc, "network_mode") != nil {
+			continue // network_mode cannot be combined with networks
 		}
-		nets, _ := svc["networks"].([]interface{})
-		svc["networks"] = append(nets, "dockify")
+		if onDockify(svc) {
+			missing = nil
+			break
+		}
+		missing = append(missing, svc)
+	}
+	for _, svc := range missing {
+		switch nets := mapValue(svc, "networks"); {
+		case nets == nil:
+			svc.Content = append(svc.Content, scalar("networks"), &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{scalar("dockify")}})
+		case nets.Kind == yaml.MappingNode:
+			nets.Content = append(nets.Content, scalar("dockify"), &yaml.Node{Kind: yaml.MappingNode, Style: yaml.FlowStyle})
+		default:
+			nets.Content = append(nets.Content, scalar("dockify"))
+		}
+	}
+	changed := len(missing) > 0
+
+	nets := mapValue(root, "networks")
+	if nets == nil {
+		nets = &yaml.Node{Kind: yaml.MappingNode}
+		root.Content = append(root.Content, scalar("networks"), nets)
+	} else if nets.Kind != yaml.MappingNode { // "networks:" left empty
+		*nets = yaml.Node{Kind: yaml.MappingNode}
+	}
+	dockify := mapValue(nets, "dockify")
+	if dockify == nil {
+		dockify = &yaml.Node{Kind: yaml.MappingNode}
+		nets.Content = append(nets.Content, scalar("dockify"), dockify)
+	} else if dockify.Kind != yaml.MappingNode {
+		*dockify = yaml.Node{Kind: yaml.MappingNode}
+	}
+	if ext := mapValue(dockify, "external"); ext == nil {
+		dockify.Content = append(dockify.Content, scalar("external"), &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
+		changed = true
+	} else if ext.Value != "true" {
+		*ext = yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}
+		changed = true
 	}
 
-	doc["networks"] = map[string]interface{}{
-		"dockify": map[string]interface{}{
-			"external": true,
-		},
+	if !changed {
+		return compose
 	}
-
-	out, err := yaml.Marshal(doc)
+	out, err := yaml.Marshal(&doc)
 	if err != nil {
 		return compose
 	}
 	return string(out)
+}
+
+// onDockify reports whether a service lists the dockify network, in either
+// the sequence or the mapping form.
+func onDockify(svc *yaml.Node) bool {
+	nets := mapValue(svc, "networks")
+	switch {
+	case nets == nil:
+		return false
+	case nets.Kind == yaml.MappingNode:
+		return mapValue(nets, "dockify") != nil
+	default:
+		return slices.ContainsFunc(nets.Content, func(n *yaml.Node) bool { return n.Value == "dockify" })
+	}
+}
+
+// mapValue returns the value node of key in a mapping node, or nil.
+func mapValue(m *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func scalar(v string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Value: v}
 }
 
 func sanitizeAppName(name string) string {

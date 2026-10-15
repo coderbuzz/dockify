@@ -72,6 +72,57 @@ func TestGenerateComposeRoundTrip(t *testing.T) {
 	}
 }
 
+// B7: "dockify" in an image name used to skip the injection entirely.
+func TestEnsureDockifyNetwork(t *testing.T) {
+	type composeDoc struct {
+		Services map[string]struct {
+			Networks yaml.Node `yaml:"networks"`
+		}
+		Networks map[string]struct{ External bool }
+	}
+	parse := func(c string) (doc composeDoc) {
+		t.Helper()
+		if err := yaml.Unmarshal([]byte(c), &doc); err != nil {
+			t.Fatalf("%v\n%s", err, c)
+		}
+		return doc
+	}
+
+	out := ensureDockifyNetwork("services:\n  app:\n    image: ghcr.io/coderbuzz/dockify:latest # the image\n")
+	doc := parse(out)
+	if n := doc.Services["app"].Networks; len(n.Content) != 1 || n.Content[0].Value != "dockify" || !doc.Networks["dockify"].External {
+		t.Fatalf("network not injected:\n%s", out)
+	}
+	if !strings.Contains(out, "# the image") {
+		t.Fatalf("comment lost:\n%s", out)
+	}
+
+	has := "services:\n  web:\n    image: nginx # pinned\n    networks: [dockify]\nnetworks:\n  dockify:\n    external: true\n"
+	if out := ensureDockifyNetwork(has); out != has {
+		t.Fatalf("complete compose changed:\n%s", out)
+	}
+
+	out = ensureDockifyNetwork("services:\n  web:\n    image: nginx\n    networks:\n      backend:\n        aliases: [api]\nnetworks:\n  backend: {}\n")
+	doc = parse(out)
+	var nets map[string]struct{ Aliases []string }
+	if n := doc.Services["web"].Networks; n.Decode(&nets) != nil || n.Kind != yaml.MappingNode {
+		t.Fatalf("networks no longer a mapping:\n%s", out)
+	}
+	if _, ok := nets["dockify"]; !ok || len(nets["backend"].Aliases) != 1 || !doc.Networks["dockify"].External {
+		t.Fatalf("mapping-form networks not preserved:\n%s", out)
+	}
+	if _, ok := doc.Networks["backend"]; !ok {
+		t.Fatalf("top-level backend network dropped:\n%s", out)
+	}
+
+	// A sidecar kept off the shared network stays off; only the declaration is added.
+	out = ensureDockifyNetwork("services:\n  web:\n    image: nginx\n    networks: [default, dockify]\n  db:\n    image: postgres\n")
+	doc = parse(out)
+	if doc.Services["db"].Networks.Kind != 0 || !doc.Networks["dockify"].External {
+		t.Fatalf("sidecar attached or network not declared:\n%s", out)
+	}
+}
+
 func TestGenerateSimpleWithAppName(t *testing.T) {
 	c := generateCompose("nginx:alpine", 80, "", "my-app", "", "", "", "", nil, "", "", "")
 	if c == "" {
