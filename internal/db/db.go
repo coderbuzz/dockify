@@ -26,6 +26,9 @@ var migrations = []migration{
 	{"legacy column changes (v0.3-v0.13)", migrateLegacy},
 	{"cascade app deletes, keep history on server delete", migrateForeignKeys},
 	{"de-duplicate routes, unique route/app/server names", migrateUnique},
+	{"add servers.host_key", func(tx *sql.Tx) error {
+		return addColumn(tx, "servers", "host_key", "TEXT DEFAULT ''")
+	}},
 }
 
 func Open(path string) (*sql.DB, error) {

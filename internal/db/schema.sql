@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS servers (
     registry_host  TEXT DEFAULT '',
     registry_user  TEXT DEFAULT '',
     registry_token TEXT DEFAULT '',
+    host_key       TEXT DEFAULT '',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );

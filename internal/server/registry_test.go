@@ -44,6 +44,18 @@ func TestMigrationAddsRegistryColumnsToExistingDB(t *testing.T) {
 	if s.RegistryHost != "" || s.RegistryUser != "" || s.RegistryToken != "" {
 		t.Fatalf("legacy server must have no registry credential, got %+v", s)
 	}
+
+	// host_key (S3 prep) is added, stored and kept out of the JSON.
+	s.HostKey = "AAAAC3NzaC1lZDI1NTE5"
+	if err := NewRepository(database).Update(s); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := NewRepository(database).Get(1); got.HostKey != s.HostKey {
+		t.Fatalf("host_key not stored: %q", got.HostKey)
+	}
+	if b, _ := json.Marshal(s); strings.Contains(string(b), s.HostKey) {
+		t.Fatalf("host key must not be serialized: %s", b)
+	}
 }
 
 func TestApplyRegistry(t *testing.T) {
