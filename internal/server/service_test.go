@@ -1,11 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/coderbuzz/dockify/internal/db"
@@ -97,4 +99,77 @@ func TestPruneWorkerDeep(t *testing.T) {
 		t.Fatalf("PruneWorker deep failed: %v", err)
 	}
 	_ = out
+}
+
+// S17: a server added without ssh_key gets a key pair made on the controller;
+// the API returns only the public half.
+func TestCreateGeneratesKey(t *testing.T) {
+	svc, _ := setupTestServerService(t)
+	keyDir := t.TempDir()
+	h := NewHandler(svc, keyDir)
+	r := chi.NewRouter()
+	r.Post("/api/servers", h.Create)
+	r.Get("/api/servers/{id}", h.Get)
+	call := func(method, url, body string) (int, map[string]interface{}) {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(method, url, strings.NewReader(body)))
+		var out map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+
+	code, created := call(http.MethodPost, "/api/servers", `{"name":"w1","host":"10.0.0.9"}`)
+	pub, _ := created["public_key"].(string)
+	if code != http.StatusCreated || !strings.HasPrefix(pub, "ssh-ed25519 ") || created["status"] != StatusPending {
+		t.Fatalf("create: %d %v", code, created)
+	}
+	keyFile := filepath.Join(keyDir, fmt.Sprintf("%v.pem", created["id"]))
+	if st, err := os.Stat(keyFile); err != nil || st.Mode().Perm() != 0600 {
+		t.Fatalf("key file: %v %v", st, err)
+	}
+	if _, got := call(http.MethodGet, fmt.Sprintf("/api/servers/%v", created["id"]), ""); got["public_key"] != pub {
+		t.Fatalf("GET public_key %v, want %q", got["public_key"], pub)
+	}
+	if strings.Contains(fmt.Sprint(created), "PRIVATE KEY") {
+		t.Fatal("private key in the response")
+	}
+}
+
+// The host key store round-trips on servers.host_key, and PATCH forgets the
+// key on host_key_clear or when host or port change.
+func TestHostKeyStoreAndClear(t *testing.T) {
+	svc, repo := setupTestServerService(t)
+	r := chi.NewRouter()
+	r.Patch("/api/servers/{id}", NewHandler(svc, t.TempDir()).Update)
+
+	s := &Server{Name: "worker-1", Host: "10.0.0.1", Port: 22, SSHKey: "/tmp/key"}
+	if err := repo.Create(s); err != nil {
+		t.Fatal(err)
+	}
+	if k, err := repo.HostKey("10.0.0.1", 22); err != nil || k != "" {
+		t.Fatalf("new server: key %q, err %v", k, err)
+	}
+	for _, tc := range []struct {
+		body string
+		want string
+	}{
+		{`{"name":"renamed"}`, "AAAA"},
+		{`{"host_key_clear":true}`, ""},
+		{`{"port":2222}`, ""},
+	} {
+		if err := repo.SaveHostKey(s.Host, 22, "AAAA"); err != nil {
+			t.Fatal(err)
+		}
+		if k, _ := repo.HostKey(s.Host, 22); k != "AAAA" {
+			t.Fatalf("stored key %q", k)
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/servers/%d", s.ID), strings.NewReader(tc.body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("patch %s: %d %s", tc.body, rec.Code, rec.Body)
+		}
+		if got, _ := repo.Get(s.ID); got.HostKey != tc.want {
+			t.Fatalf("after %s: host key %q, want %q", tc.body, got.HostKey, tc.want)
+		}
+	}
 }

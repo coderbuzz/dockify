@@ -1,8 +1,11 @@
 package app
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestGenerateSimple(t *testing.T) {
@@ -31,8 +34,92 @@ func TestGenerateSimpleWithLogging(t *testing.T) {
 		t.Fatal("empty compose")
 	}
 
-	if !strings.Contains(c, "logging:") || !strings.Contains(c, "max-size: \"10m\"") || !strings.Contains(c, "max-file: \"3\"") {
+	if sf := parseSimpleFields(c); sf.LogMaxSize != "10m" || sf.LogMaxFile != "3" {
 		t.Fatalf("expected logging configuration in compose, got:\n%s", c)
+	}
+}
+
+// Values with ':' or '#' must not break the YAML, numeric limits stay numbers,
+// and parseSimpleFields reads back what the form sent.
+func TestGenerateComposeRoundTrip(t *testing.T) {
+	cmd := `sh -c 'echo a: b # not a comment'`
+	c := generateCompose("ghcr.io/x/app:1.2", 8080, "./data:/data\n./conf:/etc/app:ro", "my.app", "512m", "0.5", "10m", "3",
+		[]string{"FOO", "BAR"}, cmd, "8080:80, 9000:9000", "65535")
+
+	var doc struct {
+		Services map[string]struct {
+			Image   string
+			CPUs    float64 `yaml:"cpus"`
+			Ulimits struct{ Nofile struct{ Soft, Hard int } }
+		}
+		Networks map[string]struct{ External bool }
+	}
+	if err := yaml.Unmarshal([]byte(c), &doc); err != nil {
+		t.Fatalf("invalid YAML: %v\n%s", err, c)
+	}
+	svc := doc.Services["my-app"]
+	if svc.Image != "ghcr.io/x/app:1.2" || svc.CPUs != 0.5 || svc.Ulimits.Nofile.Soft != 65535 || svc.Ulimits.Nofile.Hard != 65535 || !doc.Networks["dockify"].External {
+		t.Fatalf("unexpected compose:\n%s", c)
+	}
+
+	want := simpleFields{
+		Image: "ghcr.io/x/app:1.2", Port: 8080, EnvKeys: []string{"FOO", "BAR"},
+		Volumes: "./data:/data\n./conf:/etc/app:ro", MemoryLimit: "512m", CPULimit: "0.5",
+		LogMaxSize: "10m", LogMaxFile: "3", Command: cmd, Ports: "8080:80\n9000:9000", UlimitsNofile: "65535",
+	}
+	if got := parseSimpleFields(c); !reflect.DeepEqual(got, want) {
+		t.Fatalf("round trip:\ngot  %+v\nwant %+v", got, want)
+	}
+}
+
+// B7: "dockify" in an image name used to skip the injection entirely.
+func TestEnsureDockifyNetwork(t *testing.T) {
+	type composeDoc struct {
+		Services map[string]struct {
+			Networks yaml.Node `yaml:"networks"`
+		}
+		Networks map[string]struct{ External bool }
+	}
+	parse := func(c string) (doc composeDoc) {
+		t.Helper()
+		if err := yaml.Unmarshal([]byte(c), &doc); err != nil {
+			t.Fatalf("%v\n%s", err, c)
+		}
+		return doc
+	}
+
+	out := ensureDockifyNetwork("services:\n  app:\n    image: ghcr.io/coderbuzz/dockify:latest # the image\n")
+	doc := parse(out)
+	if n := doc.Services["app"].Networks; len(n.Content) != 1 || n.Content[0].Value != "dockify" || !doc.Networks["dockify"].External {
+		t.Fatalf("network not injected:\n%s", out)
+	}
+	if !strings.Contains(out, "# the image") {
+		t.Fatalf("comment lost:\n%s", out)
+	}
+
+	has := "services:\n  web:\n    image: nginx # pinned\n    networks: [dockify]\nnetworks:\n  dockify:\n    external: true\n"
+	if out := ensureDockifyNetwork(has); out != has {
+		t.Fatalf("complete compose changed:\n%s", out)
+	}
+
+	out = ensureDockifyNetwork("services:\n  web:\n    image: nginx\n    networks:\n      backend:\n        aliases: [api]\nnetworks:\n  backend: {}\n")
+	doc = parse(out)
+	var nets map[string]struct{ Aliases []string }
+	if n := doc.Services["web"].Networks; n.Decode(&nets) != nil || n.Kind != yaml.MappingNode {
+		t.Fatalf("networks no longer a mapping:\n%s", out)
+	}
+	if _, ok := nets["dockify"]; !ok || len(nets["backend"].Aliases) != 1 || !doc.Networks["dockify"].External {
+		t.Fatalf("mapping-form networks not preserved:\n%s", out)
+	}
+	if _, ok := doc.Networks["backend"]; !ok {
+		t.Fatalf("top-level backend network dropped:\n%s", out)
+	}
+
+	// A sidecar kept off the shared network stays off; only the declaration is added.
+	out = ensureDockifyNetwork("services:\n  web:\n    image: nginx\n    networks: [default, dockify]\n  db:\n    image: postgres\n")
+	doc = parse(out)
+	if doc.Services["db"].Networks.Kind != 0 || !doc.Networks["dockify"].External {
+		t.Fatalf("sidecar attached or network not declared:\n%s", out)
 	}
 }
 

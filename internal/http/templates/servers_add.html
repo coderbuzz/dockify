@@ -21,7 +21,11 @@
         <label>Port<input type="number" name="port" value="22" placeholder="22"></label>
         <label>User<input type="text" name="user" value="root" placeholder="root"></label>
       </div>
-      <label>SSH Private Key<textarea name="ssh_key" rows="8" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" required></textarea><small>Paste the full private key content (not a file path)</small></label>
+      <small>Dockify creates an SSH key pair for this server. The next page shows the public key and the command that installs it on the worker.</small>
+      <details>
+        <summary>Advanced: use an existing private key</summary>
+        <label>SSH Private Key<textarea name="ssh_key" rows="8" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"></textarea><small>Paste the full private key content (not a file path). Leave empty to generate one.</small></label>
+      </details>
     </fieldset>
     <fieldset>
       <h3>Registry Credential <small style="font-weight:normal;color:var(--text-muted)">(optional)</small></h3>

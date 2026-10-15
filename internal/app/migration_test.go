@@ -2,7 +2,9 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -109,6 +111,11 @@ func (c *recConn) ExecLong(cmd string) (string, error) {
 		return "permission denied", errors.New("exit status 1")
 	}
 	return c.MockClient.ExecLong(cmd)
+}
+
+func (c *recConn) WriteFile(path, content string, mode os.FileMode) error {
+	c.record(fmt.Sprintf("WRITE %s %o\n%s", path, mode, content))
+	return nil
 }
 
 func (c *recConn) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {

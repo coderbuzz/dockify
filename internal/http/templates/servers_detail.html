@@ -71,12 +71,22 @@
         <tr><td><strong>Port</strong></td><td>{{.Server.Port}}</td></tr>
         <tr><td><strong>User</strong></td><td>{{.Server.User}}</td></tr>
         <tr><td><strong>SSH Key</strong></td><td><code style="word-break:break-all;font-size:0.78em">{{.Server.SSHKey}}</code></td></tr>
+        <tr><td><strong>Host Key</strong></td><td>{{with .Server.HostKeyFingerprint}}<code style="word-break:break-all;font-size:0.78em">{{.}}</code>{{else}}not pinned yet{{end}}</td></tr>
         <tr><td><strong>Registry</strong></td><td>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</td></tr>
         <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></td></tr>
       </table></div>
     </div>
     {{template "servers_resources_card" .}}
   </div>
+
+  {{if .PublicKey}}
+  <div class="card">
+    <h3>Worker Access</h3>
+    <p style="font-size:0.85em;color:var(--text-dim)">Dockify connects with this public key. To prepare a new worker, run this on it as <strong>{{.Server.User}}</strong> (it installs Docker and adds the key to <code>~/.ssh/authorized_keys</code>), then click <strong>Init Worker</strong>:</p>
+    <pre style="white-space:pre-wrap;word-break:break-all;font-size:0.78em"><code>curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- '{{.PublicKey}}'</code></pre>
+    <small>Public key only: <code style="word-break:break-all">{{.PublicKey}}</code></small>
+  </div>
+  {{end}}
 
   <div class="btn-group">
     <div class="btn-group-left">

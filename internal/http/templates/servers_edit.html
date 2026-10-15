@@ -30,6 +30,12 @@
         <label>Port<input type="number" name="port" value="{{.Server.Port}}" placeholder="22"></label>
         <label>User<input type="text" name="user" value="{{.Server.User}}" placeholder="root"></label>
       </div>
+      {{with .Server.HostKeyFingerprint}}
+      <label style="display:flex;align-items:center;gap:0.4em;font-size:0.85em;cursor:pointer">
+        <input type="checkbox" name="host_key_clear" value="1"> Forget pinned host key <code style="word-break:break-all">{{.}}</code>
+      </label>
+      <small>Only after the worker was reinstalled: the next connection pins whatever key it presents. Changing host or port forgets it too.</small>
+      {{end}}
     </div>
     <div class="card">
       <h3>SSH Key</h3>

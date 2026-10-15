@@ -88,20 +88,13 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		var err error
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("console ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("console ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
+		return
 	}
+	defer client.Close()
 
 	outCh, inCh, err := client.Shell(ctx, 24, 80)
 	if err != nil {
@@ -110,6 +103,14 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	relay(ctx, conn, outCh, inCh)
+}
+
+// relay copies session output to the WebSocket and keystrokes and resizes
+// back until either side ends. The reader is the only sender on inCh and
+// closes it when it stops (the handler's conn.Close ends ReadMessage), which
+// stops the SSH stdin forwarder.
+func relay(ctx context.Context, conn *websocket.Conn, outCh <-chan ssh.Output, inCh chan<- ssh.Input) {
 	errCh := make(chan error, 2)
 
 	// SSH stdout → WebSocket (raw binary)
@@ -128,6 +129,7 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// WebSocket → SSH stdin
 	go func() {
+		defer close(inCh)
 		for {
 			messageType, msg, err := conn.ReadMessage()
 			if err != nil {
@@ -135,17 +137,21 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			var input ssh.Input
 			switch messageType {
 			case websocket.TextMessage:
 				// Keystrokes — raw text, no JSON parsing
-				inCh <- ssh.Input{Data: string(msg)}
-
+				input.Data = string(msg)
 			case websocket.BinaryMessage:
 				// Resize events — JSON
-				var input ssh.Input
-				if json.Unmarshal(msg, &input) == nil && input.Resize != nil {
-					inCh <- input
+				if json.Unmarshal(msg, &input) != nil || input.Resize == nil {
+					continue
 				}
+			}
+			select {
+			case inCh <- input:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -189,19 +195,13 @@ func (h *ConsoleHandler) ServeAppContainerWS(w http.ResponseWriter, r *http.Requ
 
 	wsKeepAlive(conn, ctx)
 
-	var client ssh.Connector
-
-	if GetDevMock(r) {
-		client = ssh.NewMockClient()
-	} else {
-		client, err = ssh.Connect(svr.Host, svr.Port, svr.User, svr.SSHKey)
-		if err != nil {
-			log.Printf("container console ssh connect error: %v", err)
-			conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
-			return
-		}
-		defer client.Close()
+	client, err := h.serverSvc.Connect(svr)
+	if err != nil {
+		log.Printf("container console ssh connect error: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()+"\r\n"))
+		return
 	}
+	defer client.Close()
 
 	composePath := fmt.Sprintf("/opt/dockify/apps/app-%d/docker-compose.yml", appData.ID)
 	composeCmd := app.DockerComposeCmd(client)
@@ -217,44 +217,5 @@ func (h *ConsoleHandler) ServeAppContainerWS(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	errCh := make(chan error, 2)
-
-	go func() {
-		for out := range outCh {
-			if out.Closed {
-				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				return
-			}
-			if err := conn.WriteMessage(websocket.BinaryMessage, out.Data); err != nil {
-				errCh <- err
-				return
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			messageType, msg, err := conn.ReadMessage()
-			if err != nil {
-				errCh <- err
-				return
-			}
-
-			switch messageType {
-			case websocket.TextMessage:
-				inCh <- ssh.Input{Data: string(msg)}
-
-			case websocket.BinaryMessage:
-				var input ssh.Input
-				if json.Unmarshal(msg, &input) == nil && input.Resize != nil {
-					inCh <- input
-				}
-			}
-		}
-	}()
-
-	select {
-	case <-errCh:
-	case <-ctx.Done():
-	}
+	relay(ctx, conn, outCh, inCh)
 }

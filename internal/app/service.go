@@ -74,7 +74,7 @@ func NewService(repo *Repository, serverRepo *server.Repository, cf *cloudflare.
 		serverRepo:  serverRepo,
 		cf:          cf,
 		scheduler:   sch,
-		connFactory: ssh.RealFactory(),
+		connFactory: ssh.RealFactory(serverRepo),
 		statsCache:  make(map[int64]*StatsOverview),
 	}
 }
@@ -242,15 +242,11 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 	log.Printf("Deploying %q to %s...", app.Name, svr.Name)
 
 	envPath := fmt.Sprintf("%s/.env", remoteDir)
+	// Always written, even empty, so removed variables leave the worker; 0600
+	// because it holds the secrets (compose runs as the SSH user).
 	envVars, _ := s.repo.ListSecrets(id)
-	var envLines []string
-	for _, ev := range envVars {
-		envLines = append(envLines, ev.Key+"="+strings.ReplaceAll(ev.Value, "$", "$$"))
-	}
-	if len(envLines) > 0 {
-		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
-			log.Printf("Warning: write .env: %v", err)
-		}
+	if err := client.WriteFile(envPath, envFile(envVars), 0600); err != nil {
+		log.Printf("Warning: write .env: %v", err)
 	}
 
 	files, _ := s.repo.ListFiles(id)

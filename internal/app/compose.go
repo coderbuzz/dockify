@@ -37,119 +37,196 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
+type simpleCompose struct {
+	Services map[string]simpleService   `yaml:"services"`
+	Networks map[string]map[string]bool `yaml:"networks"`
+}
+
+type simpleService struct {
+	Image       string         `yaml:"image,omitempty"`
+	Restart     string         `yaml:"restart,omitempty"`
+	Command     string         `yaml:"command,omitempty"`
+	Ports       []string       `yaml:"ports,omitempty"`
+	Expose      []string       `yaml:"expose,omitempty"`
+	Volumes     []string       `yaml:"volumes,omitempty"`
+	Networks    []string       `yaml:"networks,omitempty"`
+	MemLimit    *yaml.Node     `yaml:"mem_limit,omitempty"`
+	CPUs        *yaml.Node     `yaml:"cpus,omitempty"`
+	Ulimits     *simpleUlimits `yaml:"ulimits,omitempty"`
+	Logging     *simpleLogging `yaml:"logging,omitempty"`
+	Environment []string       `yaml:"environment,omitempty"`
+}
+
+type simpleUlimits struct {
+	Nofile struct {
+		Soft *yaml.Node `yaml:"soft"`
+		Hard *yaml.Node `yaml:"hard"`
+	} `yaml:"nofile"`
+}
+
+type simpleLogging struct {
+	Driver  string            `yaml:"driver"`
+	Options map[string]string `yaml:"options,omitempty"`
+}
+
+// plain is an untagged scalar: written unquoted when that is valid YAML, so
+// "cpus: 0.5" stays a number as before, and quoted otherwise.
+func plain(s string) *yaml.Node {
+	if s == "" {
+		return nil
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Value: s}
+}
+
 func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string, ports string, ulimitsNofile string) string {
 	svcName := "app"
 	if appName != "" {
 		svcName = sanitizeAppName(appName)
 	}
-	compose := fmt.Sprintf(`services:
-  %s:
-    image: %s`, svcName, image)
-
-	compose += "\n    restart: unless-stopped"
-
-	if command != "" {
-		compose += "\n    command: " + command
+	svc := simpleService{
+		Image:    image,
+		Restart:  "unless-stopped",
+		Command:  command,
+		Ports:    splitEnvVars(ports),
+		Volumes:  splitEnvVars(volumes),
+		Networks: []string{"dockify"},
+		MemLimit: plain(memoryLimit),
+		CPUs:     plain(cpuLimit),
 	}
-
-	if ports != "" {
-		compose += "\n    ports:"
-		for _, p := range splitEnvVars(ports) {
-			compose += fmt.Sprintf("\n      - %s", p)
-		}
-	}
-
 	if port > 0 {
-		compose += fmt.Sprintf("\n    expose:\n      - \"%d\"", port)
+		svc.Expose = []string{strconv.Itoa(port)}
 	}
-
-	if volumes != "" {
-		compose += "\n    volumes:"
-		for _, vol := range splitEnvVars(volumes) {
-			compose += fmt.Sprintf("\n      - %s", vol)
-		}
-	}
-
-	compose += "\n    networks:\n      - dockify"
-
-	if memoryLimit != "" {
-		compose += fmt.Sprintf("\n    mem_limit: %s", memoryLimit)
-	}
-
-	if cpuLimit != "" {
-		compose += fmt.Sprintf("\n    cpus: %s", cpuLimit)
-	}
-
 	if ulimitsNofile != "" {
-		compose += fmt.Sprintf("\n    ulimits:\n      nofile:\n        soft: %s\n        hard: %s", ulimitsNofile, ulimitsNofile)
+		svc.Ulimits = &simpleUlimits{}
+		svc.Ulimits.Nofile.Soft = plain(ulimitsNofile)
+		svc.Ulimits.Nofile.Hard = plain(ulimitsNofile)
 	}
-
 	if logMaxSize != "" || logMaxFile != "" {
-		compose += "\n    logging:"
-		compose += "\n      driver: json-file"
-		compose += "\n      options:"
+		svc.Logging = &simpleLogging{Driver: "json-file", Options: map[string]string{}}
 		if logMaxSize != "" {
-			compose += fmt.Sprintf("\n        max-size: \"%s\"", logMaxSize)
+			svc.Logging.Options["max-size"] = logMaxSize
 		}
 		if logMaxFile != "" {
-			compose += fmt.Sprintf("\n        max-file: \"%s\"", logMaxFile)
+			svc.Logging.Options["max-file"] = logMaxFile
+		}
+	}
+	for _, k := range envKeys {
+		if k = strings.TrimSpace(k); k != "" {
+			svc.Environment = append(svc.Environment, k+"=${"+k+"}")
 		}
 	}
 
-	if len(envKeys) > 0 {
-		compose += "\n    environment:"
-		for _, k := range envKeys {
-			if strings.TrimSpace(k) != "" {
-				compose += fmt.Sprintf("\n      - %s=${%s}", k, k)
-			}
-		}
+	var b strings.Builder
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(simpleCompose{
+		Services: map[string]simpleService{svcName: svc},
+		Networks: map[string]map[string]bool{"dockify": {"external": true}},
+	}); err != nil {
+		return "" // unreachable: simpleCompose holds only encodable types
 	}
-
-	compose += `
-
-networks:
-  dockify:
-    external: true`
-
-	return compose
+	return b.String()
 }
 
+// ensureDockifyNetwork attaches the services to the external "dockify" network
+// Caddy proxies through and declares that network. When some service already
+// lists dockify the services are left alone: the others are kept off the
+// shared network on purpose (a "db" alias there would collide across apps).
+// It edits the YAML node tree, so comments and key order survive, and returns
+// the input unchanged when nothing is missing.
 func ensureDockifyNetwork(compose string) string {
-	if strings.Contains(compose, "dockify") {
+	var doc yaml.Node
+	if yaml.Unmarshal([]byte(compose), &doc) != nil || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return compose
+	}
+	root := doc.Content[0]
+	services := mapValue(root, "services")
+	if services == nil || services.Kind != yaml.MappingNode {
 		return compose
 	}
 
-	var doc map[string]interface{}
-	if err := yaml.Unmarshal([]byte(compose), &doc); err != nil {
-		return compose
-	}
-
-	services, ok := doc["services"].(map[string]interface{})
-	if !ok {
-		return compose
-	}
-
-	for name := range services {
-		svc, _ := services[name].(map[string]interface{})
-		if svc == nil {
-			svc = make(map[string]interface{})
-			services[name] = svc
+	var missing []*yaml.Node
+	for i := 1; i < len(services.Content); i += 2 {
+		svc := services.Content[i]
+		if svc.Kind != yaml.MappingNode || mapValue(svc, "network_mode") != nil {
+			continue // network_mode cannot be combined with networks
 		}
-		nets, _ := svc["networks"].([]interface{})
-		svc["networks"] = append(nets, "dockify")
+		if onDockify(svc) {
+			missing = nil
+			break
+		}
+		missing = append(missing, svc)
+	}
+	for _, svc := range missing {
+		switch nets := mapValue(svc, "networks"); {
+		case nets == nil:
+			svc.Content = append(svc.Content, scalar("networks"), &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{scalar("dockify")}})
+		case nets.Kind == yaml.MappingNode:
+			nets.Content = append(nets.Content, scalar("dockify"), &yaml.Node{Kind: yaml.MappingNode, Style: yaml.FlowStyle})
+		default:
+			nets.Content = append(nets.Content, scalar("dockify"))
+		}
+	}
+	changed := len(missing) > 0
+
+	nets := mapValue(root, "networks")
+	if nets == nil {
+		nets = &yaml.Node{Kind: yaml.MappingNode}
+		root.Content = append(root.Content, scalar("networks"), nets)
+	} else if nets.Kind != yaml.MappingNode { // "networks:" left empty
+		*nets = yaml.Node{Kind: yaml.MappingNode}
+	}
+	dockify := mapValue(nets, "dockify")
+	if dockify == nil {
+		dockify = &yaml.Node{Kind: yaml.MappingNode}
+		nets.Content = append(nets.Content, scalar("dockify"), dockify)
+	} else if dockify.Kind != yaml.MappingNode {
+		*dockify = yaml.Node{Kind: yaml.MappingNode}
+	}
+	if ext := mapValue(dockify, "external"); ext == nil {
+		dockify.Content = append(dockify.Content, scalar("external"), &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
+		changed = true
+	} else if ext.Value != "true" {
+		*ext = yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}
+		changed = true
 	}
 
-	doc["networks"] = map[string]interface{}{
-		"dockify": map[string]interface{}{
-			"external": true,
-		},
+	if !changed {
+		return compose
 	}
-
-	out, err := yaml.Marshal(doc)
+	out, err := yaml.Marshal(&doc)
 	if err != nil {
 		return compose
 	}
 	return string(out)
+}
+
+// onDockify reports whether a service lists the dockify network, in either
+// the sequence or the mapping form.
+func onDockify(svc *yaml.Node) bool {
+	nets := mapValue(svc, "networks")
+	switch {
+	case nets == nil:
+		return false
+	case nets.Kind == yaml.MappingNode:
+		return mapValue(nets, "dockify") != nil
+	default:
+		return slices.ContainsFunc(nets.Content, func(n *yaml.Node) bool { return n.Value == "dockify" })
+	}
+}
+
+// mapValue returns the value node of key in a mapping node, or nil.
+func mapValue(m *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func scalar(v string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Value: v}
 }
 
 func sanitizeAppName(name string) string {
@@ -232,16 +309,16 @@ func splitEnvVars(envVars string) []string {
 }
 
 type simpleFields struct {
-	Image      string
-	Port       int
-	EnvKeys    []string
-	Volumes    string
-	MemoryLimit string
-	CPULimit    string
-	LogMaxSize  string
-	LogMaxFile  string
-	Command     string
-	Ports       string
+	Image         string
+	Port          int
+	EnvKeys       []string
+	Volumes       string
+	MemoryLimit   string
+	CPULimit      string
+	LogMaxSize    string
+	LogMaxFile    string
+	Command       string
+	Ports         string
 	UlimitsNofile string
 }
 

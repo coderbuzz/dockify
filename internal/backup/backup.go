@@ -50,18 +50,18 @@ type ExportFile struct {
 }
 
 type ExportApp struct {
-	Name               string         `yaml:"name"`
-	ServerName         string         `yaml:"server_name"`
-	Domain             string         `yaml:"domain"`
-	Port               int            `yaml:"port"`
-	Compose            string         `yaml:"compose"`
-	GitRepo            string         `yaml:"git_repo,omitempty"`
-	GitBranch          string         `yaml:"git_branch,omitempty"`
-	AuthUser           string         `yaml:"auth_user,omitempty"`
-	AuthPass           string         `yaml:"auth_pass,omitempty"`
-	ComposeMode string `yaml:"compose_mode,omitempty"`
-	Secrets            []ExportSecret `yaml:"secrets,omitempty"`
-	Files              []ExportFile   `yaml:"files,omitempty"`
+	Name        string         `yaml:"name"`
+	ServerName  string         `yaml:"server_name"`
+	Domain      string         `yaml:"domain"`
+	Port        int            `yaml:"port"`
+	Compose     string         `yaml:"compose"`
+	GitRepo     string         `yaml:"git_repo,omitempty"`
+	GitBranch   string         `yaml:"git_branch,omitempty"`
+	AuthUser    string         `yaml:"auth_user,omitempty"`
+	AuthPass    string         `yaml:"auth_pass,omitempty"`
+	ComposeMode string         `yaml:"compose_mode,omitempty"`
+	Secrets     []ExportSecret `yaml:"secrets,omitempty"`
+	Files       []ExportFile   `yaml:"files,omitempty"`
 }
 
 type Service struct {
@@ -450,6 +450,10 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		}
 	}
 
+	if err := validateImport(data.Apps); err != nil {
+		return "", err
+	}
+
 	if mode == "replace" {
 		apps, _ := s.appSvc.List()
 		for _, a := range apps {
@@ -586,6 +590,35 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 	}
 
 	return strings.Join(logLines, "\n"), nil
+}
+
+// validateImport rejects the whole import before anything is changed when an
+// app carries a domain, env key or file path the worker must not receive; it
+// normalizes domains and paths in place.
+func validateImport(apps []ExportApp) error {
+	for i := range apps {
+		ea := &apps[i]
+		if strings.TrimSpace(ea.Domain) != "" {
+			d, err := app.ValidDomain(ea.Domain)
+			if err != nil {
+				return fmt.Errorf("app %q: %w", ea.Name, err)
+			}
+			ea.Domain = d
+		}
+		for _, sec := range ea.Secrets {
+			if err := app.ValidEnvKey(sec.Key); err != nil {
+				return fmt.Errorf("app %q: %w", ea.Name, err)
+			}
+		}
+		for j := range ea.Files {
+			p, err := app.ValidFilePath(ea.Files[j].Path)
+			if err != nil {
+				return fmt.Errorf("app %q: %w", ea.Name, err)
+			}
+			ea.Files[j].Path = p
+		}
+	}
+	return nil
 }
 
 func (s *Service) findServerByName(name string) (*server.Server, error) {

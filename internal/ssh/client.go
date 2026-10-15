@@ -4,10 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -16,13 +22,91 @@ import (
 )
 
 type Client struct {
-	conn  *gossh.Client
-	Host  string
-	Port  int
-	User  string
+	conn *gossh.Client
+	Host string
+	Port int
+	User string
 }
 
-func Connect(host string, port int, user, keyPath string) (*Client, error) {
+// HostKeyStore holds the pinned SSH host key (base64 wire format) per host and port.
+type HostKeyStore interface {
+	HostKey(host string, port int) (string, error)
+	SaveHostKey(host string, port int, key string) error
+}
+
+// pinHostKey trusts the key presented on first use and stores it; afterwards
+// only that key is accepted.
+func pinHostKey(store HostKeyStore, host string, port int) gossh.HostKeyCallback {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	return func(hostname string, remote net.Addr, key gossh.PublicKey) error {
+		pinned, err := store.HostKey(host, port)
+		if err != nil {
+			return fmt.Errorf("load host key for %s: %w", addr, err)
+		}
+		if pinned == "" {
+			if err := store.SaveHostKey(host, port, base64.StdEncoding.EncodeToString(key.Marshal())); err != nil {
+				return fmt.Errorf("save host key for %s: %w", addr, err)
+			}
+			log.Printf("pinned host key for %s (%s)", addr, gossh.FingerprintSHA256(key))
+			return nil
+		}
+		raw, err := base64.StdEncoding.DecodeString(pinned)
+		if err != nil {
+			return fmt.Errorf("decode pinned host key for %s: %w", addr, err)
+		}
+		want, err := gossh.ParsePublicKey(raw)
+		if err != nil {
+			return fmt.Errorf("parse pinned host key for %s: %w", addr, err)
+		}
+		if gossh.FixedHostKey(want)(hostname, remote, key) != nil {
+			return fmt.Errorf("host key mismatch for %s — if the server was reinstalled, clear its host key in the server settings", addr)
+		}
+		return nil
+	}
+}
+
+// Fingerprint returns the SHA256 fingerprint of a pinned host key, or "" when
+// none is pinned or it cannot be parsed.
+func Fingerprint(pinned string) string {
+	raw, err := base64.StdEncoding.DecodeString(pinned)
+	if err != nil || pinned == "" {
+		return ""
+	}
+	key, err := gossh.ParsePublicKey(raw)
+	if err != nil {
+		return ""
+	}
+	return gossh.FingerprintSHA256(key)
+}
+
+// GenerateKey returns a new ed25519 private key in OpenSSH PEM format, made on
+// the controller so the private half never leaves it.
+func GenerateKey() (string, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", err
+	}
+	block, err := gossh.MarshalPrivateKey(priv, "dockify")
+	if err != nil {
+		return "", err
+	}
+	return string(pem.EncodeToMemory(block)), nil
+}
+
+// PublicKey returns the authorized_keys line for the private key at keyPath.
+func PublicKey(keyPath string) (string, error) {
+	b, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", err
+	}
+	signer, err := gossh.ParsePrivateKey(b)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(gossh.MarshalAuthorizedKey(signer.PublicKey()))) + " dockify", nil
+}
+
+func Connect(host string, port int, user, keyPath string, store HostKeyStore) (*Client, error) {
 	keyBytes, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("read SSH key: %w", err)
@@ -38,7 +122,7 @@ func Connect(host string, port int, user, keyPath string) (*Client, error) {
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(signer),
 		},
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: pinHostKey(store, host, port),
 		Timeout:         10 * time.Second,
 	}
 
@@ -105,40 +189,17 @@ func shellQuote(s string) string {
 }
 
 func (c *Client) exec(cmd string, d time.Duration) (string, error) {
-	session, err := c.conn.NewSession()
-	if err != nil {
-		return "", fmt.Errorf("new session: %w", err)
-	}
-	defer session.Close()
-
-	var stdout, stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
-
-	if err := session.Start(wrapTimeout(cmd, d)); err != nil {
-		return "", fmt.Errorf("exec %q: %w", cmd, err)
-	}
-	done := make(chan error, 1)
-	go func() { done <- session.Wait() }()
-
-	// Backstop in case the connection itself hangs; the remote timeout fires first.
-	timer := time.NewTimer(d + 30*time.Second)
-	defer timer.Stop()
-	select {
-	case err = <-done:
-	case <-timer.C:
-		session.Close()
-		<-done
-		return stdout.String(), fmt.Errorf("exec %q: timed out after %s", cmd, d)
-	}
-	if err != nil {
-		return stdout.String(), fmt.Errorf("exec %q: %w: %s", cmd, err, stderr.String())
-	}
-
-	return stdout.String(), nil
+	var stdout bytes.Buffer
+	err := c.run(cmd, nil, &stdout, d)
+	return stdout.String(), err
 }
 
 func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
+	return c.run(cmd, stdin, stdout, ExecPipeTimeout)
+}
+
+// run executes cmd under a remote timeout d, with optional stdin and stdout.
+func (c *Client) run(cmd string, stdin io.Reader, stdout io.Writer, d time.Duration) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("new session: %w", err)
@@ -154,23 +215,24 @@ func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
 	var stderr bytes.Buffer
 	session.Stderr = &stderr
 
-	if err := session.Start(wrapTimeout(cmd, ExecPipeTimeout)); err != nil {
-		return fmt.Errorf("exec pipe %q: %w", cmd, err)
+	if err := session.Start(wrapTimeout(cmd, d)); err != nil {
+		return fmt.Errorf("exec %q: %w", cmd, err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- session.Wait() }()
 
-	timer := time.NewTimer(ExecPipeTimeout + 30*time.Second)
+	// Backstop in case the connection itself hangs; the remote timeout fires first.
+	timer := time.NewTimer(d + 30*time.Second)
 	defer timer.Stop()
 	select {
 	case err = <-done:
 	case <-timer.C:
 		session.Close()
 		<-done
-		return fmt.Errorf("exec pipe %q: timed out after %s", cmd, ExecPipeTimeout)
+		return fmt.Errorf("exec %q: timed out after %s", cmd, d)
 	}
 	if err != nil {
-		return fmt.Errorf("exec pipe %q: %w: %s", cmd, err, stderr.String())
+		return fmt.Errorf("exec %q: %w: %s", cmd, err, stderr.String())
 	}
 	return nil
 }
@@ -216,13 +278,15 @@ func (c *Client) ExecStream(ctx context.Context, cmd string) (<-chan string, err
 	return outCh, nil
 }
 
-func (c *Client) WriteFile(path, content string, mode os.FileMode) error {
-	cmd := fmt.Sprintf(
-		"mkdir -p $(dirname '%s') && cat > '%s' << 'DOCKIFY_EOF'\n%s\nDOCKIFY_EOF\nchmod %o '%s'",
-		path, path, content, mode, path,
-	)
-	_, err := c.Exec(cmd)
-	return err
+// WriteFile sends content on stdin, so the shell never parses any of it. A new
+// file is created 0600 (umask) and only then chmod'ed to mode.
+func (c *Client) WriteFile(name, content string, mode os.FileMode) error {
+	return c.run(writeFileCmd(name, mode), strings.NewReader(content), nil, ExecTimeout)
+}
+
+func writeFileCmd(name string, mode os.FileMode) string {
+	q := shellQuote(name)
+	return fmt.Sprintf("mkdir -p %s && (umask 077; cat > %s) && chmod %o %s", shellQuote(path.Dir(name)), q, mode, q)
 }
 
 func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error) {
@@ -249,14 +313,22 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 	outCh := make(chan Output, 64)
 	inCh := make(chan Input, 64)
 
-	session.Stdout = channelWriter{outCh}
-	session.Stderr = channelWriter{outCh}
+	session.Stdout = channelWriter{outCh, ctx.Done()}
+	session.Stderr = channelWriter{outCh, ctx.Done()}
 
 	if err := session.Start(cmd); err != nil {
 		session.Close()
 		return nil, nil, fmt.Errorf("exec pty: %w", err)
 	}
 
+	pump(ctx, session, wIn, outCh, inCh)
+	return outCh, inCh, nil
+}
+
+// pump runs an interactive session until the remote side exits or ctx ends.
+// The caller closes inCh when done sending; outCh ends with Closed and is
+// closed once the session's output is fully drained.
+func pump(ctx context.Context, session *gossh.Session, wIn io.WriteCloser, outCh chan Output, inCh chan Input) {
 	// Forward input channel → SSH stdin
 	go func() {
 		defer wIn.Close()
@@ -271,11 +343,16 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 		}
 	}()
 
-	// Wait for remote exit
+	// Wait for remote exit. Wait returns after the output copies finished, so
+	// nothing writes to outCh once it is closed.
 	go func() {
 		session.Wait()
 		session.Close()
-		outCh <- Output{Closed: true}
+		select {
+		case outCh <- Output{Closed: true}:
+		case <-ctx.Done():
+		}
+		close(outCh)
 	}()
 
 	// Context cancellation → kill session
@@ -283,8 +360,6 @@ func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-cha
 		<-ctx.Done()
 		session.Close()
 	}()
-
-	return outCh, inCh, nil
 }
 
 func (c *Client) Close() error {
@@ -294,12 +369,11 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func RealFactory() Factory {
+func RealFactory(store HostKeyStore) Factory {
 	return func(host string, port int, user, keyPath string) (Connector, error) {
-		return Connect(host, port, user, keyPath)
+		return Connect(host, port, user, keyPath, store)
 	}
 }
-
 
 func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan<- Input, error) {
 	session, err := c.conn.NewSession()
@@ -325,51 +399,30 @@ func (c *Client) Shell(ctx context.Context, rows, cols int) (<-chan Output, chan
 	outCh := make(chan Output, 64)
 	inCh := make(chan Input, 64)
 
-	session.Stdout = channelWriter{outCh}
-	session.Stderr = channelWriter{outCh}
+	session.Stdout = channelWriter{outCh, ctx.Done()}
+	session.Stderr = channelWriter{outCh, ctx.Done()}
 
 	if err := session.Shell(); err != nil {
 		session.Close()
 		return nil, nil, fmt.Errorf("shell: %w", err)
 	}
 
-	// Forward input channel → SSH stdin
-	go func() {
-		defer wIn.Close()
-		for input := range inCh {
-			if input.Resize != nil {
-				session.WindowChange(input.Resize.Height, input.Resize.Width)
-				continue
-			}
-			if len(input.Data) > 0 {
-				wIn.Write([]byte(input.Data))
-			}
-		}
-	}()
-
-	// Wait for remote exit
-	go func() {
-		session.Wait()
-		session.Close()
-		outCh <- Output{Closed: true}
-	}()
-
-	// Context cancellation → kill session
-	go func() {
-		<-ctx.Done()
-		session.Close()
-	}()
-
+	pump(ctx, session, wIn, outCh, inCh)
 	return outCh, inCh, nil
 }
 
+// channelWriter hands session output to the console; once done is closed (the
+// console went away) it fails instead of blocking the session forever.
 type channelWriter struct {
-	ch chan<- Output
+	ch   chan<- Output
+	done <-chan struct{}
 }
 
 func (w channelWriter) Write(p []byte) (int, error) {
-	data := make([]byte, len(p))
-	copy(data, p)
-	w.ch <- Output{Data: data}
-	return len(p), nil
+	select {
+	case w.ch <- Output{Data: bytes.Clone(p)}:
+		return len(p), nil
+	case <-w.done:
+		return 0, io.ErrClosedPipe
+	}
 }
