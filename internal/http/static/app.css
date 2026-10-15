@@ -14,10 +14,10 @@
   --accent-fill: #4f46e5;
   --on-accent: #ffffff;
   --accent-soft: #eef0ff;
-  --brand2-fill: #14b8a6;
-  --on-brand2: #042f2e;
-  --brand2: #0f766e;
-  --brand2-soft: #dcf5f1;
+  --brand2-fill: #6d28d9;
+  --on-brand2: #ffffff;
+  --brand2: #6d28d9;
+  --brand2-soft: #ede9fe;
   --chart: #6366f1;
   --chart-soft: #e3e5fc;
   --ok: #15803d;
@@ -48,10 +48,10 @@
   --accent-fill: #5850ec;
   --on-accent: #ffffff;
   --accent-soft: #252a55;
-  --brand2-fill: #2dd4bf;
-  --on-brand2: #042f2e;
-  --brand2: #5eead4;
-  --brand2-soft: #103633;
+  --brand2-fill: #6d28d9;
+  --on-brand2: #ffffff;
+  --brand2: #c4b5fd;
+  --brand2-soft: #2a1d55;
   --chart: #818cf8;
   --chart-soft: #252a55;
   --ok: #4ade80;
@@ -82,10 +82,10 @@
   --accent-fill: #2b3486;
   --on-accent: #ffffff;
   --accent-soft: #e7e9f8;
-  --brand2-fill: #f26a21;
-  --on-brand2: #1b1f3b;
-  --brand2: #c2410c;
-  --brand2-soft: #fdeee4;
+  --brand2-fill: #1e40af;
+  --on-brand2: #ffffff;
+  --brand2: #1e40af;
+  --brand2-soft: #dbeafe;
   --chart: #4a54c9;
   --chart-soft: #e3e5fb;
   --ok: #15803d;
@@ -116,10 +116,10 @@
   --accent-fill: #4a54c9;
   --on-accent: #ffffff;
   --accent-soft: #242a5c;
-  --brand2-fill: #f26a21;
-  --on-brand2: #1b1f3b;
-  --brand2: #ff9a5c;
-  --brand2-soft: #3a2418;
+  --brand2-fill: #1e40af;
+  --on-brand2: #ffffff;
+  --brand2: #93c5fd;
+  --brand2-soft: #1a2a55;
   --chart: #8c96ff;
   --chart-soft: #242a5c;
   --ok: #4ade80;
@@ -150,10 +150,10 @@
   --accent-fill: #0e6e78;
   --on-accent: #ffffff;
   --accent-soft: #e0f1f2;
-  --brand2-fill: #f5a524;
-  --on-brand2: #1a1305;
-  --brand2: #a35a00;
-  --brand2-soft: #fdf0d9;
+  --brand2-fill: #075985;
+  --on-brand2: #ffffff;
+  --brand2: #075985;
+  --brand2-soft: #e0f2fe;
   --chart: #0891b2;
   --chart-soft: #dcf0f6;
   --ok: #15803d;
@@ -184,10 +184,10 @@
   --accent-fill: #0e6e78;
   --on-accent: #ffffff;
   --accent-soft: #103338;
-  --brand2-fill: #f5a524;
-  --on-brand2: #1a1305;
-  --brand2: #f8b95a;
-  --brand2-soft: #33270f;
+  --brand2-fill: #075985;
+  --on-brand2: #ffffff;
+  --brand2: #7dd3fc;
+  --brand2-soft: #0f2a3a;
   --chart: #38bdf8;
   --chart-soft: #0f2c3a;
   --ok: #4ade80;
@@ -379,8 +379,6 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
 .btn-lg { min-height: 48px; padding: 0 20px; }
 .btn-primary, .btn-primary:hover { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 .btn-primary:hover { filter: brightness(1.1); }
-.btn-brand, .btn-brand:hover { background: var(--brand2-fill); border-color: var(--brand2-fill); color: var(--on-brand2); }
-.btn-brand:hover { filter: brightness(1.06); }
 .btn-secondary { background: var(--surface); border-color: var(--control); color: var(--ink); }
 .btn-ghost, .btn-ghost:hover { background: transparent; border-color: transparent; color: var(--ink2); }
 .btn-ghost:hover { background: var(--accent-soft); color: var(--ink); }
