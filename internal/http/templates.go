@@ -234,6 +234,9 @@ func GetDevMock(r *http.Request) bool {
 	return v
 }
 
+// assetVersion busts the browser cache of /static/app.css on upgrade; set by NewRouter.
+var assetVersion string
+
 type RenderFunc func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})
 
 func Render(w http.ResponseWriter, r *http.Request, status int, name string, data interface{}) {
@@ -247,6 +250,7 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 	if ok {
 		m["BasePath"] = web.GetBasePath(r)
 		m["DevMock"] = GetDevMock(r)
+		m["AssetVersion"] = assetVersion
 	}
 
 	var buf bytes.Buffer
