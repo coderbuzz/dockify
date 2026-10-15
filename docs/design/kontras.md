@@ -85,7 +85,7 @@ Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing
 | ok / surface | 4.5 | 5.02 | 9.85 | angka KPI Online/Running |
 | white / danger-fill | 4.5 | 5.74 | 5.74 | tombol Undeploy di konfirmasi |
 | brand2 / surface | 4.5 | 5.18 | 8.20 | angka sekunder |
-| chart / chart-soft | 3 | 3.61 | 7.29 | bar CPU/RAM/Disk (grafis) |
+| chart / chart-soft | 3 | 4.96 | 5.08 | bar CPU/RAM/Disk (grafis) |
 
 | Token | Terang | Gelap |
 | :--- | :--- | :--- |
@@ -106,8 +106,8 @@ Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing
 | on-brand2 | `#1b1f3b` | `#1b1f3b` |
 | brand2 | `#c2410c` | `#ff9a5c` |
 | brand2-soft | `#fdeee4` | `#3a2418` |
-| chart | `#178a8c` | `#4fd1d3` |
-| chart-soft | `#dff3f3` | `#143339` |
+| chart | `#4a54c9` | `#8c96ff` |
+| chart-soft | `#e3e5fb` | `#242a5c` |
 | ok | `#15803d` | `#4ade80` |
 | ok-text | `#166534` | `#86efac` |
 | ok-bg | `#dcfce7` | `#10301e` |
