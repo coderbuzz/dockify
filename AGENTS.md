@@ -35,6 +35,10 @@ DOCKIFY_HOST=127.0.0.1 DOCKIFY_DATA_DIR=./data go run ./cmd/dockify serve
 # Verify templates parse
 go test ./internal/http/... -run TestTemplates
 
+# UI check (screenshots, overflow, nodes, nav timing, contrast, a11y); needs Playwright in ~/.local/share/pw-tools
+DOCKIFY_DEV_MOCK=true DOCKIFY_PORT=18090 go run ./cmd/dockify serve &   # optional: DOCKIFY_ADMIN_PASSWORD=uji123 for the login screen
+node tests/e2e/ui.mjs [BASE_URL] [OUT]   # env UI_USER/UI_PASS when auth is on; exit 1 on overflow/contrast/a11y failure
+
 # Build and run with Docker
 docker build -t dockify .
 docker run -p 127.0.0.1:8080:8080 -e DOCKIFY_ALLOW_NO_AUTH=true -v $(pwd)/data:/var/lib/dockify dockify

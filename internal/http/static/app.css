@@ -639,7 +639,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accen
 .stat small { font-size: 12.8px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Breadcrumbs */
-.breadcrumb { display: flex; align-items: center; gap: 0.4em; font-size: 0.88em; color: var(--ink2); margin-bottom: 1em; }
 .breadcrumb a { color: var(--ink2); font-weight: 500; }
 .breadcrumb a:hover { color: var(--accent); }
 
@@ -793,7 +792,7 @@ pre {
 .login-page .theme-btn { position: fixed; top: 12px; right: 12px; }
 
 /* Detail pages (DESIGN-SYSTEM §6) */
-.breadcrumb { font-size: 12.8px; color: var(--muted); margin-bottom: 8px; display: flex; gap: 6px; }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12.8px; color: var(--muted); margin-bottom: 8px; }
 .page-head { margin-bottom: 12px; }
 .page-head h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .page-head .meta { margin: 0; font-size: 12.8px; color: var(--muted); }

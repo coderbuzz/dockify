@@ -58,3 +58,26 @@ document.addEventListener('click', function (e) {
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
   else fallback();
 });
+
+// xterm is only needed for the SSH console: load it on first use.
+var xtermLoading = null;
+function loadXterm(cb) {
+  if (window.Terminal && window.FitAddon) return cb();
+  if (!xtermLoading) {
+    xtermLoading = new Promise(function (resolve, reject) {
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'static/xterm.min.css';
+      document.head.appendChild(l);
+      function add(src, next) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = next;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      }
+      add('static/xterm.min.js', function () { add('static/xterm-addon-fit.min.js', resolve); });
+    });
+  }
+  xtermLoading.then(cb, function () { xtermLoading = null; });
+}
