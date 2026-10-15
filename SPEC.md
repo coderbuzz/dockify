@@ -12,7 +12,7 @@ Dockify is a self-hosted Docker app deployment platform — single Go binary, SQ
 | Database | SQLite via `modernc.org/sqlite` | Pure Go, no CGo, embedded |
 | Router | `github.com/go-chi/chi/v5` | Middleware, groups, path params |
 | SSH | `golang.org/x/crypto/ssh` | Std SSH client, PTY sessions |
-| Web UI | Go `html/template` + HTMX | Embedded via `embed`, no JS framework, no build step |
+| Web UI | Go `html/template` + HTMX | Embedded via `embed` (templates and the vendored htmx/xterm files, no CDN), no JS framework, no build step |
 | CSS | Fully custom (no framework) | CSS variables, dark/light mode, single `<style>` block |
 | Terminal | xterm.js + WebSocket | Interactive SSH console in browser |
 | Docker | Multi-stage build | Published to `ghcr.io/coderbuzz/dockify` |
@@ -57,7 +57,8 @@ internal/
     console.go                   # WebSocket upgrade, PTY relay for SSH and container consoles
     stats_ws.go                  # WebSocket real-time server stats (1s interval)
     app_stats_ws.go              # WebSocket real-time app container stats
-    templates.go                 # Embedded templates, template funcs, Render
+    templates.go                 # Embedded templates, template funcs, Render (into a buffer, then write)
+    static/                      # Vendored htmx 2.0.4, xterm 5.3.0, xterm-addon-fit 0.8.0 (SOURCES.md: URLs + sha256)
     templates/                   # HTML templates (pages, layout, partials)
       layout.html                # head/nav/scripts blocks, all CSS (single <style> block)
       dashboard.html             # Dashboard with stats cards + server/app summary tables
@@ -254,7 +255,7 @@ Written by the background collectors, pruned after 7 days, `created_at` in UTC.
 | POST | `/logout` | Clear session, redirect to login |
 | POST | `/api/webhook/github` | GitHub push webhook (HMAC-SHA256), body ≤ 1 MiB |
 | POST | `/api/webhook/gitlab` | GitLab push webhook (token), body ≤ 1 MiB |
-| GET | `/static/*` | Static files (`web/static/`) |
+| GET | `/static/*` | Vendored htmx/xterm assets embedded in the binary (`internal/http/static/`, sources in `SOURCES.md`); one-week cache, no directory listing |
 
 Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_API_TOKEN`. A POST/PATCH/DELETE sent by another site (`Sec-Fetch-Site`, or `Origin` ≠ `Host` for older browsers) gets `403`; bearer-token requests are exempt. WebSocket handshakes must be same-origin. Request bodies under `/api/servers` and `/api/apps` are capped at 1 MiB.
 
@@ -550,6 +551,7 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 - Webhook authentication: HMAC-SHA256 (GitHub), token with constant-time compare (GitLab), auto-generated 64-char hex secret; always on (no disable), fails closed
 - Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions
 - Cross-site requests: unsafe methods from another site get `403` (Go `http.CrossOriginProtection`), WebSocket handshakes must be same-origin, no CORS headers. A reverse proxy in front of Dockify must forward the original `Host` header (Caddy does by default)
+- Every response carries `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'` (inline scripts/styles are used in the templates), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Browser scripts come from the binary, not a CDN; only Google Fonts is external
 - HTTP server: `ReadHeaderTimeout` 10s, `IdleTimeout` 120s; request bodies capped (API JSON 1 MiB, webhooks 1 MiB, import 16 MiB)
 - HTTP Basic Auth for apps enforced at Caddy proxy level with bcrypt
 - Backup encryption: AES-GCM with PBKDF2 passphrase (600,000 iterations, 256-bit key)

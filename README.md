@@ -512,6 +512,7 @@ Dockify's web UI is built with Go `html/template` + HTMX and fully custom CSS (n
 
 - **Dark/Light mode** — toggle via nav button, persisted in `localStorage` (`dockify-theme`)
 - **HTMX partial updates** — resource cards, log viewer, and status badges update without full page reloads
+- **No CDN scripts** — htmx and xterm.js are embedded in the binary and served from `/static/`; a Content-Security-Policy limits scripts to Dockify itself (only Google Fonts is loaded from outside)
 - **Responsive** — adapts to mobile screen sizes (single breakpoint at 600px)
 - **Status badges** — color-coded for all server and app states
 - **Confirm dialogs** — destructive actions (undeploy, delete, rollback) require confirmation
