@@ -65,6 +65,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 
 		r.Route("/api/servers", func(r chi.Router) {
+			r.Use(chimw.RequestSize(1 << 20)) // JSON bodies
 			r.Get("/", apiHandler.List)
 			r.Post("/", apiHandler.Create)
 			r.Get("/{id}", apiHandler.Get)
@@ -121,6 +122,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 
 		r.Route("/api/apps", func(r chi.Router) {
+			r.Use(chimw.RequestSize(1 << 20)) // JSON bodies
 			r.Get("/", appAPIHandler.List)
 			r.Post("/", appAPIHandler.Create)
 			r.Get("/{id}", appAPIHandler.Get)
