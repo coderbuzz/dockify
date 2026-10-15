@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   {{if .Flash}}<div class="toast" role="status">{{.Flash}}</div>{{end}}
   <hgroup>
     <h1>Apps</h1>
@@ -16,6 +16,5 @@
   {{template "apps_list" .}}
   {{template "ui_confirm" (dict "ID" "redeploy-all" "Title" "Redeploy all apps?" "Body" "This rebuilds and restarts every running app. Each app is briefly unavailable while it restarts." "Label" "Redeploy all" "Action" "apps/redeploy-all")}}
 </div>
-{{template "scripts" .}}
 </body>
 </html>

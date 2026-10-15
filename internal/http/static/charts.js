@@ -250,7 +250,7 @@ function initLiveCharts(opts) {
   readChartDataFromHTML();
   updateCharts();
 
-  document.body.addEventListener('htmx:afterSwap', function(evt) {
+  function onSwap(evt) {
     if (evt.target.id === opts.targetId) {
       var rangeEl = evt.target.getAttribute('data-range');
       if (rangeEl && rangeDurations[rangeEl]) {
@@ -270,8 +270,16 @@ function initLiveCharts(opts) {
         }
       }
     }
-  });
+  }
+  document.body.addEventListener('htmx:afterSwap', onSwap);
+
+  // Boosted navigation keeps this document alive: drop the socket and listener when #main is replaced.
+  function dispose() {
+    disconnect();
+    document.body.removeEventListener('htmx:afterSwap', onSwap);
+  }
+  (window.dockifyCleanups = window.dockifyCleanups || []).push(dispose);
 
   connect();
-  return { disconnect: disconnect };
+  return { disconnect: dispose };
 }

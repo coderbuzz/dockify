@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container dash">
+<div class="container dash" id="main" data-nav="{{.Nav}}">
   <hgroup>
     <h1>Dashboard</h1>
     <p>VM pool and app overview</p>
@@ -24,6 +24,5 @@
   <div class="section-head"><h2>Apps</h2><span class="count">{{len .Apps}}</span><a href="apps" class="btn btn-link">View all</a></div>
   {{template "apps_list" .}}
 </div>
-{{template "scripts" .}}
 </body>
 </html>

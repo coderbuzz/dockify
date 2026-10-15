@@ -9,6 +9,8 @@
     if (old) { if (!localStorage.getItem('dockify_theme')) localStorage.setItem('dockify_theme', old); localStorage.removeItem('dockify-theme'); }
   } catch (e) {}
   var MODES = ['light', 'dark', 'system'];
+  // light -> dark -> system -> (lawan dari tema efektif), supaya klik dari system selalu terlihat berubah
+  function nextMode(mode) { if (mode === 'system') return mq.matches ? 'light' : 'dark'; return mode === 'light' ? 'dark' : 'system'; }
   function apply() {
     var mode = get('dockify_theme', 'system', MODES);
     d.setAttribute('data-palette', get('dockify_palette', 'indigo', ['indigo', 'navy', 'teal']));
@@ -19,7 +21,7 @@
     if (window.syncAppearance) window.syncAppearance();
     var b = document.getElementById('theme-toggle');
     if (b) {
-      var next = MODES[(MODES.indexOf(mode) + 1) % 3];
+      var next = nextMode(mode);
       var ics = b.querySelectorAll('[data-theme-icon]');
       for (var i = 0; i < ics.length; i++) ics[i].hidden = ics[i].getAttribute('data-theme-icon') !== mode;
       b.setAttribute('aria-label', 'Theme: ' + mode + '. Switch to ' + next);
@@ -29,7 +31,7 @@
   window.dockifyApplyTheme = apply;
   window.dockifyCycleTheme = function () {
     var mode = get('dockify_theme', 'system', MODES);
-    try { localStorage.setItem('dockify_theme', MODES[(MODES.indexOf(mode) + 1) % 3]); } catch (e) {}
+    try { localStorage.setItem('dockify_theme', nextMode(mode)); } catch (e) {}
     apply();
   };
   mq.addEventListener('change', function () { if (get('dockify_theme', 'system', MODES) === 'system') apply(); });
@@ -51,8 +53,15 @@
 <base href="{{.BasePath}}">
 <title>{{.Title}} - Dockify</title>
 {{template "theme_head" .}}
+<link rel="manifest" href="static/manifest.webmanifest?v={{.AssetVersion}}">
+<link rel="icon" type="image/png" href="static/icon-192.png?v={{.AssetVersion}}">
+<script src="static/htmx.min.js?v={{.AssetVersion}}"></script>
+<script src="static/htmx-ext-preload.min.js?v={{.AssetVersion}}"></script>
+<script src="static/htmx-ext-head-support.min.js?v={{.AssetVersion}}"></script>
 <script src="static/app.js?v={{.AssetVersion}}"></script>
-<script src="static/list.js?v={{.AssetVersion}}" defer></script>
+<script src="static/list.js?v={{.AssetVersion}}"></script>
+<script src="static/charts.js?v={{.AssetVersion}}"></script>
+<script src="static/console.js?v={{.AssetVersion}}"></script>
 {{end}}
 
 {{define "nav"}}
@@ -62,27 +71,16 @@
     <a href="." class="logo"><span class="logo-icon">D</span>Dockify</a>
     <div class="top-actions">
       <button class="btn btn-secondary btn-icon theme-btn" onclick="dockifyCycleTheme()" id="theme-toggle" title="Theme" aria-label="Theme"><span data-theme-icon="light" hidden>{{template "ui_icon" "sun"}}</span><span data-theme-icon="dark" hidden>{{template "ui_icon" "moon"}}</span><span data-theme-icon="system">{{template "ui_icon" "monitor"}}</span></button>
-      {{if not .NoAuth}}<form method="POST" action="logout"><button type="submit" class="btn btn-secondary btn-icon" aria-label="Sign out" title="Sign out">{{template "ui_icon" "logout"}}</button></form>{{end}}
+      {{if not .NoAuth}}<form method="POST" action="logout" hx-boost="false"><button type="submit" class="btn btn-secondary btn-icon" aria-label="Sign out" title="Sign out">{{template "ui_icon" "logout"}}</button></form>{{end}}
     </div>
   </div>
-  <nav class="main-nav" aria-label="Main">
-    <a href="."{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>{{template "ui_icon" "layout-dashboard"}}<span>Dashboard</span></a>
-    <a href="servers"{{if eq .Nav "servers"}} aria-current="page"{{end}}>{{template "ui_icon" "server"}}<span>Servers</span></a>
-    <a href="apps"{{if eq .Nav "apps"}} aria-current="page"{{end}}>{{template "ui_icon" "box"}}<span>Apps</span></a>
-    <a href="settings"{{if eq .Nav "settings"}} aria-current="page"{{end}}>{{template "ui_icon" "settings"}}<span>Settings</span></a>
+  <nav class="main-nav" aria-label="Main" preload="mousedown">
+    <a href="." data-nav="dashboard"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>{{template "ui_icon" "layout-dashboard"}}<span>Dashboard</span></a>
+    <a href="servers" data-nav="servers"{{if eq .Nav "servers"}} aria-current="page"{{end}}>{{template "ui_icon" "server"}}<span>Servers</span></a>
+    <a href="apps" data-nav="apps"{{if eq .Nav "apps"}} aria-current="page"{{end}}>{{template "ui_icon" "box"}}<span>Apps</span></a>
+    <a href="settings" data-nav="settings"{{if eq .Nav "settings"}} aria-current="page"{{end}}>{{template "ui_icon" "settings"}}<span>Settings</span></a>
   </nav>
+  <div class="progress" id="progress" hidden></div>
 </header>
 {{end}}
 
-{{define "scripts"}}
-<script>
-
-
-document.querySelectorAll('time[datetime]').forEach(function(el){
-  var d = new Date(el.getAttribute('datetime'));
-  if (isNaN(d)) return;
-  var p=function(n){return String(n).padStart(2,'0');};
-  el.textContent = d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
-});
-</script>
-{{end}}

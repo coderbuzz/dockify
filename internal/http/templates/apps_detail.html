@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}<script src="static/htmx.min.js?v={{.AssetVersion}}"></script><script src="static/charts.js?v={{.AssetVersion}}"></script><script src="static/console.js?v={{.AssetVersion}}"></script>{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
-<body>
+<head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   {{if .Flash}}<div class="toast" role="status">{{.Flash}}</div>{{end}}
   <div class="breadcrumb">
     <a href="apps">Apps</a>
@@ -86,7 +86,7 @@
       <div class="gauge"><div class="gauge-head"><span class="gauge-label">Block I/O</span><span class="gauge-val" id="block-io">{{if .AppStats}}{{formatBytes .AppStats.BlockIORead}} / {{formatBytes .AppStats.BlockIOWrite}}{{else}}- / -{{end}}</span></div></div>
     </div>
     <hr class="stats-divider">
-    <div id="app-stats-body" data-range="realtime" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
+    <div id="app-stats-body" data-range="realtime" hx-target="this" hx-select="unset" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
       <p class="muted-note">Loading stats&hellip;</p>
     </div>
   </div>
@@ -190,13 +190,12 @@
       <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</button>
     </div>
   </div>
-</div>
 
 {{template "ui_confirm" (dict "ID" "app-redeploy" "Title" (printf "Redeploy %s?" .App.Name) "Body" "This rebuilds the app and restarts its containers. It is briefly unavailable while it restarts." "Label" "Redeploy" "Action" (printf "apps/%d/redeploy" .App.ID))}}
 {{template "ui_confirm" (dict "ID" "app-rollback" "Title" (printf "Roll back %s?" .App.Name) "Body" "This restores the last successful deployment and replaces the running version." "Label" "Roll back" "Action" (printf "apps/%d/rollback" .App.ID))}}
 {{if eq .App.Status "draft"}}{{template "ui_confirm" (dict "ID" "app-undeploy" "Title" (printf "Delete draft %s?" .App.Name) "Body" "This permanently deletes the draft." "Label" "Delete draft" "Action" (printf "apps/%d/undeploy" .App.ID))}}
 {{else}}{{template "ui_confirm" (dict "ID" "app-undeploy" "Title" (printf "Undeploy %s?" .App.Name) "Body" (printf "This stops and removes the app from %s." .ServerName) "Label" "Undeploy" "Action" (printf "apps/%d/undeploy" .App.ID))}}{{end}}
 {{template "ui_confirm" (dict "ID" "app-clear-history" "Title" "Clear deployment history?" "Body" "This permanently removes all deployment records for this app and cannot be undone." "Label" "Clear history" "Action" (printf "apps/%d/clear-deployments" .App.ID))}}
-{{template "scripts" .}}
+</div>
 </body>
 </html>

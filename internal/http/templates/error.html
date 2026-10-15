@@ -1,15 +1,14 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
-<body>
+<body hx-boost="true" hx-ext="preload,head-support" hx-target="#main" hx-select="#main" hx-swap="outerHTML show:none">
 {{template "nav" .}}
-<div class="container">
+<div class="container" id="main" data-nav="{{.Nav}}">
   {{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" "Something went wrong" "Sub" .Message)}}
   <div class="form-actions">
     <button type="button" class="btn btn-secondary" onclick="if (history.length > 1) history.back(); else location.href = '.'">Back</button>
     <a href="." class="btn btn-secondary">Go Home</a>
   </div>
 </div>
-{{template "scripts" .}}
 </body>
 </html>

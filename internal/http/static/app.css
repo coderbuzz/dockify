@@ -245,6 +245,11 @@ hgroup p { color: var(--muted); margin: 0; font-size: 12.8px; }
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
+/* S9: 3px request progress under the header (shown by app.js for requests slower than 150 ms). */
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--accent-fill); transform-origin: left; animation: progress 8s cubic-bezier(.1,.6,.2,1) forwards; }
+.progress[hidden] { display: none; }
+@keyframes progress { from { transform: scaleX(0.05); } to { transform: scaleX(0.95); } }
+@media (prefers-reduced-motion: reduce) { .progress { animation: none; transform: none; } }
 .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 56px; padding: 0 16px; }
 .top-actions { display: flex; align-items: center; gap: 8px; }
 .top-actions form { margin: 0; }
