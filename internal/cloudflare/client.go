@@ -66,23 +66,6 @@ func (c *Client) UpdateRecord(id, name, ip string, proxied bool) (*DNSRecord, er
 	return c.createOrUpdate(name, ip, proxied, id)
 }
 
-func (c *Client) UpsertRecord(name, ip string, proxied bool) (*DNSRecord, error) {
-	records, err := c.ListRecords(name)
-	if err != nil {
-		return c.CreateRecord(name, ip, proxied)
-	}
-	for _, r := range records {
-		if r.Name == name && r.Type == "A" {
-			if r.Content == ip && r.Proxied == proxied {
-				return &r, nil
-			}
-			log.Printf("Cloudflare DNS: updating A record %s (%s) -> %s", name, r.ID, ip)
-			return c.UpdateRecord(r.ID, name, ip, proxied)
-		}
-	}
-	return c.CreateRecord(name, ip, proxied)
-}
-
 func (c *Client) createOrUpdate(name, ip string, proxied bool, updateID string) (*DNSRecord, error) {
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", c.zoneID)
 	method := "POST"

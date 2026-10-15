@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/server"
-	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 )
@@ -61,9 +59,9 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 
-	cpuCores, _ := parseCPUCountLive(client)
-	ramMB, _ := parseRAMLive(client)
-	diskGB, _ := parseDiskLive(client)
+	cpuCores, _ := server.ParseCPUCount(client)
+	ramMB, _ := server.ParseRAM(client)
+	diskGB, _ := server.ParseDisk(client)
 
 	prevStat, err := client.Exec("head -1 /proc/stat")
 	if err != nil {
@@ -107,10 +105,10 @@ func (h *StatsHandler) ServeLiveStats(w http.ResponseWriter, r *http.Request) {
 			cpuUsage := clamp100(calculateCPUUsage(prevStat, currStat))
 			prevStat = currStat
 
-			ramUsage, _ := parseRAMUsageLive(client)
+			ramUsage, _ := server.ParseRAMUsage(client)
 			ramUsage = clamp100(ramUsage)
 
-			diskUsage, _ := parseDiskUsageLive(client)
+			diskUsage, _ := server.ParseDiskUsage(client)
 			diskUsage = clamp100(diskUsage)
 
 			data := map[string]interface{}{
@@ -193,54 +191,4 @@ func calculateCPUUsage(prev, curr string) float64 {
 	}
 
 	return 100 * (dt - di) / dt
-}
-
-func parseCPUCountLive(c ssh.Connector) (int, error) {
-	out, err := c.Exec("nproc")
-	if err != nil {
-		return 0, err
-	}
-	var count int
-	fmt.Sscanf(strings.TrimSpace(out), "%d", &count)
-	return count, nil
-}
-
-func parseRAMLive(c ssh.Connector) (int, error) {
-	out, err := c.Exec("awk '/MemTotal/{printf \"%d\", $2/1024}' /proc/meminfo")
-	if err != nil {
-		return 0, err
-	}
-	var mb int
-	fmt.Sscanf(strings.TrimSpace(out), "%d", &mb)
-	return mb, nil
-}
-
-func parseDiskLive(c ssh.Connector) (int, error) {
-	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/G/,\"\"); print $2}'")
-	if err != nil {
-		return 0, err
-	}
-	var gb int
-	fmt.Sscanf(strings.TrimSpace(out), "%d", &gb)
-	return gb, nil
-}
-
-func parseRAMUsageLive(c ssh.Connector) (float64, error) {
-	out, err := c.Exec("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f\", 100*(t-a)/t}' /proc/meminfo")
-	if err != nil {
-		return 0, err
-	}
-	var usage float64
-	fmt.Sscanf(strings.TrimSpace(out), "%f", &usage)
-	return usage, nil
-}
-
-func parseDiskUsageLive(c ssh.Connector) (float64, error) {
-	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/%/,\"\"); print $5}'")
-	if err != nil {
-		return 0, err
-	}
-	var usage float64
-	fmt.Sscanf(strings.TrimSpace(out), "%f", &usage)
-	return usage, nil
 }

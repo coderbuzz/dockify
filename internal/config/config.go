@@ -23,6 +23,7 @@ type Config struct {
 
 	AllowNoAuth bool
 	DevMock     bool
+	TrustProxy  bool // client IP from X-Forwarded-For/X-Real-IP (only behind a proxy that sets them)
 }
 
 func Load() *Config {
@@ -40,6 +41,7 @@ func Load() *Config {
 
 		AllowNoAuth: os.Getenv("DOCKIFY_ALLOW_NO_AUTH") == "true",
 		DevMock:     os.Getenv("DOCKIFY_DEV_MOCK") == "true",
+		TrustProxy:  os.Getenv("DOCKIFY_TRUST_PROXY") == "true",
 	}
 
 	os.MkdirAll(cfg.DataDir, 0700)
@@ -54,10 +56,6 @@ func (c *Config) DBPath() string {
 
 func (c *Config) Addr() string {
 	return c.Host + ":" + c.Port
-}
-
-func (c *Config) AuthEnabled() bool {
-	return c.AdminPass != ""
 }
 
 // CheckAuth refuses a passwordless UI on a non-loopback bind unless the

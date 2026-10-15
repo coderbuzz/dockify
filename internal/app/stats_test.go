@@ -90,3 +90,15 @@ func TestRepo_ContainerStatsNetHistory_ContainerReset(t *testing.T) {
 		}
 	}
 }
+
+// An idle (all-zero) sample replaces a busy one; disk usage survives samples without it (B15).
+func TestStatsCacheAcceptsIdleSample(t *testing.T) {
+	s := &Service{}
+	s.UpdateStatsCacheBatch(map[int64]*StatsOverview{1: {CPUPercent: 80, MemUsageBytes: 500, MemPercent: 50}})
+	s.updateDiskCache(1, 4096)
+	s.UpdateStatsCacheBatch(map[int64]*StatsOverview{1: {}})
+	got := s.StatsOverviewByApp()[1]
+	if got.CPUPercent != 0 || got.MemUsageBytes != 0 || got.MemPercent != 0 || got.DiskUsageBytes != 4096 {
+		t.Errorf("cache = %+v, want zeros with disk 4096", got)
+	}
+}

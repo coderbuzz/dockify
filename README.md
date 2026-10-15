@@ -116,7 +116,8 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID |
-| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind a reverse proxy (e.g. `/proxy/9898`) |
+| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind a reverse proxy (e.g. `/proxy/9898`); links and redirects stay under it. A proxy can send `X-Forwarded-Prefix` per request instead |
+| `DOCKIFY_TRUST_PROXY` | `false` | No | `true` takes the client IP from `X-Forwarded-For`/`X-Real-IP` (login throttle, logs). Set it only when every request comes through a proxy that sets these headers |
 
 ### Authentication
 
@@ -134,6 +135,7 @@ DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
 - **Default username:** `admin` (configurable via `DOCKIFY_ADMIN_USER`)
 - **No password set:** Dockify refuses to start unless it binds to loopback (`DOCKIFY_HOST=127.0.0.1`, `::1` or `localhost`) or `DOCKIFY_ALLOW_NO_AUTH=true` is set; in both cases the web UI has **no authentication**
 - **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
+- **Failed logins:** each one waits 1 s; more than 10 from one client IP within 15 minutes get `429` until the 15 minutes are over. The client IP is the TCP peer unless `DOCKIFY_TRUST_PROXY=true`. Behind a reverse proxy (e.g. Caddy in front of `127.0.0.1:8080`) set `DOCKIFY_TRUST_PROXY=true` and keep the port unreachable from outside; otherwise every client counts as the proxy and failed logins from anyone lock everyone out for 15 minutes
 - **Session:** Cookie-based (`HttpOnly`, `SameSite=Lax`, `Secure` behind HTTPS), expires after 24 hours
 - **Cross-site requests:** a form or script on another site cannot change anything (`403`). Behind a reverse proxy, forward the original `Host` header (Caddy does this by default)
 - **Logout:** Visit `/logout`
@@ -467,7 +469,7 @@ No DNS automation occurs if the env vars are not set.
 
 ## Backup & Restore
 
-Export your configuration (servers + apps + secrets + config files) as YAML and import it into another instance.
+Export your configuration (servers + apps with their resource limits, command, ports and every domain + secrets + config files) as YAML and import it into another instance.
 
 ### Encrypted Export
 
@@ -487,7 +489,7 @@ When importing on a new instance, all servers and their SSH keys are restored au
 Upload a previously exported YAML file via the Import page (`/import`):
 
 - **merge** (default): skip entries that already exist by name
-- **replace**: delete all existing servers and apps before import
+- **replace**: delete all existing servers and apps before import; refused unless every app is stopped, a draft or never deployed (stop or undeploy running apps first)
 - Encrypted values are validated by attempting decryption before the actual import
 
 ### Unified Backup Page
@@ -512,6 +514,7 @@ Dockify's web UI is built with Go `html/template` + HTMX and fully custom CSS (n
 
 - **Dark/Light mode** — toggle via nav button, persisted in `localStorage` (`dockify-theme`)
 - **HTMX partial updates** — resource cards, log viewer, and status badges update without full page reloads
+- **No CDN scripts** — htmx and xterm.js are embedded in the binary and served from `/static/`; a Content-Security-Policy limits scripts to Dockify itself (only Google Fonts is loaded from outside)
 - **Responsive** — adapts to mobile screen sizes (single breakpoint at 600px)
 - **Status badges** — color-coded for all server and app states
 - **Confirm dialogs** — destructive actions (undeploy, delete, rollback) require confirmation

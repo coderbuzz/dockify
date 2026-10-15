@@ -12,7 +12,7 @@ Dockify is a self-hosted Docker app deployment platform — single Go binary, SQ
 | Database | SQLite via `modernc.org/sqlite` | Pure Go, no CGo, embedded |
 | Router | `github.com/go-chi/chi/v5` | Middleware, groups, path params |
 | SSH | `golang.org/x/crypto/ssh` | Std SSH client, PTY sessions |
-| Web UI | Go `html/template` + HTMX | Embedded via `embed`, no JS framework, no build step |
+| Web UI | Go `html/template` + HTMX | Embedded via `embed` (templates and the vendored htmx/xterm files, no CDN), no JS framework, no build step |
 | CSS | Fully custom (no framework) | CSS variables, dark/light mode, single `<style>` block |
 | Terminal | xterm.js + WebSocket | Interactive SSH console in browser |
 | Docker | Multi-stage build | Published to `ghcr.io/coderbuzz/dockify` |
@@ -43,7 +43,7 @@ internal/
     handler.go                   # JSON API + web UI handlers (apps, deployments, secrets, files, logs, stats)
   scheduler/scheduler.go         # Auto-select least-loaded server
   caddy/client.go                # Caddy Admin API client: route CRUD and config save via `docker exec caddy curl` over SSH
-  cloudflare/client.go           # Cloudflare DNS API v4 (list, create, upsert records)
+  cloudflare/client.go           # Cloudflare DNS API v4 (list, create, update, delete records)
   webhook/handler.go             # GitHub + GitLab webhook receiver, HMAC/token validation
   settings/
     settings.go                  # Webhook secret, GitHub Releases update check, systemd-run self-update
@@ -57,7 +57,8 @@ internal/
     console.go                   # WebSocket upgrade, PTY relay for SSH and container consoles
     stats_ws.go                  # WebSocket real-time server stats (1s interval)
     app_stats_ws.go              # WebSocket real-time app container stats
-    templates.go                 # Embedded templates, template funcs, Render
+    templates.go                 # Embedded templates, template funcs, Render (into a buffer, then write)
+    static/                      # Vendored htmx 2.0.4, xterm 5.3.0, xterm-addon-fit 0.8.0 (SOURCES.md: URLs + sha256)
     templates/                   # HTML templates (pages, layout, partials)
       layout.html                # head/nav/scripts blocks, all CSS (single <style> block)
       dashboard.html             # Dashboard with stats cards + server/app summary tables
@@ -106,7 +107,8 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | Allow a passwordless UI on a non-loopback bind |
 | `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
-| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`) |
+| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`); `X-Forwarded-Prefix` overrides it per request. Templates use links relative to `<base href>`, redirects go through `web.Redirect`, which prepends the prefix |
+| `DOCKIFY_TRUST_PROXY` | `false` | No | Apply `chimw.RealIP` (client IP from `X-Forwarded-For`/`X-Real-IP`); off = TCP peer address |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for DNS automation (Zone:DNS:Edit scope) |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID for the domain |
 
@@ -254,7 +256,7 @@ Written by the background collectors, pruned after 7 days, `created_at` in UTC.
 | POST | `/logout` | Clear session, redirect to login |
 | POST | `/api/webhook/github` | GitHub push webhook (HMAC-SHA256), body ≤ 1 MiB |
 | POST | `/api/webhook/gitlab` | GitLab push webhook (token), body ≤ 1 MiB |
-| GET | `/static/*` | Static files (`web/static/`) |
+| GET | `/static/*` | Vendored htmx/xterm assets embedded in the binary (`internal/http/static/`, sources in `SOURCES.md`); one-week cache, no directory listing |
 
 Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_API_TOKEN`. A POST/PATCH/DELETE sent by another site (`Sec-Fetch-Site`, or `Origin` ≠ `Host` for older browsers) gets `403`; bearer-token requests are exempt. WebSocket handshakes must be same-origin. Request bodies under `/api/servers` and `/api/apps` are capped at 1 MiB.
 
@@ -313,7 +315,7 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | DELETE | `/api/apps/:id/secrets/:key` | Delete secret |
 | GET | `/api/apps/:id/files` | List config files |
 | POST | `/api/apps/:id/files` | Set config file `{path, content}`; path validated (see Input validation) |
-| DELETE | `/api/apps/:id/files/:path` | Delete config file |
+| DELETE | `/api/apps/:id/files/*path` | Delete config file (nested paths like `conf/app.ini` included) |
 | GET | `/api/apps/:id/console` | WebSocket upgrade → shell in the app's first service container |
 | GET | `/api/apps/:id/stats` | Latest container stats |
 | GET | `/api/apps/:id/stats/history` | Container stats history (`?range=`, default `1h`) |
@@ -421,7 +423,7 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 ### Export
 
 1. Query all servers (name, host, port, user, SSH key, registry host/user/token)
-2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, server name mapping)
+2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command, ports, ulimits_nofile, server name mapping) and `domains`: every active route's domain, the primary first
 3. Query all app secrets and config files
 4. If passphrase provided: encrypt SSH keys, registry tokens, secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
 5. Generate YAML document
@@ -432,9 +434,9 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 1. Parse YAML file
 2. If passphrase provided: attempt decryption of all `enc:` values to validate passphrase (including SSH keys)
 3. In **merge** mode (default): skip entries that already exist by same name
-4. In **replace** mode: delete all existing servers and apps, then import
+4. In **replace** mode: refuse with "stop or undeploy running apps before a replace import" unless every existing app is `draft`, `created` or `stopped`; otherwise undeploy all apps and delete all servers (the first error stops the import), then import
 5. Create servers with SSH key from export (fallback to `"pending"` if key is empty — user must enter key manually)
-6. Create apps (status = created, ready for deploy)
+6. Create apps (status = created, ready for deploy) with one route per entry in `domains` (exports without `domains` get a route for `domain`)
 7. Import secrets and config files
 8. Redirect to servers page
 
@@ -548,8 +550,10 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 - Cloudflare API token requires minimal scope: Zone:DNS:Edit
 - App containers on internal `dockify` Docker network only — no public port exposure except via Caddy
 - Webhook authentication: HMAC-SHA256 (GitHub), token with constant-time compare (GitLab), auto-generated 64-char hex secret; always on (no disable), fails closed
-- Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions
+- Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions; expired sessions are dropped on each login
+- Login: user and password compared in constant time; a failure waits 1 s; more than 10 failures from one client IP within 15 minutes (counted from the first) answer `429` until the window ends. The client IP is `RemoteAddr`; `chimw.RealIP` (trusting `X-Forwarded-For`/`X-Real-IP`) applies only with `DOCKIFY_TRUST_PROXY=true`
 - Cross-site requests: unsafe methods from another site get `403` (Go `http.CrossOriginProtection`), WebSocket handshakes must be same-origin, no CORS headers. A reverse proxy in front of Dockify must forward the original `Host` header (Caddy does by default)
+- Every response carries `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'` (inline scripts/styles are used in the templates), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Browser scripts come from the binary, not a CDN; only Google Fonts is external
 - HTTP server: `ReadHeaderTimeout` 10s, `IdleTimeout` 120s; request bodies capped (API JSON 1 MiB, webhooks 1 MiB, import 16 MiB)
 - HTTP Basic Auth for apps enforced at Caddy proxy level with bcrypt
 - Backup encryption: AES-GCM with PBKDF2 passphrase (600,000 iterations, 256-bit key)

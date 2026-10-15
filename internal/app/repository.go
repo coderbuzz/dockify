@@ -14,14 +14,30 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List() ([]App, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
-		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, ulimits_nofile, created_at, updated_at
-		FROM apps ORDER BY name ASC
-	`)
+const appColumns = `id, name, server_id, domain, port, compose,
+	git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
+	memory_limit, cpu_limit, log_max_size, log_max_file,
+	command, ports, ulimits_nofile, created_at, updated_at`
+
+// scanApp reads one row selected with appColumns.
+func scanApp(row interface{ Scan(...any) error }) (App, error) {
+	var a App
+	var gitRepo, gitBranch sql.NullString
+	var serverID sql.NullInt64
+	err := row.Scan(
+		&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
+		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
+		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
+		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
+	)
+	a.ServerID = serverID.Int64
+	a.GitRepo = gitRepo.String
+	a.GitBranch = gitBranch.String
+	return a, err
+}
+
+func (r *Repository) queryApps(where string, args ...any) ([]App, error) {
+	rows, err := r.db.Query("SELECT "+appColumns+" FROM apps "+where, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -29,147 +45,36 @@ func (r *Repository) List() ([]App, error) {
 
 	var apps []App
 	for rows.Next() {
-		var a App
-		var gitRepo, gitBranch sql.NullString
-		var serverID sql.NullInt64
-		if err := rows.Scan(
-			&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
-			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
-		); err != nil {
+		a, err := scanApp(rows)
+		if err != nil {
 			return nil, err
 		}
-		a.ServerID = serverID.Int64
-		a.GitRepo = gitRepo.String
-		a.GitBranch = gitBranch.String
 		apps = append(apps, a)
 	}
 	return apps, rows.Err()
+}
+
+func (r *Repository) List() ([]App, error) {
+	return r.queryApps("ORDER BY name ASC")
 }
 
 func (r *Repository) Get(id int64) (*App, error) {
-	a := &App{}
-	var gitRepo, gitBranch sql.NullString
-	var serverID sql.NullInt64
-	err := r.db.QueryRow(`
-		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
-		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, ulimits_nofile, created_at, updated_at
-		FROM apps WHERE id = ?
-	`, id).Scan(
-		&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
-		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
-	)
+	a, err := scanApp(r.db.QueryRow("SELECT "+appColumns+" FROM apps WHERE id = ?", id))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	a.ServerID = serverID.Int64
-	a.GitRepo = gitRepo.String
-	a.GitBranch = gitBranch.String
-	return a, nil
+	return &a, nil
 }
 
 func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
-		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, ulimits_nofile, created_at, updated_at
-		FROM apps WHERE git_repo = ? AND git_branch = ? AND status != 'draft' ORDER BY id
-	`, repo, branch)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var apps []App
-	for rows.Next() {
-		var a App
-		var gitRepo, gitBranch sql.NullString
-		var serverID sql.NullInt64
-		if err := rows.Scan(
-			&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
-			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		a.ServerID = serverID.Int64
-		a.GitRepo = gitRepo.String
-		a.GitBranch = gitBranch.String
-		apps = append(apps, a)
-	}
-	return apps, rows.Err()
-}
-
-func (r *Repository) FindByGitRepo(repo, branch string) (*App, error) {
-	a := &App{}
-	var gitRepo, gitBranch sql.NullString
-	var serverID sql.NullInt64
-	err := r.db.QueryRow(`
-		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
-		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, created_at, updated_at
-		FROM apps WHERE git_repo = ? AND git_branch = ? LIMIT 1
-	`, repo, branch).Scan(
-		&a.ID, &a.Name, &serverID, &a.Domain, &a.Port, &a.Compose,
-		&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
-		&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-		&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	a.ServerID = serverID.Int64
-	a.GitRepo = gitRepo.String
-	a.GitBranch = gitBranch.String
-	return a, nil
+	return r.queryApps("WHERE git_repo = ? AND git_branch = ? AND status != 'draft' ORDER BY id", repo, branch)
 }
 
 func (r *Repository) ListByServer(serverID int64) ([]App, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, server_id, domain, port, compose,
-		       git_repo, git_branch, auth_user, auth_pass, status, compose_mode,
-		       memory_limit, cpu_limit, log_max_size, log_max_file,
-		       command, ports, ulimits_nofile, created_at, updated_at
-		FROM apps WHERE server_id = ? ORDER BY created_at DESC
-	`, serverID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var apps []App
-	for rows.Next() {
-		var a App
-		var gitRepo, gitBranch sql.NullString
-		var ns sql.NullInt64
-		if err := rows.Scan(
-			&a.ID, &a.Name, &ns, &a.Domain, &a.Port, &a.Compose,
-			&gitRepo, &gitBranch, &a.AuthUser, &a.AuthPass, &a.Status, &a.ComposeMode,
-			&a.MemoryLimit, &a.CPULimit, &a.LogMaxSize, &a.LogMaxFile,
-			&a.Command, &a.Ports, &a.UlimitsNofile, &a.CreatedAt, &a.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		a.ServerID = ns.Int64
-		a.GitRepo = gitRepo.String
-		a.GitBranch = gitBranch.String
-		apps = append(apps, a)
-	}
-	return apps, rows.Err()
+	return r.queryApps("WHERE server_id = ? ORDER BY created_at DESC", serverID)
 }
 
 func (r *Repository) Create(a *App) error {
@@ -423,11 +328,6 @@ func (r *Repository) GetDNSRecords(appID int64) ([]DNSRecordInfo, error) {
 	return records, rows.Err()
 }
 
-func (r *Repository) DeleteDNSRecord(id int64) error {
-	_, err := r.db.Exec("DELETE FROM dns_records WHERE id = ?", id)
-	return err
-}
-
 type DNSRecordInfo struct {
 	ID        int64
 	AppID     int64
@@ -589,18 +489,6 @@ func (r *Repository) InsertContainerStats(s *ContainerStats) error {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, s.AppID, s.ServerID, s.ContainerName, s.CPUPercent, s.MemUsageBytes, s.MemLimitBytes, s.MemPercent, s.NetIORxBytes, s.NetIOTxBytes, s.BlockIORead, s.BlockIOWrite)
 	return err
-}
-
-func (r *Repository) LatestContainerStats(appID int64) (*ContainerStats, error) {
-	s := &ContainerStats{}
-	err := r.db.QueryRow(`
-		SELECT id, app_id, COALESCE(server_id, 0), container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, created_at
-		FROM container_stats WHERE app_id = ? ORDER BY created_at DESC LIMIT 1
-	`, appID).Scan(&s.ID, &s.AppID, &s.ServerID, &s.ContainerName, &s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent, &s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &s.CreatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return s, err
 }
 
 // LatestAggregatedStats returns the total resource usage of an app at its most

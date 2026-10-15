@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/ssh"
@@ -23,8 +22,6 @@ type Service struct {
 	repo        *Repository
 	monitor     *Monitor
 	connFactory ssh.Factory
-	serverCache []Server
-	serverMu    sync.RWMutex
 }
 
 func NewService(repo *Repository) *Service {
@@ -44,33 +41,8 @@ func (s *Service) Connect(svr *Server) (ssh.Connector, error) {
 	return s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 }
 
-func (s *Service) refreshCacheLocked() {
-	if servers, err := s.repo.List(); err == nil {
-		s.serverCache = servers
-	}
-}
-
 func (s *Service) List() ([]Server, error) {
-	s.serverMu.RLock()
-	if s.serverCache != nil {
-		out := make([]Server, len(s.serverCache))
-		copy(out, s.serverCache)
-		s.serverMu.RUnlock()
-		return out, nil
-	}
-	s.serverMu.RUnlock()
-
-	s.serverMu.Lock()
-	defer s.serverMu.Unlock()
-	if s.serverCache != nil {
-		out := make([]Server, len(s.serverCache))
-		copy(out, s.serverCache)
-		return out, nil
-	}
-	s.refreshCacheLocked()
-	out := make([]Server, len(s.serverCache))
-	copy(out, s.serverCache)
-	return out, nil
+	return s.repo.List()
 }
 
 func (s *Service) Get(id int64) (*Server, error) {
@@ -87,23 +59,11 @@ func (s *Service) Create(server *Server) error {
 	if server.Status == "" {
 		server.Status = StatusPending // stays so until the worker is initialized
 	}
-	if err := s.repo.Create(server); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Create(server)
 }
 
 func (s *Service) Update(server *Server) error {
-	if err := s.repo.Update(server); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Update(server)
 }
 
 // ErrServerHasApps refuses deleting a server that apps still point at; their
@@ -122,13 +82,7 @@ func (s *Service) Delete(id int64) error {
 	if n > 0 {
 		return &ErrServerHasApps{Count: n}
 	}
-	if err := s.repo.Delete(id); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Delete(id)
 }
 
 // connectAndInit is the first contact with a newly added server.
@@ -372,19 +326,16 @@ func (s *Service) RefreshResources(id int64) error {
 	client, err := s.Connect(server)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
-		s.serverMu.Lock()
-		s.refreshCacheLocked()
-		s.serverMu.Unlock()
 		return err
 	}
 	defer client.Close()
 
-	cpuCores, _ := parseCPUCount(client)
-	ramMB, _ := parseRAM(client)
-	diskGB, _ := parseDisk(client)
+	cpuCores, _ := ParseCPUCount(client)
+	ramMB, _ := ParseRAM(client)
+	diskGB, _ := ParseDisk(client)
 	cpuUsage, _ := parseCPUUsage(client)
-	ramUsage, _ := parseRAMUsage(client)
-	diskUsage, _ := parseDiskUsage(client)
+	ramUsage, _ := ParseRAMUsage(client)
+	diskUsage, _ := ParseDiskUsage(client)
 
 	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage, diskUsage)
 	s.repo.UpdateStatus(id, StatusOnline)
@@ -398,10 +349,6 @@ func (s *Service) RefreshResources(id int64) error {
 		RAMMB:       ramMB,
 		DiskGB:      diskGB,
 	})
-
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
 
 	return nil
 }
@@ -448,7 +395,9 @@ func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]in
 	}
 }
 
-func parseCPUCount(c ssh.Connector) (int, error) {
+// ParseCPUCount, ParseRAM, ParseDisk, ParseRAMUsage and ParseDiskUsage read worker
+// metrics over SSH; the monitor and the live stats WebSocket share them.
+func ParseCPUCount(c ssh.Connector) (int, error) {
 	out, err := c.Exec("nproc")
 	if err != nil {
 		return 0, err
@@ -458,7 +407,7 @@ func parseCPUCount(c ssh.Connector) (int, error) {
 	return count, nil
 }
 
-func parseRAM(c ssh.Connector) (int, error) {
+func ParseRAM(c ssh.Connector) (int, error) {
 	out, err := c.Exec("awk '/MemTotal/{printf \"%d\", $2/1024}' /proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -468,7 +417,7 @@ func parseRAM(c ssh.Connector) (int, error) {
 	return mb, nil
 }
 
-func parseDisk(c ssh.Connector) (int, error) {
+func ParseDisk(c ssh.Connector) (int, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/G/,\"\"); print $2}'")
 	if err != nil {
 		return 0, err
@@ -488,7 +437,7 @@ func parseCPUUsage(c ssh.Connector) (float64, error) {
 	return usage, nil
 }
 
-func parseRAMUsage(c ssh.Connector) (float64, error) {
+func ParseRAMUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f\", 100*(t-a)/t}' /proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -498,7 +447,7 @@ func parseRAMUsage(c ssh.Connector) (float64, error) {
 	return usage, nil
 }
 
-func parseDiskUsage(c ssh.Connector) (float64, error) {
+func ParseDiskUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/%/,\"\"); print $5}'")
 	if err != nil {
 		return 0, err

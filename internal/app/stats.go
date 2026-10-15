@@ -204,7 +204,7 @@ func (s *Service) collectDiskUsageForApps(client ssh.Connector, apps []App) {
 	// Append a disk sample for each app and update cache.
 	for _, e := range entries {
 		s.repo.InsertAppDiskUsage(e.appID, serverByApp[e.appID], e.bytes)
-		s.UpdateStatsCache(e.appID, &StatsOverview{DiskUsageBytes: e.bytes})
+		s.updateDiskCache(e.appID, e.bytes)
 	}
 }
 

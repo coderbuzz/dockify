@@ -1,6 +1,7 @@
 package http
 
 import (
+	"embed"
 	"net/http"
 	"os"
 	"strings"
@@ -9,18 +10,22 @@ import (
 	"github.com/coderbuzz/dockify/internal/backup"
 	"github.com/coderbuzz/dockify/internal/server"
 	"github.com/coderbuzz/dockify/internal/settings"
+	"github.com/coderbuzz/dockify/internal/web"
 	"github.com/coderbuzz/dockify/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock bool) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock, trustProxy bool) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
-	r.Use(chimw.RealIP)
+	if trustProxy {
+		r.Use(chimw.RealIP) // X-Forwarded-For/X-Real-IP from anyone otherwise
+	}
 	r.Use(PrefixMiddleware)
+	r.Use(securityHeaders)
 	r.Use(DevMockMiddleware(devMock))
 
 	authEnabled := cfgPass != ""
@@ -42,7 +47,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
 		if !authEnabled || getSessionUser(r) != "" {
-			http.Redirect(w, r, "/", http.StatusFound)
+			web.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 		HandleLogin(w, r, cfgUser, cfgPass, render)
@@ -55,8 +60,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	r.Post("/api/webhook/github", whHandler.GitHub)
 	r.Post("/api/webhook/gitlab", whHandler.GitLab)
 
-	staticDir := http.Dir("web/static")
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(staticDir)))
+	r.Get("/static/*", serveStatic)
 
 	// Protected routes (auth required)
 	r.Group(func(r chi.Router) {
@@ -140,7 +144,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Delete("/{id}/secrets/{key}", appAPIHandler.DeleteSecret)
 			r.Get("/{id}/files", appAPIHandler.ListFiles)
 			r.Post("/{id}/files", appAPIHandler.SetFile)
-			r.Delete("/{id}/files/{path}", appAPIHandler.DeleteFile)
+			r.Delete("/{id}/files/*", appAPIHandler.DeleteFile) // * keeps nested paths like conf/app.ini
 			r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
 			r.Get("/{id}/stats", appAPIHandler.Stats)
 			r.Get("/{id}/stats/history", appAPIHandler.StatsHistory)
@@ -254,6 +258,36 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	return r
 }
 
+//go:embed static/*.js static/*.css
+var staticFS embed.FS
+
+// serveStatic serves the vendored browser assets (see static/SOURCES.md); no directory listing.
+func serveStatic(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "*")
+	if name == "" || strings.Contains(name, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	// ponytail: a week, not immutable — file names do not change when an asset is upgraded.
+	w.Header().Set("Cache-Control", "public, max-age=604800")
+	http.ServeFileFS(w, r, staticFS, "static/"+name)
+}
+
+// Inline <script>/<style> blocks are used throughout the templates, hence 'unsafe-inline'.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; " +
+	"img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'"
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func PrefixMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prefix := r.Header.Get("X-Forwarded-Prefix")
@@ -262,7 +296,7 @@ func PrefixMiddleware(next http.Handler) http.Handler {
 		}
 		if prefix != "" {
 			prefix = strings.TrimSuffix(prefix, "/") + "/"
-			r = SetBasePath(r, prefix)
+			r = web.SetBasePath(r, prefix)
 		}
 		next.ServeHTTP(w, r)
 	})
