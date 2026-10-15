@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -95,7 +96,22 @@ func (s *Service) Update(server *Server) error {
 	return nil
 }
 
+// ErrServerHasApps refuses deleting a server that apps still point at; their
+// history (deployments, stats, DNS rows) survives a delete with server_id NULL.
+type ErrServerHasApps struct{ Count int }
+
+func (e *ErrServerHasApps) Error() string {
+	return fmt.Sprintf("server still has %d app(s); move or delete them first", e.Count)
+}
+
 func (s *Service) Delete(id int64) error {
+	n, err := s.repo.CountApps(id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return &ErrServerHasApps{Count: n}
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return err
 	}
@@ -342,9 +358,9 @@ func (s *Service) RefreshResources(id int64) error {
 	return nil
 }
 
-func (s *Service) StartMonitor() {
+func (s *Service) StartMonitor(ctx context.Context) {
 	s.monitor = NewMonitor(s)
-	go s.monitor.Run()
+	go s.monitor.Run(ctx)
 }
 
 func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]interface{} {
@@ -452,7 +468,7 @@ func NewMonitor(svc *Service) *Monitor {
 	return &Monitor{service: svc}
 }
 
-func (m *Monitor) Run() {
+func (m *Monitor) Run(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -461,6 +477,8 @@ func (m *Monitor) Run() {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			m.refreshAll()
 		case <-pruneTicker.C:

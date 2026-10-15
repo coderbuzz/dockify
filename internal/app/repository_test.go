@@ -35,6 +35,56 @@ func createTestServer(t *testing.T, srvRepo *server.Repository) int64 {
 	return s.ID
 }
 
+func TestRepo_SaveRouteUpserts(t *testing.T) {
+	repo, srvRepo := setupRepo(t)
+	srvID := createTestServer(t, srvRepo)
+	a := &App{Name: "web", ServerID: srvID, Compose: "services: {}"}
+	if err := repo.Create(a); err != nil {
+		t.Fatal(err)
+	}
+	first := &Route{AppID: a.ID, ServerID: srvID, Domain: "web.example.com"}
+	second := &Route{AppID: a.ID, ServerID: srvID, Domain: "web.example.com"}
+	if err := repo.SaveRoute(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveRoute(second); err != nil {
+		t.Fatal(err)
+	}
+	routes, _ := repo.GetRoutes(a.ID)
+	if len(routes) != 1 || second.ID != first.ID {
+		t.Fatalf("want one route, got %+v (ids %d, %d)", routes, first.ID, second.ID)
+	}
+}
+
+func TestRepo_FailInterrupted(t *testing.T) {
+	repo, srvRepo := setupRepo(t)
+	srvID := createTestServer(t, srvRepo)
+	stuck := &App{Name: "stuck", ServerID: srvID, Compose: "services: {}", Status: StatusDeploying}
+	ok := &App{Name: "ok", ServerID: srvID, Compose: "services: {}", Status: StatusRunning}
+	for _, a := range []*App{stuck, ok} {
+		if err := repo.Create(a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if n, err := repo.FailInterrupted(); err != nil || n != 1 {
+		t.Fatalf("FailInterrupted = %d, %v; want 1", n, err)
+	}
+	if a, _ := repo.Get(stuck.ID); a.Status != StatusFailed {
+		t.Errorf("stuck app status %q, want failed", a.Status)
+	}
+	if a, _ := repo.Get(ok.ID); a.Status != StatusRunning {
+		t.Errorf("running app status changed to %q", a.Status)
+	}
+	deps, _ := repo.ListDeployments(stuck.ID)
+	if len(deps) != 1 || deps[0].Status != StatusFailed || deps[0].Log != "interrupted by Dockify restart" || deps[0].ServerID != srvID {
+		t.Errorf("deployments: %+v", deps)
+	}
+	if deps, _ := repo.ListDeployments(ok.ID); len(deps) != 0 {
+		t.Errorf("running app got deployments: %+v", deps)
+	}
+}
+
 func TestRepo_CreateAndGet(t *testing.T) {
 	repo, srvRepo := setupRepo(t)
 	srvID := createTestServer(t, srvRepo)

@@ -1,3 +1,7 @@
+-- Baseline schema, run on every start. Changes to existing tables and new
+-- indexes that existing data could violate (UNIQUE) go into the migrations
+-- in db.go, which also run on fresh databases.
+
 CREATE TABLE IF NOT EXISTS servers (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
@@ -16,6 +20,7 @@ CREATE TABLE IF NOT EXISTS servers (
     registry_host  TEXT DEFAULT '',
     registry_user  TEXT DEFAULT '',
     registry_token TEXT DEFAULT '',
+    host_key       TEXT DEFAULT '',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,8 +51,8 @@ CREATE TABLE IF NOT EXISTS apps (
 
 CREATE TABLE IF NOT EXISTS deployments (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    app_id          INTEGER REFERENCES apps(id),
-    server_id       INTEGER REFERENCES servers(id),
+    app_id          INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    server_id       INTEGER REFERENCES servers(id) ON DELETE SET NULL,
     status          TEXT,
     log             TEXT,
     commit_sha      TEXT,
@@ -57,8 +62,8 @@ CREATE TABLE IF NOT EXISTS deployments (
 
 CREATE TABLE IF NOT EXISTS routes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    app_id      INTEGER REFERENCES apps(id),
-    server_id   INTEGER REFERENCES servers(id),
+    app_id      INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    server_id   INTEGER REFERENCES servers(id) ON DELETE SET NULL,
     domain      TEXT NOT NULL,
     target      TEXT NOT NULL,
     status      TEXT DEFAULT 'active',
@@ -67,8 +72,8 @@ CREATE TABLE IF NOT EXISTS routes (
 
 CREATE TABLE IF NOT EXISTS dns_records (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    app_id      INTEGER REFERENCES apps(id),
-    server_id   INTEGER REFERENCES servers(id),
+    app_id      INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+    server_id   INTEGER REFERENCES servers(id) ON DELETE SET NULL,
     zone_id     TEXT NOT NULL,
     record_id   TEXT NOT NULL,
     name        TEXT NOT NULL,
@@ -104,7 +109,7 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS container_stats (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     app_id           INTEGER REFERENCES apps(id) ON DELETE CASCADE,
-    server_id        INTEGER REFERENCES servers(id),
+    server_id        INTEGER REFERENCES servers(id) ON DELETE SET NULL,
     container_name   TEXT NOT NULL,
     cpu_percent      REAL,
     mem_usage_bytes  INTEGER,
@@ -121,7 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_container_stats_app_time ON container_stats(app_i
 CREATE TABLE IF NOT EXISTS app_disk_stats (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     app_id           INTEGER REFERENCES apps(id) ON DELETE CASCADE,
-    server_id        INTEGER REFERENCES servers(id),
+    server_id        INTEGER REFERENCES servers(id) ON DELETE SET NULL,
     disk_usage_bytes INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );

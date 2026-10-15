@@ -29,14 +29,14 @@ type dockerStat struct {
 	Name     string `json:"Name"`
 }
 
-func (s *Service) StartStatsCollector() {
-	go s.statsLoop()
+func (s *Service) StartStatsCollector(ctx context.Context) {
+	go s.statsLoop(ctx)
 	// Collect disk usage once at startup so the value appears without waiting
 	// for the first 5-minute tick.
 	go s.collectAppDiskUsage()
 }
 
-func (s *Service) statsLoop() {
+func (s *Service) statsLoop(ctx context.Context) {
 	statsTicker := time.NewTicker(10 * time.Second)
 	defer statsTicker.Stop()
 
@@ -51,6 +51,8 @@ func (s *Service) statsLoop() {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-statsTicker.C:
 			s.collectAllStats()
 		case <-caddyTicker.C:

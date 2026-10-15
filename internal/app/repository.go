@@ -207,6 +207,28 @@ func (r *Repository) UpdateStatus(id int64, status string) error {
 	return err
 }
 
+// FailInterrupted marks apps a restart left in 'deploying' as failed and
+// records why in their deployment history. Run once at startup.
+func (r *Repository) FailInterrupted() (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+		INSERT INTO deployments (app_id, server_id, status, log)
+		SELECT id, server_id, 'failed', 'interrupted by Dockify restart' FROM apps WHERE status = 'deploying'
+	`); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`UPDATE apps SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE status = 'deploying'`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
+}
+
 func (r *Repository) Delete(id int64) error {
 	_, err := r.db.Exec("DELETE FROM apps WHERE id = ?", id)
 	return err
@@ -216,7 +238,7 @@ func (r *Repository) AddDeployment(d *Deployment) error {
 	result, err := r.db.Exec(`
 		INSERT INTO deployments (app_id, server_id, status, log, commit_sha, compose_snapshot)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, d.AppID, d.ServerID, d.Status, d.Log, nullString(d.CommitSHA), nullString(d.ComposeSnapshot))
+	`, d.AppID, nullInt64(d.ServerID), d.Status, d.Log, nullString(d.CommitSHA), nullString(d.ComposeSnapshot))
 	if err != nil {
 		return fmt.Errorf("insert deployment: %w", err)
 	}
@@ -227,7 +249,7 @@ func (r *Repository) AddDeployment(d *Deployment) error {
 
 func (r *Repository) ListDeployments(appID int64) ([]Deployment, error) {
 	rows, err := r.db.Query(`
-		SELECT id, app_id, server_id, status, log, commit_sha, compose_snapshot, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), status, log, commit_sha, compose_snapshot, created_at
 		FROM deployments WHERE app_id = ? ORDER BY created_at DESC LIMIT 20
 	`, appID)
 	if err != nil {
@@ -257,7 +279,7 @@ func (r *Repository) GetDeployment(id int64) (*Deployment, error) {
 	d := &Deployment{}
 	var logStr, commitSHA, compSnap sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, app_id, server_id, status, log, commit_sha, compose_snapshot, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), status, log, commit_sha, compose_snapshot, created_at
 		FROM deployments WHERE id = ?
 	`, id).Scan(
 		&d.ID, &d.AppID, &d.ServerID, &d.Status,
@@ -279,7 +301,7 @@ func (r *Repository) GetLastSuccessfulDeployment(appID int64) (*Deployment, erro
 	d := &Deployment{}
 	var logStr, commitSHA, compSnap sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, app_id, server_id, status, log, commit_sha, compose_snapshot, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), status, log, commit_sha, compose_snapshot, created_at
 		FROM deployments WHERE app_id = ? AND status = 'success'
 		ORDER BY created_at DESC LIMIT 1
 	`, appID).Scan(
@@ -303,26 +325,18 @@ func (r *Repository) DeleteDeployments(appID int64) error {
 	return err
 }
 
-func (r *Repository) DeleteRoutes(appID int64) error {
-	_, err := r.db.Exec("DELETE FROM routes WHERE app_id = ?", appID)
-	return err
-}
-
-func (r *Repository) DeleteDNSRecords(appID int64) error {
-	_, err := r.db.Exec("DELETE FROM dns_records WHERE app_id = ?", appID)
-	return err
-}
-
+// SaveRoute adds the app's route for a domain, or points the existing one at
+// route.ServerID; there is one row per (app_id, domain).
 func (r *Repository) SaveRoute(route *Route) error {
-	result, err := r.db.Exec(`
+	err := r.db.QueryRow(`
 		INSERT INTO routes (app_id, server_id, domain, target, status)
 		VALUES (?, ?, ?, ?, 'active')
-	`, route.AppID, route.ServerID, route.Domain, route.Target)
+		ON CONFLICT(app_id, domain) DO UPDATE SET server_id = excluded.server_id, status = 'active'
+		RETURNING id
+	`, route.AppID, route.ServerID, route.Domain, route.Target).Scan(&route.ID)
 	if err != nil {
-		return fmt.Errorf("insert route: %w", err)
+		return fmt.Errorf("save route: %w", err)
 	}
-	id, _ := result.LastInsertId()
-	route.ID = id
 	return nil
 }
 
@@ -336,14 +350,9 @@ func (r *Repository) DeleteRouteByDomain(appID int64, domain string) error {
 	return err
 }
 
-func (r *Repository) RemoveRoute(routeID int64) error {
-	_, err := r.db.Exec("UPDATE routes SET status='removed' WHERE id=?", routeID)
-	return err
-}
-
 func (r *Repository) GetRoutes(appID int64) ([]Route, error) {
 	rows, err := r.db.Query(`
-		SELECT id, app_id, server_id, domain, target, status, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), domain, target, status, created_at
 		FROM routes WHERE app_id = ? AND status = 'active'
 	`, appID)
 	if err != nil {
@@ -395,7 +404,7 @@ func (r *Repository) UpdateDNSRecordProxied(recordID string, proxied bool) error
 
 func (r *Repository) GetDNSRecords(appID int64) ([]DNSRecordInfo, error) {
 	rows, err := r.db.Query(`
-		SELECT id, app_id, server_id, zone_id, record_id, name, type, content, proxied, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), zone_id, record_id, name, type, content, proxied, created_at
 		FROM dns_records WHERE app_id = ?
 	`, appID)
 	if err != nil {
@@ -585,7 +594,7 @@ func (r *Repository) InsertContainerStats(s *ContainerStats) error {
 func (r *Repository) LatestContainerStats(appID int64) (*ContainerStats, error) {
 	s := &ContainerStats{}
 	err := r.db.QueryRow(`
-		SELECT id, app_id, server_id, container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, created_at
+		SELECT id, app_id, COALESCE(server_id, 0), container_name, cpu_percent, mem_usage_bytes, mem_limit_bytes, mem_percent, net_io_rx_bytes, net_io_tx_bytes, block_io_read, block_io_write, created_at
 		FROM container_stats WHERE app_id = ? ORDER BY created_at DESC LIMIT 1
 	`, appID).Scan(&s.ID, &s.AppID, &s.ServerID, &s.ContainerName, &s.CPUPercent, &s.MemUsageBytes, &s.MemLimitBytes, &s.MemPercent, &s.NetIORxBytes, &s.NetIOTxBytes, &s.BlockIORead, &s.BlockIOWrite, &s.CreatedAt)
 	if err == sql.ErrNoRows {
