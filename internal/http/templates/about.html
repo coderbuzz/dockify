@@ -78,7 +78,7 @@ function runUpdate() {
       btn.textContent = 'Update Failed';
     } else {
       var attempts = 0;
-      var maxAttempts = 30;
+      var maxAttempts = 60;
       var delay = 1000;
       function poll() {
         if (attempts >= maxAttempts) {
@@ -89,23 +89,20 @@ function runUpdate() {
         }
         attempts++;
         log.textContent += '.';
-        fetch('api/settings/update/check?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.json()}).then(function(info){
-          if (info.error) {
-            log.textContent += '\nCheck error: ' + info.error;
-            if (info.error.indexOf('rate limit') !== -1) {
-              log.textContent += ' (stopping monitor)';
-              return;
-            }
-          } else if (info.current !== versionOnPage) {
-            log.textContent += '\nUpdate detected, refresh';
-            setTimeout(function(){ location.reload(true); }, 1000);
+        // Poll the local health endpoint, not the GitHub-backed update check: after the restart that
+        // check can fail or be rate limited, which used to stop the monitor although the new version was up.
+        fetch('health?_=' + Date.now(), {cache:'no-store'}).then(function(r){
+          var v = r.headers.get('X-Dockify-Version');
+          if (r.ok && v && v !== versionOnPage) {
+            log.textContent += '\nUpdate detected (v' + v + '), refreshing';
+            setTimeout(function(){ location.reload(); }, 1000);
             return;
           }
           setTimeout(poll, delay);
-          delay = Math.min(delay * 2, 30000);
+          delay = Math.min(delay * 2, 5000);
         }).catch(function(){
           setTimeout(poll, delay);
-          delay = Math.min(delay * 2, 30000);
+          delay = Math.min(delay * 2, 5000);
         });
       }
       poll();
