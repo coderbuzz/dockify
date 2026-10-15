@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -213,5 +216,52 @@ func TestSetSecretIsSecretFlag(t *testing.T) {
 	post(`{"key": "PW", "value": "c", "is_secret": false}`)
 	if flag() {
 		t.Fatal("is_secret false not stored")
+	}
+}
+
+type noServers struct{}
+
+func (noServers) List() ([]ServerInfo, error) { return nil, nil }
+
+// B22: saving the edit form used to add the primary domain twice per save.
+func TestEditFormKeepsOneRoutePerDomain(t *testing.T) {
+	f := newMoveFixture(t)
+	f.repo.UpdateStatus(f.app.ID, StatusDraft) // no background deploy
+	h := NewWebHandler(f.svc, noServers{})
+	r := chi.NewRouter()
+	r.Post("/apps/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+		h.AppEditForm(w, r, func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{}) {
+			t.Fatalf("form rendered %s (%d): %v", name, status, data)
+		})
+	})
+	edit := func(domains ...string) {
+		form := url.Values{"name": {"mongo"}, "compose": {f.app.Compose}, "server_id": {fmt.Sprint(f.src.ID)}, "domain": domains}
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/apps/%d/edit", f.app.ID), strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("edit: %d %s", rec.Code, rec.Body)
+		}
+	}
+	domainsOf := func() []string {
+		routes, _ := f.repo.GetRoutes(f.app.ID)
+		var out []string
+		for _, rt := range routes {
+			out = append(out, rt.Domain)
+		}
+		sort.Strings(out)
+		return out
+	}
+
+	// A new primary domain was saved by the app.Domain block and the loop.
+	edit("www.example.com", "db.example.com")
+	edit("www.example.com", "db.example.com")
+	if got := domainsOf(); !reflect.DeepEqual(got, []string{"db.example.com", "www.example.com"}) {
+		t.Fatalf("routes after two identical edits: %v", got)
+	}
+	edit("db.example.com")
+	if got := domainsOf(); !reflect.DeepEqual(got, []string{"db.example.com"}) {
+		t.Fatalf("routes after removing a domain: %v", got)
 	}
 }

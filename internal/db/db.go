@@ -25,6 +25,7 @@ type migration struct {
 var migrations = []migration{
 	{"legacy column changes (v0.3-v0.13)", migrateLegacy},
 	{"cascade app deletes, keep history on server delete", migrateForeignKeys},
+	{"de-duplicate routes, unique route/app/server names", migrateUnique},
 }
 
 func Open(path string) (*sql.DB, error) {
@@ -254,6 +255,39 @@ func migrateForeignKeys(tx *sql.Tx) error {
 	for _, t := range tables {
 		if err := rebuildTable(tx, t.name, t.columns, t.index); err != nil {
 			return fmt.Errorf("rebuild %s: %w", t.name, err)
+		}
+	}
+	return nil
+}
+
+// migrateUnique keeps one active routes row per (app_id, domain), the oldest,
+// and makes that unique. apps.name and servers.name get unique indexes unless
+// existing rows collide; those are logged and the index is not created (the
+// migration does not run again).
+func migrateUnique(tx *sql.Tx) error {
+	res, err := tx.Exec(`DELETE FROM routes WHERE status IS NOT 'active' OR id NOT IN (
+		SELECT MIN(id) FROM routes WHERE status = 'active' GROUP BY app_id, domain)`)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	log.Printf("migration: removed %d duplicate or inactive routes rows", n)
+	if _, err := tx.Exec("CREATE UNIQUE INDEX idx_routes_app_domain ON routes(app_id, domain)"); err != nil {
+		return err
+	}
+
+	for _, table := range []string{"apps", "servers"} {
+		var dups sql.NullString
+		if err := tx.QueryRow(fmt.Sprintf(`SELECT GROUP_CONCAT(name, ', ') FROM (
+			SELECT name FROM %s GROUP BY name HAVING COUNT(*) > 1)`, table)).Scan(&dups); err != nil {
+			return err
+		}
+		if dups.Valid {
+			log.Printf("WARNING: duplicate %s names (%s): unique index idx_%s_name not created", table, dups.String, table)
+			continue
+		}
+		if _, err := tx.Exec(fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_name ON %s(name)", table, table)); err != nil {
+			return err
 		}
 	}
 	return nil

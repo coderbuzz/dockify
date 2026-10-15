@@ -303,21 +303,18 @@ func (r *Repository) DeleteDeployments(appID int64) error {
 	return err
 }
 
-func (r *Repository) DeleteRoutes(appID int64) error {
-	_, err := r.db.Exec("DELETE FROM routes WHERE app_id = ?", appID)
-	return err
-}
-
+// SaveRoute adds the app's route for a domain, or points the existing one at
+// route.ServerID; there is one row per (app_id, domain).
 func (r *Repository) SaveRoute(route *Route) error {
-	result, err := r.db.Exec(`
+	err := r.db.QueryRow(`
 		INSERT INTO routes (app_id, server_id, domain, target, status)
 		VALUES (?, ?, ?, ?, 'active')
-	`, route.AppID, route.ServerID, route.Domain, route.Target)
+		ON CONFLICT(app_id, domain) DO UPDATE SET server_id = excluded.server_id, status = 'active'
+		RETURNING id
+	`, route.AppID, route.ServerID, route.Domain, route.Target).Scan(&route.ID)
 	if err != nil {
-		return fmt.Errorf("insert route: %w", err)
+		return fmt.Errorf("save route: %w", err)
 	}
-	id, _ := result.LastInsertId()
-	route.ID = id
 	return nil
 }
 
@@ -328,11 +325,6 @@ func (r *Repository) UpdateRouteTarget(routeID int64, target string) error {
 
 func (r *Repository) DeleteRouteByDomain(appID int64, domain string) error {
 	_, err := r.db.Exec("DELETE FROM routes WHERE app_id = ? AND domain = ?", appID, domain)
-	return err
-}
-
-func (r *Repository) RemoveRoute(routeID int64) error {
-	_, err := r.db.Exec("UPDATE routes SET status='removed' WHERE id=?", routeID)
 	return err
 }
 

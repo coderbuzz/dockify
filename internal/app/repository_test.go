@@ -35,6 +35,27 @@ func createTestServer(t *testing.T, srvRepo *server.Repository) int64 {
 	return s.ID
 }
 
+func TestRepo_SaveRouteUpserts(t *testing.T) {
+	repo, srvRepo := setupRepo(t)
+	srvID := createTestServer(t, srvRepo)
+	a := &App{Name: "web", ServerID: srvID, Compose: "services: {}"}
+	if err := repo.Create(a); err != nil {
+		t.Fatal(err)
+	}
+	first := &Route{AppID: a.ID, ServerID: srvID, Domain: "web.example.com"}
+	second := &Route{AppID: a.ID, ServerID: srvID, Domain: "web.example.com"}
+	if err := repo.SaveRoute(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveRoute(second); err != nil {
+		t.Fatal(err)
+	}
+	routes, _ := repo.GetRoutes(a.ID)
+	if len(routes) != 1 || second.ID != first.ID {
+		t.Fatalf("want one route, got %+v (ids %d, %d)", routes, first.ID, second.ID)
+	}
+}
+
 func TestRepo_CreateAndGet(t *testing.T) {
 	repo, srvRepo := setupRepo(t)
 	srvID := createTestServer(t, srvRepo)

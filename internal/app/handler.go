@@ -279,7 +279,6 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		// server is only touched after the new deploy runs.
 		action = "move_without_files"
 		routes, _ := h.service.GetRoutes(id)
-		h.service.DeleteRoutes(id)
 		for _, rt := range routes {
 			h.service.SaveRoute(&Route{AppID: id, ServerID: newServerID, Domain: rt.Domain})
 		}
@@ -1018,7 +1017,6 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 		}
 		flashMsg = url.QueryEscape(msg)
 	} else if moving {
-		h.service.DeleteRoutes(app.ID)
 		msg := fmt.Sprintf("App moved from %s to %s.", oldServerName, newServerName)
 		if purgeOld {
 			msg += fmt.Sprintf(" %s will be purged once the new deployment succeeds.", oldServerName)
@@ -1031,46 +1029,18 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	saveFormEnvVars(r, h.service, id)
 	saveFormFiles(r, h.service, id)
 
+	// SaveRoute upserts, so re-saving every domain also points the existing
+	// routes at the new server on a move. domains includes app.Domain.
 	oldRoutes, _ := h.service.GetRoutes(id)
-	oldDomains := make(map[string]Route)
-	for _, r := range oldRoutes {
-		oldDomains[r.Domain] = r
-	}
-	if app.Domain != "" {
-		if _, exists := oldDomains[app.Domain]; !exists {
-			if app.Domain != "" {
-				h.service.SaveRoute(&Route{
-					AppID:    app.ID,
-					ServerID: app.ServerID,
-					Domain:   app.Domain,
-					Target:   "",
-				})
-			}
-		}
-	}
 	seen := map[string]bool{}
 	for _, d := range domains {
-		if d == "" || seen[d] {
-			continue
-		}
 		seen[d] = true
-		if _, exists := oldDomains[d]; !exists {
-			h.service.SaveRoute(&Route{
-				AppID:    app.ID,
-				ServerID: app.ServerID,
-				Domain:   d,
-				Target:   "",
-			})
-		}
+		h.service.SaveRoute(&Route{AppID: app.ID, ServerID: app.ServerID, Domain: d})
 	}
 	var removedDomains []string
 	for _, r := range oldRoutes {
 		if !seen[r.Domain] {
 			removedDomains = append(removedDomains, r.Domain)
-		}
-	}
-	for _, r := range oldRoutes {
-		if !seen[r.Domain] {
 			h.service.DeleteRouteByDomain(app.ID, r.Domain)
 		}
 	}

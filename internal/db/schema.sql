@@ -1,3 +1,7 @@
+-- Baseline schema, run on every start. Changes to existing tables and new
+-- indexes that existing data could violate (UNIQUE) go into the migrations
+-- in db.go, which also run on fresh databases.
+
 CREATE TABLE IF NOT EXISTS servers (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,

@@ -17,6 +17,32 @@ var productionSeed = []string{
 	"INSERT INTO server_stats (server_id) VALUES (1), (2)",
 }
 
+func TestRouteDedupAndUniqueNames(t *testing.T) {
+	d := open(t, legacyDB(t, append(productionSeed,
+		// B22: the same route saved again on each edit, plus an inactive row.
+		"INSERT INTO routes (app_id, server_id, domain, target) VALUES (10, 1, 'web.example.com', ''), (10, 2, 'web.example.com', '')",
+		"INSERT INTO routes (app_id, server_id, domain, target, status) VALUES (10, 1, 'old.example.com', '', 'removed')",
+		"INSERT INTO servers (name, host, ssh_key) VALUES ('dead', '10.0.0.3', '/k/3.pem')",
+	)...))
+
+	if n := scalar(t, d, "SELECT COUNT(*) FROM routes"); n != 1 {
+		t.Errorf("routes rows = %d, want 1", n)
+	}
+	if n := scalar(t, d, "SELECT MIN(id) FROM routes"); n != 1 {
+		t.Errorf("kept route id %d, want the oldest (1)", n)
+	}
+	if _, err := d.Exec("INSERT INTO routes (app_id, domain, target) VALUES (10, 'web.example.com', '')"); err == nil {
+		t.Error("duplicate (app_id, domain) accepted")
+	}
+	if _, err := d.Exec("INSERT INTO apps (name, compose) VALUES ('web', '')"); err == nil {
+		t.Error("duplicate app name accepted")
+	}
+	// servers had duplicate names: the index is skipped, startup goes on.
+	if n := scalar(t, d, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'idx_servers_name'"); n != 0 {
+		t.Error("idx_servers_name created despite duplicates")
+	}
+}
+
 func TestForeignKeysAfterMigration(t *testing.T) {
 	d := open(t, legacyDB(t, productionSeed...))
 

@@ -174,10 +174,6 @@ func (s *Service) UpdateStatus(id int64, status string) error {
 	return s.repo.UpdateStatus(id, status)
 }
 
-func (s *Service) DeleteRoutes(appID int64) error {
-	return s.repo.DeleteRoutes(appID)
-}
-
 func (s *Service) SaveRoute(route *Route) error {
 	return s.repo.SaveRoute(route)
 }
@@ -762,7 +758,6 @@ func (s *Service) MoveApp(appID, fromServerID, toServerID int64, purgeOld bool) 
 	}
 
 	routes, _ := s.repo.GetRoutes(appID)
-	s.repo.DeleteRoutes(appID)
 	for _, r := range routes {
 		s.repo.SaveRoute(&Route{AppID: appID, ServerID: toServerID, Domain: r.Domain})
 	}
