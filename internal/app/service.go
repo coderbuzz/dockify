@@ -294,13 +294,25 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 		}
 	}
 
+	routeFailed := false
 	if app.Domain != "" {
 		routes, _ := s.repo.GetRoutes(app.ID)
 		for _, r := range routes {
-			s.setupRouteAndDNSForDomain(r, app, svr, client, composeContent, &logs)
+			if err := s.setupRouteAndDNSForDomain(r, app, svr, client, composeContent, &logs); err != nil {
+				routeFailed = true
+			}
 		}
 	} else {
 		log.Printf("App %q deployed as internal service (no domain, no Caddy route)", app.Name)
+	}
+
+	// Containers are up but unreachable without their route; DNS and SaveConfig
+	// problems stay warnings in the log.
+	if routeFailed {
+		s.repo.UpdateStatus(id, StatusFailed)
+		s.recordDeployment(id, svr.ID, StatusFailed, strings.Join(logs, "\n"), commitSHA, app.Compose)
+		log.Printf("App %q deployed, but its Caddy route failed", app.Name)
+		return
 	}
 
 	s.repo.UpdateStatus(id, StatusRunning)
@@ -789,7 +801,9 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 	}
 }
 
-func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) {
+// setupRouteAndDNSForDomain returns the Caddy route error, if any; DNS for the
+// domain is then skipped. DNS failures are only logged.
+func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.Server, client ssh.Connector, composeContent string, logs *[]string) error {
 	target := fmt.Sprintf("%s:%d", getServiceName(composeContent), app.Port)
 	caddyClient := caddy.NewClient(client)
 
@@ -806,12 +820,12 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 		if logs != nil {
 			*logs = append(*logs, fmt.Sprintf("caddy/%s: %v", route.Domain, caddyErr))
 		}
-	} else {
-		if err := caddyClient.SaveConfig(); err != nil {
-			log.Printf("Warning: failed to save caddy config: %v", err)
-			if logs != nil {
-				*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
-			}
+		return caddyErr
+	}
+	if err := caddyClient.SaveConfig(); err != nil {
+		log.Printf("Warning: failed to save caddy config: %v", err)
+		if logs != nil {
+			*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
 		}
 	}
 
@@ -824,7 +838,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 			if logs != nil {
 				*logs = append(*logs, fmt.Sprintf("dns/%s: lookup failed: %v", route.Domain, err))
 			}
-			return
+			return nil
 		}
 		var existing *cloudflare.DNSRecord
 		for _, r := range records {
@@ -941,6 +955,7 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 			}
 		}
 	}
+	return nil
 }
 
 func (s *Service) Redeploy(id int64, removedDomains ...string) {
