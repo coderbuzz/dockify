@@ -86,8 +86,8 @@
   --on-brand2: #1b1f3b;
   --brand2: #c2410c;
   --brand2-soft: #fdeee4;
-  --chart: #178a8c;
-  --chart-soft: #dff3f3;
+  --chart: #4a54c9;
+  --chart-soft: #e3e5fb;
   --ok: #15803d;
   --ok-text: #166534;
   --ok-bg: #dcfce7;
@@ -120,8 +120,8 @@
   --on-brand2: #1b1f3b;
   --brand2: #ff9a5c;
   --brand2-soft: #3a2418;
-  --chart: #4fd1d3;
-  --chart-soft: #143339;
+  --chart: #8c96ff;
+  --chart-soft: #242a5c;
   --ok: #4ade80;
   --ok-text: #86efac;
   --ok-bg: #10301e;
@@ -254,7 +254,7 @@ hgroup p { color: var(--ink2); margin: 0; font-size: 0.95em; }
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-fill), var(--chart));
+  background: var(--accent-fill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -744,7 +744,7 @@ pre {
 .login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
 .login-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; width: 360px; max-width: 100%; box-shadow: var(--shadow); }
 .brand-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.brand-icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--accent-fill), var(--chart)); display: inline-flex; align-items: center; justify-content: center; color: var(--on-accent); font-weight: 800; }
+.brand-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--accent-fill); display: inline-flex; align-items: center; justify-content: center; color: var(--on-accent); font-weight: 800; }
 .login-card h1 { font-size: 20px; font-weight: 800; margin: 0; }
 .login-card p { color: var(--ink2); margin: 0 0 20px; font-size: 14px; }
 .login-card .alert { margin-bottom: 16px; }

@@ -78,8 +78,8 @@ Semua pasangan kontras sudah dihitung (38/38 lolos per palet, lihat `docs/design
 | on-brand2 | `#1b1f3b` | `#1b1f3b` |
 | brand2 | `#c2410c` | `#ff9a5c` |
 | brand2-soft | `#fdeee4` | `#3a2418` |
-| chart | `#178a8c` | `#4fd1d3` |
-| chart-soft | `#dff3f3` | `#143339` |
+| chart | `#4a54c9` | `#8c96ff` |
+| chart-soft | `#e3e5fb` | `#242a5c` |
 | ok | `#15803d` | `#4ade80` |
 | ok-text | `#166534` | `#86efac` |
 | ok-bg | `#dcfce7` | `#10301e` |
