@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	sessions     = map[string]time.Time{}
-	sessionsMu   sync.RWMutex
-	sessionName  = "dockify_session"
+	sessions      = map[string]time.Time{}
+	sessionsMu    sync.RWMutex
+	sessionName   = "dockify_session"
 	sessionMaxAge = 24 * time.Hour
 )
 
@@ -40,7 +40,7 @@ func getSessionUser(r *http.Request) string {
 	return "admin"
 }
 
-func setSession(w http.ResponseWriter, user string) {
+func setSession(w http.ResponseWriter, r *http.Request) {
 	id := generateSessionID()
 	sessionsMu.Lock()
 	sessions[id] = time.Now().Add(sessionMaxAge)
@@ -50,6 +50,8 @@ func setSession(w http.ResponseWriter, user string) {
 		Value:    id,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 		MaxAge:   int(sessionMaxAge.Seconds()),
 	})
 }
@@ -73,14 +75,12 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 // AuthMiddleware lets a request through with a valid session cookie or, when apiToken is set,
 // an "Authorization: Bearer <apiToken>" header (for scripts and agents; no login round trip,
 // survives controller restarts). A wrong bearer token gets 401 instead of the login redirect.
+// Other requests with an unsafe method sent by another site get 403 (CSRF), also when auth is
+// disabled: the stdlib check uses Sec-Fetch-Site, or Origin vs Host for older browsers.
 func AuthMiddleware(enabled bool, apiToken string, next http.Handler) http.Handler {
+	csrf := http.NewCrossOriginProtection()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && enabled {
 			if apiToken != "" && subtle.ConstantTimeCompare([]byte(bearer), []byte(apiToken)) == 1 {
 				next.ServeHTTP(w, r)
 				return
@@ -89,7 +89,12 @@ func AuthMiddleware(enabled bool, apiToken string, next http.Handler) http.Handl
 			return
 		}
 
-		if getSessionUser(r) != "" {
+		if err := csrf.Check(r); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
+		if !enabled || getSessionUser(r) != "" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -112,7 +117,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, cfgUser, cfgPass string
 		pass := r.FormValue("pass")
 
 		if user == cfgUser && pass == cfgPass {
-			setSession(w, user)
+			setSession(w, r)
 			log.Printf("Login: %s", user)
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
