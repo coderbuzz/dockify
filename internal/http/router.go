@@ -141,7 +141,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Delete("/{id}/secrets/{key}", appAPIHandler.DeleteSecret)
 			r.Get("/{id}/files", appAPIHandler.ListFiles)
 			r.Post("/{id}/files", appAPIHandler.SetFile)
-			r.Delete("/{id}/files/{path}", appAPIHandler.DeleteFile)
+			r.Delete("/{id}/files/*", appAPIHandler.DeleteFile) // * keeps nested paths like conf/app.ini
 			r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
 			r.Get("/{id}/stats", appAPIHandler.Stats)
 			r.Get("/{id}/stats/history", appAPIHandler.StatsHistory)

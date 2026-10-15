@@ -112,7 +112,7 @@ func TestAPIRejectsInvalidInput(t *testing.T) {
 	r.Post("/api/apps", h.Create)
 	r.Post("/api/apps/{id}/secrets", h.SetSecret)
 	r.Post("/api/apps/{id}/files", h.SetFile)
-	r.Delete("/api/apps/{id}/files/{path}", h.DeleteFile)
+	r.Delete("/api/apps/{id}/files/*", h.DeleteFile)
 
 	for _, tc := range []struct{ method, url, body, want string }{
 		{"POST", "/api/apps", `{"name":"x","image":"nginx","domain":"bad domain.com","draft":true}`, `bad domain.com`},

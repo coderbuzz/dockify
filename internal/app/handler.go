@@ -483,7 +483,7 @@ func (h *Handler) SetFile(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	path, err := ValidFilePath(chi.URLParam(r, "path"))
+	path, err := ValidFilePath(chi.URLParam(r, "*"))
 	if err != nil {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return

@@ -313,7 +313,7 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | DELETE | `/api/apps/:id/secrets/:key` | Delete secret |
 | GET | `/api/apps/:id/files` | List config files |
 | POST | `/api/apps/:id/files` | Set config file `{path, content}`; path validated (see Input validation) |
-| DELETE | `/api/apps/:id/files/:path` | Delete config file |
+| DELETE | `/api/apps/:id/files/*path` | Delete config file (nested paths like `conf/app.ini` included) |
 | GET | `/api/apps/:id/console` | WebSocket upgrade → shell in the app's first service container |
 | GET | `/api/apps/:id/stats` | Latest container stats |
 | GET | `/api/apps/:id/stats/history` | Container stats history (`?range=`, default `1h`) |
