@@ -174,7 +174,7 @@
   {{if or (eq .App.Status "running") (eq .App.Status "stopped")}}
   <div class="card">
     <h3>Logs</h3>
-    {{template "ui_segmented" (dict "Label" "Log lines" "Base" (printf "api/apps/%d/logs?tail=" .App.ID) "Target" "#log-output" "Swap" "innerHTML" "Active" -1 "Items" (list "50:Tail 50" "200:Tail 200" "500:Tail 500"))}}
+    {{template "ui_segmented" (dict "Label" "Log lines" "Base" (printf "api/apps/%d/logs?tail=" .App.ID) "Target" "#log-output" "Swap" "textContent" "Active" -1 "Items" (list "50:Tail 50" "200:Tail 200" "500:Tail 500"))}}
     <pre id="log-output" class="log-content">Click to load logs…</pre>
   </div>
   {{end}}

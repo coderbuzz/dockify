@@ -773,6 +773,7 @@ pre {
 .actgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .actgrid form { display: contents; }
 .actgrid .btn-primary { grid-column: 1 / -1; }
+.actgrid > :nth-child(2):last-child { grid-column: 1 / -1; } /* satu-satunya aksi selain primary: selebar kartu juga */
 .actgrid .btn .icon { width: 17px; height: 17px; }
 @media (min-width: 700px) {
   .actgrid { display: flex; flex-wrap: wrap; }
@@ -898,4 +899,4 @@ hgroup .page-actions { margin-top: 4px; }
 }
 
 /* Lencana di tabel/daftar lebih kecil dari lencana judul (umpan balik produksi 2026-10-15) */
-.rows .badge, .group-head .badge { font-size: 10px; font-weight: 700; padding: 2px 6px; letter-spacing: 0.03em; }
+.rows .badge, .group-head .badge { font-size: 9px; font-weight: 700; padding: 2px 5px; letter-spacing: 0.02em; }
