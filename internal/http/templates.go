@@ -287,6 +287,10 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// htmx preload (hover/touch prefetch) relies on the browser cache: let a prefetched page live a few seconds.
+	if status == http.StatusOK && r.Method == http.MethodGet && r.Header.Get("HX-Preloaded") == "true" {
+		w.Header().Set("Cache-Control", "private, max-age=5")
+	}
 	w.WriteHeader(status)
 	buf.WriteTo(w)
 }

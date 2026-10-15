@@ -59,4 +59,5 @@
   }
   document.addEventListener('DOMContentLoaded', init);
   document.addEventListener('htmx:afterSettle', init);
+  document.addEventListener('htmx:historyRestore', init);
 })();

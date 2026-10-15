@@ -115,7 +115,25 @@ function syncNav() {
     else a.removeAttribute('aria-current');
   });
 }
-document.addEventListener('DOMContentLoaded', function () { formatTimes(); });
+// Auto-refresh of status pages (deploying/initializing): <main data-poll="2000"> re-fetches itself; the timer is a page cleanup.
+var pollTimer = null;
+function startPoll() {
+  clearTimeout(pollTimer);
+  var m = document.getElementById('main'), ms = m && Number(m.getAttribute('data-poll'));
+  if (!ms || !window.htmx) return;
+  pollTimer = setTimeout(function () {
+    htmx.ajax('GET', location.href, { target: '#main', select: '#main', swap: 'outerHTML' });
+  }, ms);
+  (window.dockifyCleanups = window.dockifyCleanups || []).push(function () { clearTimeout(pollTimer); });
+}
+// Everything a page needs after its #main arrives (swap or history restore); idempotent.
+function pageInit() {
+  formatTimes();
+  syncNav();
+  if (window.dockifyApplyTheme) window.dockifyApplyTheme(); // head merge replaces <meta name=theme-color>
+  startPoll();
+}
+document.addEventListener('DOMContentLoaded', function () { formatTimes(); startPoll(); });
 if (window.htmx) {
   var progressTimer = null;
   function progress(show) {
@@ -137,19 +155,20 @@ if (window.htmx) {
     var d = e.detail;
     if (d.boosted) {
       // Login redirect, session expiry, anything without #main: fall back to a full page load.
-      if (d.xhr.responseText.indexOf('id="main"') < 0) {
+      var doc = new DOMParser().parseFromString(d.xhr.responseText, 'text/html');
+      if (!doc.getElementById('main')) {
         d.shouldSwap = false;
         progress(false);
-        location.assign(d.xhr.responseURL || location.href);
+        // A GET can be repeated as a normal navigation; a POST must not be replayed as one.
+        if (d.requestConfig.verb === 'get') location.assign(d.xhr.responseURL || location.href);
+        else showToast('The server did not return a page. Reload and check the result.', true);
         return;
       }
       // 4xx/5xx pages (error.html) are shown like any other page.
       if (d.xhr.status >= 400) { d.shouldSwap = true; d.isError = false; }
     }
     if (d.target && d.target.id === 'main') {
-      var c = window.dockifyCleanups || [];
-      window.dockifyCleanups = [];
-      c.forEach(function (f) { try { f(); } catch (err) {} });
+      runCleanups();
     }
   });
   // head-support: never drop scripts/styles already loaded (fonts link mutates media=all, xterm is added at runtime).
@@ -164,11 +183,17 @@ if (window.htmx) {
     if (url && document.head.querySelector((el.tagName === 'LINK' ? 'link[href="' : 'script[src="') + url + '"]')) e.preventDefault();
   });
   document.addEventListener('htmx:afterSettle', function (e) {
-    formatTimes();
-    syncNav();
-    if (window.dockifyApplyTheme) window.dockifyApplyTheme(); // head merge replaces <meta name=theme-color>
+    pageInit();
     if (e.detail.boosted) window.scrollTo(0, 0);
   });
+  // Back/Forward never fire beforeSwap/afterSettle: close live sockets before the restored body is swapped in, re-init after.
+  function runCleanups() {
+    var c = window.dockifyCleanups || [];
+    window.dockifyCleanups = [];
+    c.forEach(function (f) { try { f(); } catch (err) {} });
+  }
+  document.addEventListener('htmx:historyCacheMissLoad', runCleanups);
+  document.addEventListener('htmx:historyRestore', pageInit);
   // Back/forward: do not restore stale DOM snapshots; fetch the page again.
   htmx.config.historyCacheSize = 0;
 }
