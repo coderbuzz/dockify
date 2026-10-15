@@ -43,7 +43,7 @@ internal/
     handler.go                   # JSON API + web UI handlers (apps, deployments, secrets, files, logs, stats)
   scheduler/scheduler.go         # Auto-select least-loaded server
   caddy/client.go                # Caddy Admin API client: route CRUD and config save via `docker exec caddy curl` over SSH
-  cloudflare/client.go           # Cloudflare DNS API v4 (list, create, upsert records)
+  cloudflare/client.go           # Cloudflare DNS API v4 (list, create, update, delete records)
   webhook/handler.go             # GitHub + GitLab webhook receiver, HMAC/token validation
   settings/
     settings.go                  # Webhook secret, GitHub Releases update check, systemd-run self-update

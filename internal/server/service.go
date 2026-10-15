@@ -379,12 +379,12 @@ func (s *Service) RefreshResources(id int64) error {
 	}
 	defer client.Close()
 
-	cpuCores, _ := parseCPUCount(client)
-	ramMB, _ := parseRAM(client)
-	diskGB, _ := parseDisk(client)
+	cpuCores, _ := ParseCPUCount(client)
+	ramMB, _ := ParseRAM(client)
+	diskGB, _ := ParseDisk(client)
 	cpuUsage, _ := parseCPUUsage(client)
-	ramUsage, _ := parseRAMUsage(client)
-	diskUsage, _ := parseDiskUsage(client)
+	ramUsage, _ := ParseRAMUsage(client)
+	diskUsage, _ := ParseDiskUsage(client)
 
 	s.repo.UpdateResources(id, cpuCores, ramMB, diskGB, cpuUsage, ramUsage, diskUsage)
 	s.repo.UpdateStatus(id, StatusOnline)
@@ -448,7 +448,9 @@ func (s *Service) GetStatsHistory(serverID int64, duration string) map[string]in
 	}
 }
 
-func parseCPUCount(c ssh.Connector) (int, error) {
+// ParseCPUCount, ParseRAM, ParseDisk, ParseRAMUsage and ParseDiskUsage read worker
+// metrics over SSH; the monitor and the live stats WebSocket share them.
+func ParseCPUCount(c ssh.Connector) (int, error) {
 	out, err := c.Exec("nproc")
 	if err != nil {
 		return 0, err
@@ -458,7 +460,7 @@ func parseCPUCount(c ssh.Connector) (int, error) {
 	return count, nil
 }
 
-func parseRAM(c ssh.Connector) (int, error) {
+func ParseRAM(c ssh.Connector) (int, error) {
 	out, err := c.Exec("awk '/MemTotal/{printf \"%d\", $2/1024}' /proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -468,7 +470,7 @@ func parseRAM(c ssh.Connector) (int, error) {
 	return mb, nil
 }
 
-func parseDisk(c ssh.Connector) (int, error) {
+func ParseDisk(c ssh.Connector) (int, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/G/,\"\"); print $2}'")
 	if err != nil {
 		return 0, err
@@ -488,7 +490,7 @@ func parseCPUUsage(c ssh.Connector) (float64, error) {
 	return usage, nil
 }
 
-func parseRAMUsage(c ssh.Connector) (float64, error) {
+func ParseRAMUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f\", 100*(t-a)/t}' /proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -498,7 +500,7 @@ func parseRAMUsage(c ssh.Connector) (float64, error) {
 	return usage, nil
 }
 
-func parseDiskUsage(c ssh.Connector) (float64, error) {
+func ParseDiskUsage(c ssh.Connector) (float64, error) {
 	out, err := c.Exec("df -BG / | awk 'NR==2 {gsub(/%/,\"\"); print $5}'")
 	if err != nil {
 		return 0, err

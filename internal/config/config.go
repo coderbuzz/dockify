@@ -58,10 +58,6 @@ func (c *Config) Addr() string {
 	return c.Host + ":" + c.Port
 }
 
-func (c *Config) AuthEnabled() bool {
-	return c.AdminPass != ""
-}
-
 // CheckAuth refuses a passwordless UI on a non-loopback bind unless the
 // operator opted in with DOCKIFY_ALLOW_NO_AUTH=true.
 func (c *Config) CheckAuth() error {

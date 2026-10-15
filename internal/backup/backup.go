@@ -82,35 +82,6 @@ func NewService(serverSvc *server.Service, appSvc *app.Service, keyDir string) *
 	return &Service{serverSvc: serverSvc, appSvc: appSvc, keyDir: keyDir}
 }
 
-func encrypt(plaintext, passphrase string) (string, error) {
-	salt := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return "", err
-	}
-	key, err := pbkdf2.Key(sha256.New, passphrase, salt, 600000, 32)
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
-	}
-	ciphertext := aead.Seal(nil, nonce, []byte(plaintext), nil)
-	raw := make([]byte, 0, len(salt)+len(nonce)+len(ciphertext))
-	raw = append(raw, salt...)
-	raw = append(raw, nonce...)
-	raw = append(raw, ciphertext...)
-	return "enc:" + base64.StdEncoding.EncodeToString(raw), nil
-}
-
 func encryptValue(aead cipher.AEAD, plaintext string) (string, error) {
 	nonce := make([]byte, aead.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
