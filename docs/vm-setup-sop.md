@@ -260,13 +260,33 @@ Log out and in again so the `docker` group applies.
    ls -la /opt/dockify/caddy/config.json                                      # persisted config
    ```
 
-### 2.5 Host firewall on the worker — [recommended], not yet applied on production workers
+### 2.5 Host firewall on the worker — applied on `prod-heavy-1` 2026-10-15; `staging` (Photon OS) uses the distribution's iptables policy instead
 
-Same procedure and watchdog as §1.4: `ufw default deny incoming`, allow `22/tcp`,
-`80/tcp`, `443/tcp`, `443/udp`. Two Docker caveats: Docker publishes ports with its
-own iptables rules that bypass ufw, so anything a compose file publishes with
-`ports:` is reachable regardless; and the Caddy admin port is already bound to
-loopback. Prefer `expose` (simple mode does this) over `ports` for apps.
+Same procedure and watchdog as §1.4, plus two rules that keep container-to-host
+traffic working (an app calling a sibling app through its public domain reaches
+the host's own IP through `docker-proxy`, which arrives on the bridge interface):
+
+```bash
+BR=br-$(docker network inspect dockify -f '{{.Id}}' | cut -c1-12)
+sudo ufw default deny incoming && sudo ufw default allow outgoing
+sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow 443/udp
+sudo ufw allow in on "$BR" comment 'dockify bridge hairpin'
+sudo ufw allow in on docker0 comment 'docker bridge'
+```
+
+Before enabling, scan what is actually open (`ss -lntup`, `docker ps --format
+'{{.Names}} {{.Ports}}'`) and keep any host-level port other services rely on.
+Docker caveats: ports a compose file publishes with `ports:` are reachable through
+Docker's own iptables chains regardless of ufw (on `prod-heavy-1`, MongoDB 27017
+stays public this way; restrict it with a `DOCKER-USER` rule to known client IPs,
+not with ufw); the Caddy admin port is bound to loopback. Prefer `expose` (simple
+mode does this) over `ports` for apps. After enabling, check
+`journalctl -k | grep 'UFW BLOCK'`: there must be no `SRC=172.` (bridge) entries.
+The dockify SSH user needs passwordless sudo for this (`/etc/sudoers.d/dockify`,
+mode 440, validated with `visudo -c`). On Photon OS (`staging`) `ufw` is not
+available; its default `iptables.service` policy (INPUT DROP, 22 only, hairpin
+rule for the dockify bridge, persisted in `/etc/systemd/scripts/ip4save`) is
+equivalent and must be kept.
 
 ### 2.6 Conventions enforced per app (by Dockify, nothing to configure)
 
