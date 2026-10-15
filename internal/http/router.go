@@ -16,12 +16,14 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock bool) *chi.Mux {
+func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serverListAdapter app.ServerRepo, cfgUser, cfgPass, apiToken, sshKeyDir string, webhookSecretFn func() string, settingsHandler *settings.Handler, backupHandler *backup.Handler, version string, devMock, trustProxy bool) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
-	r.Use(chimw.RealIP)
+	if trustProxy {
+		r.Use(chimw.RealIP) // X-Forwarded-For/X-Real-IP from anyone otherwise
+	}
 	r.Use(PrefixMiddleware)
 	r.Use(securityHeaders)
 	r.Use(DevMockMiddleware(devMock))

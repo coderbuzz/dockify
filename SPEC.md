@@ -108,6 +108,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
 | `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`); `X-Forwarded-Prefix` overrides it per request. Templates use links relative to `<base href>`, redirects go through `web.Redirect`, which prepends the prefix |
+| `DOCKIFY_TRUST_PROXY` | `false` | No | Apply `chimw.RealIP` (client IP from `X-Forwarded-For`/`X-Real-IP`); off = TCP peer address |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for DNS automation (Zone:DNS:Edit scope) |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID for the domain |
 
@@ -549,7 +550,8 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 - Cloudflare API token requires minimal scope: Zone:DNS:Edit
 - App containers on internal `dockify` Docker network only — no public port exposure except via Caddy
 - Webhook authentication: HMAC-SHA256 (GitHub), token with constant-time compare (GitLab), auto-generated 64-char hex secret; always on (no disable), fails closed
-- Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions
+- Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions; expired sessions are dropped on each login
+- Login: user and password compared in constant time; a failure waits 1 s; more than 10 failures from one client IP within 15 minutes (counted from the first) answer `429` until the window ends. The client IP is `RemoteAddr`; `chimw.RealIP` (trusting `X-Forwarded-For`/`X-Real-IP`) applies only with `DOCKIFY_TRUST_PROXY=true`
 - Cross-site requests: unsafe methods from another site get `403` (Go `http.CrossOriginProtection`), WebSocket handshakes must be same-origin, no CORS headers. A reverse proxy in front of Dockify must forward the original `Host` header (Caddy does by default)
 - Every response carries `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'` (inline scripts/styles are used in the templates), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Browser scripts come from the binary, not a CDN; only Google Fonts is external
 - HTTP server: `ReadHeaderTimeout` 10s, `IdleTimeout` 120s; request bodies capped (API JSON 1 MiB, webhooks 1 MiB, import 16 MiB)

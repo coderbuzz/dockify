@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,6 +20,58 @@ var (
 	sessionName   = "dockify_session"
 	sessionMaxAge = 24 * time.Hour
 )
+
+// Login throttle: more than loginMaxFailures failed logins from one client within
+// loginWindow (counted from the first failure) answer 429 until the window ends.
+const (
+	loginMaxFailures = 10
+	loginWindow      = 15 * time.Minute
+)
+
+type loginFailure struct {
+	count int
+	since time.Time
+}
+
+var (
+	loginFailures   = map[string]*loginFailure{}
+	loginFailuresMu sync.Mutex
+	loginFailDelay  = time.Second
+)
+
+// clientKey is the client IP: r.RemoteAddr, which chimw.RealIP rewrites only
+// when DOCKIFY_TRUST_PROXY=true.
+func clientKey(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+// loginBlocked reports whether the client used up its failures in the current
+// window, and drops entries whose window has ended.
+func loginBlocked(key string) bool {
+	loginFailuresMu.Lock()
+	defer loginFailuresMu.Unlock()
+	now := time.Now()
+	for k, f := range loginFailures {
+		if now.Sub(f.since) >= loginWindow {
+			delete(loginFailures, k)
+		}
+	}
+	f := loginFailures[key]
+	return f != nil && f.count >= loginMaxFailures
+}
+
+func recordLoginFailure(key string) {
+	loginFailuresMu.Lock()
+	defer loginFailuresMu.Unlock()
+	if f := loginFailures[key]; f != nil {
+		f.count++
+	} else {
+		loginFailures[key] = &loginFailure{count: 1, since: time.Now()}
+	}
+}
 
 func generateSessionID() string {
 	b := make([]byte, 32)
@@ -44,8 +97,14 @@ func getSessionUser(r *http.Request) string {
 
 func setSession(w http.ResponseWriter, r *http.Request) {
 	id := generateSessionID()
+	now := time.Now()
 	sessionsMu.Lock()
-	sessions[id] = time.Now().Add(sessionMaxAge)
+	for k, expiry := range sessions {
+		if now.After(expiry) {
+			delete(sessions, k)
+		}
+	}
+	sessions[id] = now.Add(sessionMaxAge)
 	sessionsMu.Unlock()
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionName,
@@ -115,16 +174,32 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, cfgUser, cfgPass string
 			return
 		}
 
+		key := clientKey(r)
+		if loginBlocked(key) {
+			render(w, r, http.StatusTooManyRequests, "login.html", map[string]interface{}{
+				"Title": "Login",
+				"Error": "too many failed logins, try again later",
+			})
+			return
+		}
+
 		user := r.FormValue("user")
 		pass := r.FormValue("pass")
-
-		if user == cfgUser && pass == cfgPass {
+		userOK := subtle.ConstantTimeCompare([]byte(user), []byte(cfgUser))
+		passOK := subtle.ConstantTimeCompare([]byte(pass), []byte(cfgPass))
+		if userOK&passOK == 1 {
+			loginFailuresMu.Lock()
+			delete(loginFailures, key)
+			loginFailuresMu.Unlock()
 			setSession(w, r)
 			log.Printf("Login: %s", user)
 			web.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 
+		recordLoginFailure(key)
+		log.Printf("Login failed from %s", key)
+		time.Sleep(loginFailDelay)
 		render(w, r, http.StatusUnauthorized, "login.html", map[string]interface{}{
 			"Title": "Login",
 			"Error": "invalid username or password",

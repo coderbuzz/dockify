@@ -23,7 +23,7 @@ func newTestRouter(t *testing.T) (*chi.Mux, *app.Service, *server.Service) {
 	srvRepo := server.NewRepository(database)
 	svc := server.NewService(srvRepo)
 	appSvc := app.NewService(app.NewRepository(database), srvRepo, nil, nil)
-	return NewRouter(svc, appSvc, Render, nil, "admin", "", "", t.TempDir(), func() string { return "" }, nil, nil, "test", true), appSvc, svc
+	return NewRouter(svc, appSvc, Render, nil, "admin", "", "", t.TempDir(), func() string { return "" }, nil, nil, "test", true, false), appSvc, svc
 }
 
 // Vendored assets are served from the binary with the security headers; no listing (B20, S12).
