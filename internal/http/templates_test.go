@@ -65,9 +65,9 @@ func TestTemplatesLookup(t *testing.T) {
 
 func TestTemplatesRender(t *testing.T) {
 	data := map[string]interface{}{
-		"Title":   "Test",
+		"Title":    "Test",
 		"BasePath": "/",
-		"Version": "0.3.15",
+		"Version":  "0.3.15",
 		"Stats": &struct {
 			TotalApps     int
 			RunningApps   int
@@ -77,23 +77,23 @@ func TestTemplatesRender(t *testing.T) {
 		"Servers": []interface{}{},
 		"Apps":    []interface{}{},
 		"App": map[string]interface{}{
-			"ID":             int64(1),
-			"Name":           "test",
-			"Domain":         "test.example.com",
-			"Port":           80,
-			"Status":         "running",
-			"Compose":        "services:\n  app:\n    image: nginx",
-			"GitRepo":        "",
-			"GitBranch":      "main",
-			"AuthUser":       "",
-			"CreatedAt":      "2026-01-01",
-			"UpdatedAt":      "2026-01-01",
+			"ID":        int64(1),
+			"Name":      "test",
+			"Domain":    "test.example.com",
+			"Port":      80,
+			"Status":    "running",
+			"Compose":   "services:\n  app:\n    image: nginx",
+			"GitRepo":   "",
+			"GitBranch": "main",
+			"AuthUser":  "",
+			"CreatedAt": "2026-01-01",
+			"UpdatedAt": "2026-01-01",
 		},
-		"Secrets":         []interface{}{},
-		"Deployments":     []interface{}{},
-		"Routes":          []interface{}{},
-		"Domains":         []string{"test.example.com"},
-		"DomainCount":     1,
+		"Secrets":          []interface{}{},
+		"Deployments":      []interface{}{},
+		"Routes":           []interface{}{},
+		"Domains":          []string{"test.example.com"},
+		"DomainCount":      1,
 		"ExtraDomainCount": 0,
 		"Server": map[string]interface{}{
 			"ID":        int64(1),
@@ -221,5 +221,12 @@ func TestLatestChartVal(t *testing.T) {
 	}
 	if got := latestChartVal(nil, 99.0); got != 99.0 {
 		t.Errorf("expected fallback 99.0, got %v", got)
+	}
+}
+
+func TestNl2brEscapes(t *testing.T) {
+	nl2br := funcMap["nl2br"].(func(string) template.HTML)
+	if got, want := nl2br("<img src=x onerror=alert(1)>\n8080:80"), template.HTML("&lt;img src=x onerror=alert(1)&gt;<br>8080:80"); got != want {
+		t.Errorf("nl2br = %q, want %q", got, want)
 	}
 }
