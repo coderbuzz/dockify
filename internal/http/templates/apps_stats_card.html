@@ -25,7 +25,7 @@
   <div class="chart-section">
     <div class="chart-title"><span>Memory</span> <span class="chart-title-val chart-title-val--mem" id="mem-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 (latestChartVal .ChartData.memory .Stats.MemPercent))}}% ({{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}){{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--ok)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--brand2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax $range}}" />
       <line id="memory-threshold-line" x1="0" y1="{{$memThreshY}}" x2="{{$width}}" y2="{{$memThreshY}}"
         stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />

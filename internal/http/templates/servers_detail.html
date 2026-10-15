@@ -15,7 +15,7 @@
     <p class="meta mono">{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
   </div>
 
-  {{if eq .Server.Status "online"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" "Online" "Sub" (printf "Updated %s" (relativeTime .Server.ResourcesUpdatedAt)))}}
+  {{if eq .Server.Status "online"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" "Online" "Sub" (or (and (not .Server.ResourcesUpdatedAt.IsZero) (printf "Updated %s" (relativeTime .Server.ResourcesUpdatedAt))) ""))}}
   {{else if or (eq .Server.Status "initializing") (eq .Server.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" (printf "Status: %s" .Server.Status) "Sub" "Initialization in progress. This page refreshes every 2 seconds.")}}
   {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .Server.Status) "Sub" "Check the SSH key and connection, then run Init worker.")}}{{end}}
 
@@ -43,15 +43,15 @@
     <div class="gauges">
       <div class="gauge">
         <div class="gauge-head"><span class="gauge-label">CPU</span><span class="gauge-val" id="cpu-gauge-pct">{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0.0{{end}}%</span></div>
-        <div class="bar"><span id="cpu-gauge-fill" style="--w:{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0{{end}}%"></span></div>
+        <div class="bar{{if ge .Server.CPUUsage 85.0}} bar-danger{{else if ge .Server.CPUUsage 70.0}} bar-warn{{end}}"><span id="cpu-gauge-fill" style="--w:{{if .Server.CPUUsage}}{{printf "%.1f" (clamp100 .Server.CPUUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
       <div class="gauge">
         <div class="gauge-head"><span class="gauge-label">RAM</span><span class="gauge-val"><span id="ram-gauge-pct">{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="ram-gauge-detail">{{if and .Server.RAMMB .Server.RAMUsage}}{{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB{{else}}-{{end}}</span></span></div>
-        <div class="bar"><span id="ram-gauge-fill" style="--w:{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0{{end}}%"></span></div>
+        <div class="bar{{if ge .Server.RAMUsage 85.0}} bar-danger{{else if ge .Server.RAMUsage 70.0}} bar-warn{{end}}"><span id="ram-gauge-fill" style="--w:{{if .Server.RAMUsage}}{{printf "%.1f" (clamp100 .Server.RAMUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
       <div class="gauge">
         <div class="gauge-head"><span class="gauge-label">Disk</span><span class="gauge-val"><span id="disk-gauge-pct">{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="disk-gauge-detail">{{if and .Server.DiskGB .Server.DiskUsage}}{{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB{{else}}-{{end}}</span></span></div>
-        <div class="bar"><span id="disk-gauge-fill" style="--w:{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0{{end}}%"></span></div>
+        <div class="bar{{if ge .Server.DiskUsage 85.0}} bar-danger{{else if ge .Server.DiskUsage 70.0}} bar-warn{{end}}"><span id="disk-gauge-fill" style="--w:{{if .Server.DiskUsage}}{{printf "%.1f" (clamp100 .Server.DiskUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
     </div>
     <hr class="stats-divider">
@@ -113,11 +113,7 @@
 
   <div class="card danger-zone">
     <h3>Danger zone</h3>
-    {{if eq .Server.Status "online"}}
-    <div class="dz-row"><div><div class="dz-title">Worker initialized</div><div class="dz-desc">Docker and Caddy are set up on this server.</div></div><span class="badge badge-online">{{template "ui_icon" "check"}}Done</span></div>
-    {{else}}
-    <div class="dz-row"><div><div class="dz-title">Init worker</div><div class="dz-desc">Install Docker and Caddy over SSH. May restart services on the server.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-init')">Init worker</button></div>
-    {{end}}
+    <div class="dz-row"><div><div class="dz-title">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</div><div class="dz-desc">Installs Docker and Caddy, re-applies the worker config.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-init')">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</button></div>
     <div class="dz-row"><div><div class="dz-title">Prune disk</div><div class="dz-desc">Remove stopped containers, unused images and build cache.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('prune-modal')">Prune disk</button></div>
     <div class="dz-row"><div><div class="dz-title">Remove server</div><div class="dz-desc">Remove from Dockify and delete its SSH key. Cannot be undone.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-remove')">Remove server</button></div>
   </div>

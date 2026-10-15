@@ -18,7 +18,7 @@
 
   {{if eq .App.Status "running"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" (printf "Running on %s" .ServerName) "Sub" "")}}
   {{else if eq .App.Status "stopped"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Stopped" "Sub" "The app is not running. Start it to serve traffic.")}}
-  {{else if eq .App.Status "draft"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Draft" "Sub" "Assign a server and deploy.")}}
+  {{else if eq .App.Status "draft"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Draft" "Sub" (or (and (ne .App.ServerID 0) (printf "Draft on %s. Deploy when ready." .ServerName)) "Assign a server and deploy."))}}
   {{else if or (eq .App.Status "deploying") (eq .App.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" "Deploying" "Sub" "This page refreshes every 2 seconds.")}}
   {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .App.Status) "Sub" (or (and .Deployments (index .Deployments 0).Log) ""))}}{{end}}
 
@@ -29,12 +29,12 @@
     </form>
     <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
     {{else}}
-    {{if eq .App.Status "running"}}
-    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
-    <form method="POST" action="apps/{{.App.ID}}/stop"><button type="submit" class="btn btn-secondary">Stop</button></form>
-    {{else}}
-    {{if eq .App.Status "stopped"}}<form method="POST" action="apps/{{.App.ID}}/start"><button type="submit" class="btn btn-primary">Start</button></form>{{end}}
+    {{if eq .App.Status "stopped"}}
+    <form method="POST" action="apps/{{.App.ID}}/start"><button type="submit" class="btn btn-primary">Start</button></form>
     <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
+    {{else}}
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
+    {{if eq .App.Status "running"}}<form method="POST" action="apps/{{.App.ID}}/stop"><button type="submit" class="btn btn-secondary">Stop</button></form>{{end}}
     {{end}}
     <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
     {{end}}
@@ -59,11 +59,11 @@
     <div class="gauges">
       <div class="gauge">
         <div class="gauge-head"><span class="gauge-label">CPU</span><span class="gauge-val" id="cpu-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0.0{{end}}%</span></div>
-        <div class="bar"><span id="cpu-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0{{end}}%"></span></div>
+        <div class="bar{{if .AppStats}}{{if ge .AppStats.CPUPercent 85.0}} bar-danger{{else if ge .AppStats.CPUPercent 70.0}} bar-warn{{end}}{{end}}"><span id="cpu-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0{{end}}%"></span></div>
       </div>
       <div class="gauge">
         <div class="gauge-head"><span class="gauge-label">Memory</span><span class="gauge-val"><span id="mem-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="mem-gauge-detail">{{if .AppStats}}{{formatBytes .AppStats.MemUsageBytes}} / {{formatBytes .AppStats.MemLimitBytes}}{{else}}- / -{{end}}</span></span></div>
-        <div class="bar"><span id="mem-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0{{end}}%"></span></div>
+        <div class="bar{{if .AppStats}}{{if ge .AppStats.MemPercent 85.0}} bar-danger{{else if ge .AppStats.MemPercent 70.0}} bar-warn{{end}}{{end}}"><span id="mem-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0{{end}}%"></span></div>
       </div>
       <div class="gauge"><div class="gauge-head"><span class="gauge-label">Disk</span><span class="gauge-val" id="disk-usage">{{if .AppStats}}{{formatBytes .AppStats.DiskUsageBytes}}{{else}}-{{end}}</span></div></div>
       <div class="gauge"><div class="gauge-head"><span class="gauge-label">Net I/O</span><span class="gauge-val" id="net-io">{{if .AppStats}}{{formatBytes .AppStats.NetIORxBytes}} / {{formatBytes .AppStats.NetIOTxBytes}}{{else}}- / -{{end}}</span></div></div>

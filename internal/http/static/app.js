@@ -33,10 +33,28 @@ document.addEventListener('click', function (e) {
   if (!b) return;
   [].forEach.call(b.parentNode.children, function (s) { s.setAttribute('aria-pressed', String(s === b)); });
 });
-// Copy button: data-copy="#selector" copies that element's text.
+// Copy button: data-copy="#selector" copies that element's text (execCommand fallback for plain http).
 document.addEventListener('click', function (e) {
   var b = e.target.closest && e.target.closest('[data-copy]');
   if (!b) return;
   var src = document.querySelector(b.getAttribute('data-copy'));
-  if (src && navigator.clipboard) navigator.clipboard.writeText(src.textContent.trim());
+  if (!src) return;
+  var text = src.textContent.trim();
+  function done(ok) {
+    var old = b.innerHTML;
+    b.textContent = ok ? 'Copied' : 'Copy failed';
+    setTimeout(function () { b.innerHTML = old; }, 1500);
+  }
+  function fallback() {
+    var r = document.createRange();
+    r.selectNodeContents(src);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
+    done(ok);
+  }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+  else fallback();
 });
