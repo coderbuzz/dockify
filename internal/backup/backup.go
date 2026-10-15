@@ -50,18 +50,26 @@ type ExportFile struct {
 }
 
 type ExportApp struct {
-	Name        string         `yaml:"name"`
-	ServerName  string         `yaml:"server_name"`
-	Domain      string         `yaml:"domain"`
-	Port        int            `yaml:"port"`
-	Compose     string         `yaml:"compose"`
-	GitRepo     string         `yaml:"git_repo,omitempty"`
-	GitBranch   string         `yaml:"git_branch,omitempty"`
-	AuthUser    string         `yaml:"auth_user,omitempty"`
-	AuthPass    string         `yaml:"auth_pass,omitempty"`
-	ComposeMode string         `yaml:"compose_mode,omitempty"`
-	Secrets     []ExportSecret `yaml:"secrets,omitempty"`
-	Files       []ExportFile   `yaml:"files,omitempty"`
+	Name          string         `yaml:"name"`
+	ServerName    string         `yaml:"server_name"`
+	Domain        string         `yaml:"domain"`
+	Domains       []string       `yaml:"domains,omitempty"` // every routed domain, the primary first
+	Port          int            `yaml:"port"`
+	Compose       string         `yaml:"compose"`
+	GitRepo       string         `yaml:"git_repo,omitempty"`
+	GitBranch     string         `yaml:"git_branch,omitempty"`
+	AuthUser      string         `yaml:"auth_user,omitempty"`
+	AuthPass      string         `yaml:"auth_pass,omitempty"`
+	ComposeMode   string         `yaml:"compose_mode,omitempty"`
+	MemoryLimit   string         `yaml:"memory_limit,omitempty"`
+	CPULimit      string         `yaml:"cpu_limit,omitempty"`
+	LogMaxSize    string         `yaml:"log_max_size,omitempty"`
+	LogMaxFile    string         `yaml:"log_max_file,omitempty"`
+	Command       string         `yaml:"command,omitempty"`
+	Ports         string         `yaml:"ports,omitempty"`
+	UlimitsNofile string         `yaml:"ulimits_nofile,omitempty"`
+	Secrets       []ExportSecret `yaml:"secrets,omitempty"`
+	Files         []ExportFile   `yaml:"files,omitempty"`
 }
 
 type Service struct {
@@ -321,15 +329,34 @@ func (s *Service) Export(passphrase string) (string, error) {
 
 	for _, a := range apps {
 		ea := ExportApp{
-			Name:        a.Name,
-			ServerName:  serverNameMap[a.ServerID],
-			Domain:      a.Domain,
-			Port:        a.Port,
-			Compose:     a.Compose,
-			GitRepo:     a.GitRepo,
-			GitBranch:   a.GitBranch,
-			AuthUser:    a.AuthUser,
-			ComposeMode: a.ComposeMode,
+			Name:          a.Name,
+			ServerName:    serverNameMap[a.ServerID],
+			Domain:        a.Domain,
+			Port:          a.Port,
+			Compose:       a.Compose,
+			GitRepo:       a.GitRepo,
+			GitBranch:     a.GitBranch,
+			AuthUser:      a.AuthUser,
+			ComposeMode:   a.ComposeMode,
+			MemoryLimit:   a.MemoryLimit,
+			CPULimit:      a.CPULimit,
+			LogMaxSize:    a.LogMaxSize,
+			LogMaxFile:    a.LogMaxFile,
+			Command:       a.Command,
+			Ports:         a.Ports,
+			UlimitsNofile: a.UlimitsNofile,
+		}
+		if a.Domain != "" {
+			ea.Domains = []string{a.Domain}
+		}
+		routes, err := s.appSvc.GetRoutes(a.ID)
+		if err != nil {
+			return "", fmt.Errorf("list routes for %q: %w", a.Name, err)
+		}
+		for _, rt := range routes {
+			if rt.Domain != a.Domain {
+				ea.Domains = append(ea.Domains, rt.Domain)
+			}
 		}
 
 		if a.AuthPass != "" {
@@ -455,15 +482,30 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 	}
 
 	if mode == "replace" {
-		apps, _ := s.appSvc.List()
+		apps, err := s.appSvc.List()
+		if err != nil {
+			return "", fmt.Errorf("list apps: %w", err)
+		}
+		for _, a := range apps {
+			if a.Status != app.StatusDraft && a.Status != app.StatusStopped && a.Status != app.StatusCreated {
+				return "", fmt.Errorf("stop or undeploy running apps before a replace import (%q is %s)", a.Name, a.Status)
+			}
+		}
 		for _, a := range apps {
 			logLines = append(logLines, fmt.Sprintf("Removing app %q", a.Name))
-			s.appSvc.Undeploy(a.ID)
+			if err := s.appSvc.Undeploy(a.ID); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("remove app %q: %w", a.Name, err)
+			}
 		}
-		servers, _ := s.serverSvc.List()
+		servers, err := s.serverSvc.List()
+		if err != nil {
+			return strings.Join(logLines, "\n"), fmt.Errorf("list servers: %w", err)
+		}
 		for _, svr := range servers {
 			logLines = append(logLines, fmt.Sprintf("Removing server %q", svr.Name))
-			s.serverSvc.Delete(svr.ID)
+			if err := s.serverSvc.Delete(svr.ID); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("remove server %q: %w", svr.Name, err)
+			}
 		}
 	}
 
@@ -548,22 +590,35 @@ func (s *Service) Import(yamlData, passphrase, mode string) (string, error) {
 		}
 
 		ap := &app.App{
-			Name:        ea.Name,
-			ServerID:    sid,
-			Domain:      ea.Domain,
-			Port:        ea.Port,
-			Compose:     ea.Compose,
-			GitRepo:     ea.GitRepo,
-			GitBranch:   ea.GitBranch,
-			AuthUser:    ea.AuthUser,
-			AuthPass:    authPass,
-			ComposeMode: ea.ComposeMode,
+			Name:          ea.Name,
+			ServerID:      sid,
+			Domain:        ea.Domain,
+			Port:          ea.Port,
+			Compose:       ea.Compose,
+			GitRepo:       ea.GitRepo,
+			GitBranch:     ea.GitBranch,
+			AuthUser:      ea.AuthUser,
+			AuthPass:      authPass,
+			ComposeMode:   ea.ComposeMode,
+			MemoryLimit:   ea.MemoryLimit,
+			CPULimit:      ea.CPULimit,
+			LogMaxSize:    ea.LogMaxSize,
+			LogMaxFile:    ea.LogMaxFile,
+			Command:       ea.Command,
+			Ports:         ea.Ports,
+			UlimitsNofile: ea.UlimitsNofile,
 		}
 		if ap.GitBranch == "" {
 			ap.GitBranch = "main"
 		}
 		if err := s.appSvc.Create(ap); err != nil {
 			return strings.Join(logLines, "\n"), fmt.Errorf("create app %q: %w", ea.Name, err)
+		}
+
+		for _, d := range ea.Domains {
+			if err := s.appSvc.SaveRoute(&app.Route{AppID: ap.ID, ServerID: sid, Domain: d}); err != nil {
+				return strings.Join(logLines, "\n"), fmt.Errorf("save route %q for %q: %w", d, ea.Name, err)
+			}
 		}
 
 		for _, sec := range ea.Secrets {
@@ -604,6 +659,16 @@ func validateImport(apps []ExportApp) error {
 				return fmt.Errorf("app %q: %w", ea.Name, err)
 			}
 			ea.Domain = d
+		}
+		if len(ea.Domains) == 0 && ea.Domain != "" {
+			ea.Domains = []string{ea.Domain} // exports before the domains list
+		}
+		for j, d := range ea.Domains {
+			d, err := app.ValidDomain(d)
+			if err != nil {
+				return fmt.Errorf("app %q: %w", ea.Name, err)
+			}
+			ea.Domains[j] = d
 		}
 		for _, sec := range ea.Secrets {
 			if err := app.ValidEnvKey(sec.Key); err != nil {

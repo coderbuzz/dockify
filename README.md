@@ -467,7 +467,7 @@ No DNS automation occurs if the env vars are not set.
 
 ## Backup & Restore
 
-Export your configuration (servers + apps + secrets + config files) as YAML and import it into another instance.
+Export your configuration (servers + apps with their resource limits, command, ports and every domain + secrets + config files) as YAML and import it into another instance.
 
 ### Encrypted Export
 
@@ -487,7 +487,7 @@ When importing on a new instance, all servers and their SSH keys are restored au
 Upload a previously exported YAML file via the Import page (`/import`):
 
 - **merge** (default): skip entries that already exist by name
-- **replace**: delete all existing servers and apps before import
+- **replace**: delete all existing servers and apps before import; refused unless every app is stopped, a draft or never deployed (stop or undeploy running apps first)
 - Encrypted values are validated by attempting decryption before the actual import
 
 ### Unified Backup Page

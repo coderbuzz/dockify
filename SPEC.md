@@ -421,7 +421,7 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 ### Export
 
 1. Query all servers (name, host, port, user, SSH key, registry host/user/token)
-2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, server name mapping)
+2. Query all apps (name, domain, port, compose, git_repo, git_branch, auth_user, auth_pass, compose_mode, memory_limit, cpu_limit, log_max_size, log_max_file, command, ports, ulimits_nofile, server name mapping) and `domains`: every active route's domain, the primary first
 3. Query all app secrets and config files
 4. If passphrase provided: encrypt SSH keys, registry tokens, secrets, auth_pass, and file contents with AES-GCM (PBKDF2 key derivation, 600,000 iterations, `enc:` prefix)
 5. Generate YAML document
@@ -432,9 +432,9 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 1. Parse YAML file
 2. If passphrase provided: attempt decryption of all `enc:` values to validate passphrase (including SSH keys)
 3. In **merge** mode (default): skip entries that already exist by same name
-4. In **replace** mode: delete all existing servers and apps, then import
+4. In **replace** mode: refuse with "stop or undeploy running apps before a replace import" unless every existing app is `draft`, `created` or `stopped`; otherwise undeploy all apps and delete all servers (the first error stops the import), then import
 5. Create servers with SSH key from export (fallback to `"pending"` if key is empty — user must enter key manually)
-6. Create apps (status = created, ready for deploy)
+6. Create apps (status = created, ready for deploy) with one route per entry in `domains` (exports without `domains` get a route for `domain`)
 7. Import secrets and config files
 8. Redirect to servers page
 
