@@ -42,7 +42,7 @@ func NewClient(sshClient ssh.Connector) *Client {
 
 func (c *Client) AddRoute(domain, target string) error {
 	route := Route{
-		ID: sanitizeID(domain),
+		ID:    sanitizeID(domain),
 		Match: []match{{Host: []string{domain}}},
 		Handle: []handle{{
 			Handler:   "reverse_proxy",
@@ -59,7 +59,7 @@ func (c *Client) AddRouteWithAuth(domain, target, user, pass string) error {
 	}
 
 	route := Route{
-		ID: sanitizeID(domain),
+		ID:    sanitizeID(domain),
 		Match: []match{{Host: []string{domain}}},
 		Handle: []handle{
 			{
@@ -145,13 +145,46 @@ func (c *Client) RemoveRoute(domain string) error {
 	return nil
 }
 
+// SaveConfig writes the running config to the file Caddy was started with
+// (`caddy run --config <path>`) so routes added through the admin API survive a
+// Caddy restart or reboot. Workers differ: InitWorker uses /etc/caddy/config.json,
+// older inits /data/config.json (a single-file bind mount, so the write is in place).
 func (c *Client) SaveConfig() error {
-	cmd := `docker exec caddy sh -c 'curl -s http://localhost:2019/config/ -o /data/config.json'`
-	_, err := c.ssh.Exec(cmd)
+	out, err := c.ssh.Exec(`docker inspect caddy --format '{{json .Config.Cmd}}'`)
 	if err != nil {
 		return fmt.Errorf("caddy save config: %w", err)
 	}
+	path, err := configPath(out)
+	if err != nil {
+		return fmt.Errorf("caddy save config: %w", err)
+	}
+	// rmdir drops a stray empty directory at the path and never a non-empty one;
+	// curl -f leaves the file untouched when the admin API answers with an error.
+	cmd := fmt.Sprintf(`docker exec caddy sh -c '[ ! -d "$1" ] || rmdir "$1"; curl -sf http://localhost:2019/config/ -o "$1"' sh '%s'`, escapeShell(path))
+	if _, err := c.ssh.Exec(cmd); err != nil {
+		return fmt.Errorf("caddy save config to %s: %w", path, err)
+	}
 	return nil
+}
+
+// configPath returns the --config argument of the Caddy container's command, given
+// as JSON by docker inspect. A non-JSON file (a Caddyfile) is refused: the admin
+// API's JSON must not overwrite it.
+func configPath(cmdJSON string) (string, error) {
+	var args []string
+	if err := json.Unmarshal([]byte(cmdJSON), &args); err != nil {
+		return "", fmt.Errorf("parse caddy command %q: %w", strings.TrimSpace(cmdJSON), err)
+	}
+	path := "/etc/caddy/config.json"
+	for i, a := range args {
+		if a == "--config" && i+1 < len(args) {
+			path = args[i+1]
+		}
+	}
+	if !strings.HasSuffix(path, ".json") {
+		return "", fmt.Errorf("caddy runs with non-JSON config %s, not overwriting it", path)
+	}
+	return path, nil
 }
 
 // CheckCertificate checks whether Caddy has obtained a valid TLS certificate

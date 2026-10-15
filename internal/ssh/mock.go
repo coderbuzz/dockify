@@ -23,6 +23,7 @@ func NewMockClient() *MockClient {
 			{"docker stats", `{"BlockIO":"1.5MB / 0B","CPUPerc":"12.34%","Container":"abc12345","ID":"abc12345","MemPerc":"8.20%","MemUsage":"256MiB / 3.125GiB","Name":"app","NetIO":"45.6MB / 12.3MB","PIDs":"3"}`},
 			{"docker compose version", "Docker Compose version v2.24.0"},
 			{"docker compose", "app\n"},
+			{"docker inspect caddy", `["caddy","run","--config","/etc/caddy/config.json"]`},
 			{"docker", "Docker version 28.0.4, build b8034c0"},
 			{"uptime", "10:00:00 up 30 days,  0 users,  load average: 0.08, 0.03, 0.01"},
 			{"nproc", "4"},

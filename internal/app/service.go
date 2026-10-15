@@ -409,7 +409,9 @@ func (s *Service) Undeploy(id int64) error {
 		caddyClient.RemoveRoute(r.Domain)
 	}
 	if len(routes) > 0 {
-		caddy.NewClient(client).SaveConfig()
+		if err := caddy.NewClient(client).SaveConfig(); err != nil {
+			log.Printf("Warning: failed to save caddy config: %v", err)
+		}
 	}
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDeployments(app.ID)
@@ -780,7 +782,9 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 		caddyClient.RemoveRoute(r.Domain)
 	}
 	if len(routes) > 0 {
-		caddy.NewClient(client).SaveConfig()
+		if err := caddy.NewClient(client).SaveConfig(); err != nil {
+			log.Printf("Warning: failed to save caddy config: %v", err)
+		}
 	}
 
 	if purgeOld {
@@ -810,6 +814,9 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 	} else {
 		if err := caddyClient.SaveConfig(); err != nil {
 			log.Printf("Warning: failed to save caddy config: %v", err)
+			if logs != nil {
+				*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
+			}
 		}
 	}
 
@@ -1209,7 +1216,7 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 	return s.repo.GetDeployment(id)
 }
 
-	var _ = time.Now
+var _ = time.Now
 
 func registryHost(svr *server.Server) string {
 	if svr.RegistryHost == "" {
