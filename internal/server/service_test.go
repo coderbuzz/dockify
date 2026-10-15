@@ -71,6 +71,24 @@ func TestDeleteServer(t *testing.T) {
 	}
 }
 
+// A status set by TestConnection shows in List right away (A6).
+func TestListShowsStatusChange(t *testing.T) {
+	svc, _ := setupTestServerService(t)
+	s := &Server{Name: "worker-1", Host: "10.0.0.1", SSHKey: "/tmp/key"}
+	if err := svc.Create(s); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := svc.List(); len(list) != 1 || list[0].Status != StatusPending {
+		t.Fatalf("before: %+v", list)
+	}
+	if err := svc.TestConnection(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := svc.List(); list[0].Status != StatusOnline {
+		t.Errorf("status after TestConnection = %q, want online", list[0].Status)
+	}
+}
+
 func TestPruneWorkerStandard(t *testing.T) {
 	svc, repo := setupTestServerService(t)
 

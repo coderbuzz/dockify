@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/ssh"
@@ -23,8 +22,6 @@ type Service struct {
 	repo        *Repository
 	monitor     *Monitor
 	connFactory ssh.Factory
-	serverCache []Server
-	serverMu    sync.RWMutex
 }
 
 func NewService(repo *Repository) *Service {
@@ -44,33 +41,8 @@ func (s *Service) Connect(svr *Server) (ssh.Connector, error) {
 	return s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 }
 
-func (s *Service) refreshCacheLocked() {
-	if servers, err := s.repo.List(); err == nil {
-		s.serverCache = servers
-	}
-}
-
 func (s *Service) List() ([]Server, error) {
-	s.serverMu.RLock()
-	if s.serverCache != nil {
-		out := make([]Server, len(s.serverCache))
-		copy(out, s.serverCache)
-		s.serverMu.RUnlock()
-		return out, nil
-	}
-	s.serverMu.RUnlock()
-
-	s.serverMu.Lock()
-	defer s.serverMu.Unlock()
-	if s.serverCache != nil {
-		out := make([]Server, len(s.serverCache))
-		copy(out, s.serverCache)
-		return out, nil
-	}
-	s.refreshCacheLocked()
-	out := make([]Server, len(s.serverCache))
-	copy(out, s.serverCache)
-	return out, nil
+	return s.repo.List()
 }
 
 func (s *Service) Get(id int64) (*Server, error) {
@@ -87,23 +59,11 @@ func (s *Service) Create(server *Server) error {
 	if server.Status == "" {
 		server.Status = StatusPending // stays so until the worker is initialized
 	}
-	if err := s.repo.Create(server); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Create(server)
 }
 
 func (s *Service) Update(server *Server) error {
-	if err := s.repo.Update(server); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Update(server)
 }
 
 // ErrServerHasApps refuses deleting a server that apps still point at; their
@@ -122,13 +82,7 @@ func (s *Service) Delete(id int64) error {
 	if n > 0 {
 		return &ErrServerHasApps{Count: n}
 	}
-	if err := s.repo.Delete(id); err != nil {
-		return err
-	}
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
-	return nil
+	return s.repo.Delete(id)
 }
 
 // connectAndInit is the first contact with a newly added server.
@@ -372,9 +326,6 @@ func (s *Service) RefreshResources(id int64) error {
 	client, err := s.Connect(server)
 	if err != nil {
 		s.repo.UpdateStatus(id, StatusOffline)
-		s.serverMu.Lock()
-		s.refreshCacheLocked()
-		s.serverMu.Unlock()
 		return err
 	}
 	defer client.Close()
@@ -398,10 +349,6 @@ func (s *Service) RefreshResources(id int64) error {
 		RAMMB:       ramMB,
 		DiskGB:      diskGB,
 	})
-
-	s.serverMu.Lock()
-	s.refreshCacheLocked()
-	s.serverMu.Unlock()
 
 	return nil
 }
