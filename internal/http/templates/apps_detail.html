@@ -16,28 +16,44 @@
     <p class="meta">{{if .Domains}}{{index .Domains 0}}{{if .ExtraDomainCount}} <span class="badge">+{{.ExtraDomainCount}} more</span>{{end}}:{{.App.Port}}{{else}}Internal service, port {{.App.Port}}{{end}}</p>
   </div>
 
-  {{if eq .App.Status "running"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" (printf "Running on %s" .ServerName) "Sub" "")}}
+  {{if eq .App.Status "running"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" (printf "Running on %s" .ServerName) "Sub" (or (and .Deployments (printf "Last deploy %s · %s" ((index .Deployments 0).CreatedAt.Format "2006-01-02 15:04") (or (index .Deployments 0).Status "unknown"))) ""))}}
   {{else if eq .App.Status "stopped"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Stopped" "Sub" "The app is not running. Start it to serve traffic.")}}
   {{else if eq .App.Status "draft"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Draft" "Sub" (or (and (ne .App.ServerID 0) (printf "Draft on %s. Deploy when ready." .ServerName)) "Assign a server and deploy."))}}
   {{else if or (eq .App.Status "deploying") (eq .App.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" "Deploying" "Sub" "This page refreshes every 2 seconds.")}}
   {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .App.Status) "Sub" (or (and .Deployments (index .Deployments 0).Log) ""))}}{{end}}
 
-  <div class="action-bar">
+  <div class="card detail-card">
+    <dl class="detail-grid">
+      <div><dt>Server</dt><dd>{{if eq .App.ServerID 0}}Not assigned <a href="apps/{{.App.ID}}/edit">Select one</a>{{else}}{{.ServerName}}{{end}}</dd></div>
+      <div><dt>Domain{{if gt (len .Domains) 1}}s{{end}}</dt><dd class="mono">{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</dd></div>
+      <div><dt>Port</dt><dd class="mono">{{.App.Port}}</dd></div>
+      <div><dt>Internal</dt><dd class="mono">{{.ServiceName}}:{{.App.Port}}</dd></div>
+      {{if .App.Command}}<div><dt>Command</dt><dd class="mono">{{.App.Command}}</dd></div>{{end}}
+      {{if .App.Ports}}<div><dt>Ports</dt><dd class="mono">{{.App.Ports | nl2br}}</dd></div>{{end}}
+      {{if .App.MemoryLimit}}<div><dt>Memory limit</dt><dd>{{.App.MemoryLimit}}</dd></div>{{end}}
+      {{if .App.CPULimit}}<div><dt>CPU limit</dt><dd>{{.App.CPULimit}}</dd></div>{{end}}
+      {{if .App.UlimitsNofile}}<div><dt>Ulimits (nofile)</dt><dd>{{.App.UlimitsNofile}}</dd></div>{{end}}
+      {{if or .App.LogMaxSize .App.LogMaxFile}}<div><dt>Log limits</dt><dd>{{if .App.LogMaxSize}}max-size={{.App.LogMaxSize}}{{end}}{{if and .App.LogMaxSize .App.LogMaxFile}}, {{end}}{{if .App.LogMaxFile}}max-file={{.App.LogMaxFile}}{{end}}</dd></div>{{end}}
+      {{if .App.AuthUser}}<div><dt>Auth</dt><dd>basic auth ({{.App.AuthUser}})</dd></div>{{end}}
+      {{if .App.GitRepo}}<div><dt>Git repo</dt><dd class="mono">{{.App.GitRepo}}</dd></div><div><dt>Branch</dt><dd class="mono">{{.App.GitBranch}}</dd></div>{{end}}
+    </dl>
+  <div class="actgrid">
     {{if eq .App.Status "draft"}}
     <form method="POST" action="apps/{{.App.ID}}/deploy">
-      <button type="submit" class="btn btn-primary"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
+      <button type="submit" class="btn btn-primary"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>{{template "ui_icon" "rocket"}}Deploy</button>
     </form>
-    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">{{template "ui_icon" "edit"}}Edit</a>
     {{else}}
     {{if eq .App.Status "stopped"}}
-    <form method="POST" action="apps/{{.App.ID}}/start"><button type="submit" class="btn btn-primary">Start</button></form>
-    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
+    <form method="POST" action="apps/{{.App.ID}}/start"><button type="submit" class="btn btn-primary">{{template "ui_icon" "play"}}Start</button></form>
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">{{template "ui_icon" "edit"}}Edit</a>
     {{else}}
-    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
-    {{if eq .App.Status "running"}}<form method="POST" action="apps/{{.App.ID}}/stop"><button type="submit" class="btn btn-secondary">Stop</button></form>{{end}}
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">{{template "ui_icon" "edit"}}Edit</a>
+    {{if eq .App.Status "running"}}<form method="POST" action="apps/{{.App.ID}}/stop"><button type="submit" class="btn btn-secondary">{{template "ui_icon" "square"}}Stop</button></form>{{end}}
     {{end}}
-    <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
+    <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">{{template "ui_icon" "terminal"}}Console</button>
     {{end}}
+  </div>
   </div>
 
   <div class="console-section">
@@ -104,24 +120,6 @@
   </script>
   {{end}}
 
-  <div class="card">
-    <h3>Details</h3>
-    <dl class="detail-grid">
-      <div><dt>Status</dt><dd><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></dd></div>
-      <div><dt>Server</dt><dd>{{if eq .App.ServerID 0}}Not assigned <a href="apps/{{.App.ID}}/edit">Select one</a>{{else}}{{.ServerName}}{{end}}</dd></div>
-      <div><dt>Domain{{if gt (len .Domains) 1}}s{{end}}</dt><dd class="mono">{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</dd></div>
-      <div><dt>Port</dt><dd class="mono">{{.App.Port}}</dd></div>
-      <div><dt>Internal</dt><dd class="mono">{{.ServiceName}}:{{.App.Port}}</dd></div>
-      {{if .App.Command}}<div><dt>Command</dt><dd class="mono">{{.App.Command}}</dd></div>{{end}}
-      {{if .App.Ports}}<div><dt>Ports</dt><dd class="mono">{{.App.Ports | nl2br}}</dd></div>{{end}}
-      {{if .App.MemoryLimit}}<div><dt>Memory limit</dt><dd>{{.App.MemoryLimit}}</dd></div>{{end}}
-      {{if .App.CPULimit}}<div><dt>CPU limit</dt><dd>{{.App.CPULimit}}</dd></div>{{end}}
-      {{if .App.UlimitsNofile}}<div><dt>Ulimits (nofile)</dt><dd>{{.App.UlimitsNofile}}</dd></div>{{end}}
-      {{if or .App.LogMaxSize .App.LogMaxFile}}<div><dt>Log limits</dt><dd>{{if .App.LogMaxSize}}max-size={{.App.LogMaxSize}}{{end}}{{if and .App.LogMaxSize .App.LogMaxFile}}, {{end}}{{if .App.LogMaxFile}}max-file={{.App.LogMaxFile}}{{end}}</dd></div>{{end}}
-      {{if .App.AuthUser}}<div><dt>Auth</dt><dd>basic auth ({{.App.AuthUser}})</dd></div>{{end}}
-      {{if .App.GitRepo}}<div><dt>Git repo</dt><dd class="mono">{{.App.GitRepo}}</dd></div><div><dt>Branch</dt><dd class="mono">{{.App.GitBranch}}</dd></div>{{end}}
-    </dl>
-  </div>
 
   <div class="card">
     <h3>Docker Compose</h3>
@@ -184,14 +182,13 @@
 
   <div class="card danger-zone">
     <h3>Danger zone</h3>
-    {{if ne .App.Status "draft"}}
-    <div class="dz-row"><div><div class="dz-title">Redeploy</div><div class="dz-desc">Rebuild and restart the app. It is briefly unavailable.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-redeploy')">Redeploy</button></div>
-    <div class="dz-row"><div><div class="dz-title">Rollback</div><div class="dz-desc">Restore the last successful deployment.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-rollback')">Rollback</button></div>
-    {{end}}
-    {{if .Deployments}}
-    <div class="dz-row"><div><div class="dz-title">Clear deployment history</div><div class="dz-desc">Remove all deployment records. This cannot be undone.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-clear-history')">Clear history</button></div>
-    {{end}}
-    <div class="dz-row"><div><div class="dz-title">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</div><div class="dz-desc">{{if eq .App.Status "draft"}}Permanently delete this draft.{{else}}Stop the app and remove it from {{.ServerName}}.{{end}}</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</button></div>
+    <p class="dz-sub">Each action asks for confirmation first.</p>
+    <div class="dz-grid">
+      {{if ne .App.Status "draft"}}<button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-redeploy')">Redeploy</button>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-rollback')">Rollback</button>{{end}}
+      {{if .Deployments}}<button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-clear-history')">Clear history</button>{{end}}
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</button>
+    </div>
   </div>
 </div>
 
