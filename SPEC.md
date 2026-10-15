@@ -89,7 +89,7 @@ scripts/
 Dockerfile                       # Multi-stage Docker build
 docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 .air.toml                        # Air live-reload config
-.github/workflows/build.yml      # CI: vet, test, smoke test, build binary + Docker, release on v* tag
+.github/workflows/build.yml      # CI on PRs, main and v* tags: vet, gofmt -l, test -race, govulncheck, smoke test; v* tag also builds binary + .sha256 + Docker, releases
 ```
 
 ## Environment Variables
