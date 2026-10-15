@@ -11,10 +11,15 @@ import (
 	"testing"
 )
 
-// legacyDB writes a database the way an old Open left it: schema.sql plus
-// the columns it added and dropped on every start, at user_version 0.
+// legacyDB writes a database the way the pre-migration Open left it: the old
+// schema.sql (testdata/schema_v0.sql) plus the columns it added and dropped on
+// every start, at user_version 0, followed by the extra statements.
 func legacyDB(t *testing.T, extra ...string) string {
 	t.Helper()
+	schemaV0, err := os.ReadFile("testdata/schema_v0.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(t.TempDir(), "old.db")
 	old, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -22,7 +27,8 @@ func legacyDB(t *testing.T, extra ...string) string {
 	}
 	defer old.Close()
 	stmts := append([]string{
-		schemaSQL,
+		"PRAGMA foreign_keys=ON",
+		string(schemaV0),
 		"ALTER TABLE apps ADD COLUMN webhook_secret TEXT",
 		"ALTER TABLE apps ADD COLUMN unique_service_name INTEGER DEFAULT 0",
 		"ALTER TABLE apps DROP COLUMN command", // a release that never got it

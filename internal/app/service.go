@@ -419,28 +419,19 @@ func (s *Service) Undeploy(id int64) error {
 	}
 
 	if app.Status == StatusDraft {
-		s.repo.DeleteRoutes(app.ID)
-		s.repo.DeleteDeployments(app.ID)
-		s.repo.Delete(id)
-		return nil
+		return s.forget(app)
 	}
 
 	svr, err := s.serverRepo.Get(app.ServerID)
 	if err != nil || svr == nil {
 		log.Printf("Undeploy %q: server not found, cleaning up DB", app.Name)
-		s.repo.DeleteRoutes(app.ID)
-		s.repo.DeleteDeployments(app.ID)
-		s.repo.Delete(id)
-		return nil
+		return s.forget(app)
 	}
 
 	client, err := s.connFactory(svr.Host, svr.Port, svr.User, svr.SSHKey)
 	if err != nil {
 		log.Printf("Undeploy %q: SSH connect failed, cleaning up DB: %v", app.Name, err)
-		s.repo.DeleteRoutes(app.ID)
-		s.repo.DeleteDeployments(app.ID)
-		s.repo.Delete(id)
-		return nil
+		return s.forget(app)
 	}
 	defer client.Close()
 
@@ -463,14 +454,65 @@ func (s *Service) Undeploy(id int64) error {
 			log.Printf("Warning: failed to save caddy config: %v", err)
 		}
 	}
-	s.repo.DeleteRoutes(app.ID)
-	s.repo.DeleteDeployments(app.ID)
 
 	client.ExecLong(fmt.Sprintf("rm -rf %s", remoteDir))
 
-	s.repo.Delete(id)
+	if err := s.forget(app); err != nil {
+		return err
+	}
 	log.Printf("App %q undeployed", app.Name)
 	return nil
+}
+
+// forget deletes the Cloudflare records Dockify created for the app, then the
+// app row; routes, deployments, DNS rows and stats go with it by cascade.
+func (s *Service) forget(app *App) error {
+	s.deleteDNSRecords(app)
+	if err := s.repo.Delete(app.ID); err != nil {
+		log.Printf("Undeploy %q: delete app row: %v", app.Name, err)
+		return fmt.Errorf("delete app %q: %w", app.Name, err)
+	}
+	return nil
+}
+
+// deleteDNSRecords removes the app's Cloudflare records that Dockify created:
+// named after one of its domains and pointing at one of Dockify's servers.
+// Records that point elsewhere were only recorded, so they stay. Failures are
+// warnings; the rows go with the app either way.
+func (s *Service) deleteDNSRecords(app *App) {
+	if s.cf == nil {
+		return
+	}
+	records, err := s.repo.GetDNSRecords(app.ID)
+	if err != nil || len(records) == 0 {
+		return
+	}
+	domains := map[string]bool{app.Domain: true}
+	routes, _ := s.repo.GetRoutes(app.ID)
+	for _, r := range routes {
+		domains[r.Domain] = true
+	}
+	servers, err := s.serverRepo.List()
+	if err != nil {
+		log.Printf("Warning: undeploy %q: list servers, DNS records kept: %v", app.Name, err)
+		return
+	}
+	hosts := map[string]bool{}
+	for _, svr := range servers {
+		hosts[svr.Host] = true
+	}
+	deleted := map[string]bool{}
+	for _, rec := range records {
+		if rec.Name == "" || !domains[rec.Name] || !hosts[rec.Content] || deleted[rec.RecordID] {
+			continue
+		}
+		deleted[rec.RecordID] = true
+		if err := s.cf.DeleteRecord(rec.RecordID); err != nil {
+			log.Printf("Warning: undeploy %q: delete DNS record %s -> %s: %v", app.Name, rec.Name, rec.Content, err)
+			continue
+		}
+		log.Printf("Undeploy %q: deleted DNS record %s -> %s", app.Name, rec.Name, rec.Content)
+	}
 }
 
 // rootPrefix sets $S to "sudo -n" when the SSH user is not root but has

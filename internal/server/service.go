@@ -95,7 +95,22 @@ func (s *Service) Update(server *Server) error {
 	return nil
 }
 
+// ErrServerHasApps refuses deleting a server that apps still point at; their
+// history (deployments, stats, DNS rows) survives a delete with server_id NULL.
+type ErrServerHasApps struct{ Count int }
+
+func (e *ErrServerHasApps) Error() string {
+	return fmt.Sprintf("server still has %d app(s); move or delete them first", e.Count)
+}
+
 func (s *Service) Delete(id int64) error {
+	n, err := s.repo.CountApps(id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return &ErrServerHasApps{Count: n}
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -23,6 +24,7 @@ type migration struct {
 // migrations is append-only: PRAGMA user_version holds the number applied.
 var migrations = []migration{
 	{"legacy column changes (v0.3-v0.13)", migrateLegacy},
+	{"cascade app deletes, keep history on server delete", migrateForeignKeys},
 }
 
 func Open(path string) (*sql.DB, error) {
@@ -185,6 +187,118 @@ func migrateLegacy(tx *sql.Tx) error {
 	} {
 		if err := dropColumn(tx, c.table, c.column); err != nil {
 			return fmt.Errorf("drop %s.%s: %w", c.table, c.column, err)
+		}
+	}
+	return nil
+}
+
+// migrateForeignKeys rebuilds the tables that point at apps and servers:
+// deleting an app deletes its history, deleting a server keeps it with
+// server_id NULL. route_stats already cascades and has no server_id.
+// SQLite cannot alter a constraint, so each table is copied into a new one.
+func migrateForeignKeys(tx *sql.Tx) error {
+	const app = "INTEGER REFERENCES apps(id) ON DELETE CASCADE"
+	const srv = "INTEGER REFERENCES servers(id) ON DELETE SET NULL"
+	tables := []struct{ name, columns, index string }{
+		{"deployments", `
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_id           ` + app + `,
+			server_id        ` + srv + `,
+			status           TEXT,
+			log              TEXT,
+			commit_sha       TEXT,
+			compose_snapshot TEXT,
+			created_at       DATETIME DEFAULT CURRENT_TIMESTAMP`, ""},
+		{"routes", `
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_id      ` + app + `,
+			server_id   ` + srv + `,
+			domain      TEXT NOT NULL,
+			target      TEXT NOT NULL,
+			status      TEXT DEFAULT 'active',
+			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP`, ""},
+		{"dns_records", `
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_id      ` + app + `,
+			server_id   ` + srv + `,
+			zone_id     TEXT NOT NULL,
+			record_id   TEXT NOT NULL,
+			name        TEXT NOT NULL,
+			type        TEXT DEFAULT 'A',
+			content     TEXT NOT NULL,
+			proxied     INTEGER DEFAULT 0,
+			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP`, ""},
+		{"container_stats", `
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_id           ` + app + `,
+			server_id        ` + srv + `,
+			container_name   TEXT NOT NULL,
+			cpu_percent      REAL,
+			mem_usage_bytes  INTEGER,
+			mem_limit_bytes  INTEGER,
+			mem_percent      REAL,
+			net_io_rx_bytes  INTEGER,
+			net_io_tx_bytes  INTEGER,
+			block_io_read    INTEGER,
+			block_io_write   INTEGER,
+			created_at       DATETIME DEFAULT CURRENT_TIMESTAMP`,
+			"CREATE INDEX idx_container_stats_app_time ON container_stats(app_id, created_at)"},
+		{"app_disk_stats", `
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_id           ` + app + `,
+			server_id        ` + srv + `,
+			disk_usage_bytes INTEGER DEFAULT 0,
+			created_at       DATETIME DEFAULT CURRENT_TIMESTAMP`,
+			"CREATE INDEX idx_app_disk_stats_app_time ON app_disk_stats(app_id, created_at)"},
+	}
+	for _, t := range tables {
+		if err := rebuildTable(tx, t.name, t.columns, t.index); err != nil {
+			return fmt.Errorf("rebuild %s: %w", t.name, err)
+		}
+	}
+	return nil
+}
+
+// rebuildTable is SQLite's documented table rebuild: create the new table,
+// copy the rows in one INSERT ... SELECT, drop the old one, rename, re-index.
+// Only columns both tables share are copied. The AUTOINCREMENT counter is
+// carried over so ids of deleted rows are not handed out again.
+func rebuildTable(tx *sql.Tx, name, columns, index string) error {
+	tmp := "new_" + name
+	if _, err := tx.Exec(fmt.Sprintf("CREATE TABLE %s (%s)", tmp, columns)); err != nil {
+		return err
+	}
+	rows, err := tx.Query("SELECT n.name FROM pragma_table_info(?) n JOIN pragma_table_info(?) o ON o.name = n.name", tmp, name)
+	if err != nil {
+		return err
+	}
+	var cols []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			rows.Close()
+			return err
+		}
+		cols = append(cols, c)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	list := strings.Join(cols, ", ")
+	for _, stmt := range []string{
+		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", tmp, list, list, name),
+		fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name = '%s'", tmp),
+		fmt.Sprintf("INSERT INTO sqlite_sequence (name, seq) SELECT '%s', seq FROM sqlite_sequence WHERE name = '%s'", tmp, name),
+		fmt.Sprintf("DROP TABLE %s", name),
+		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tmp, name),
+		index,
+	} {
+		if stmt == "" {
+			continue
+		}
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("%s: %w", stmt, err)
 		}
 	}
 	return nil

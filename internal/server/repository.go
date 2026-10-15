@@ -130,6 +130,12 @@ func (r *Repository) Update(s *Server) error {
 	return err
 }
 
+func (r *Repository) CountApps(id int64) (int, error) {
+	var n int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM apps WHERE server_id = ?", id).Scan(&n)
+	return n, err
+}
+
 func (r *Repository) Delete(id int64) error {
 	_, err := r.db.Exec("DELETE FROM servers WHERE id = ?", id)
 	return err

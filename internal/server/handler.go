@@ -209,11 +209,29 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
 	if err := h.service.Delete(id); err != nil {
-		JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		JSON(w, deleteStatus(err), map[string]string{"error": err.Error()})
 		return
 	}
+	removeKeyFiles(h.sshKeyDir, id)
 
 	JSON(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func deleteStatus(err error) int {
+	var hasApps *ErrServerHasApps
+	if errors.As(err, &hasApps) {
+		return http.StatusConflict
+	}
+	return http.StatusInternalServerError
+}
+
+// removeKeyFiles deletes the SSH key and registry token saved for a server.
+func removeKeyFiles(dir string, id int64) {
+	for _, name := range []string{"%d.pem", "%d.registry-token"} {
+		if err := os.Remove(filepath.Join(dir, fmt.Sprintf(name, id))); err != nil && !os.IsNotExist(err) {
+			log.Printf("Warning: remove key file of server %d: %v", id, err)
+		}
+	}
 }
 
 func (h *Handler) Init(w http.ResponseWriter, r *http.Request) {
@@ -604,9 +622,10 @@ func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, ren
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 
 	if err := h.service.Delete(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		render(w, r, deleteStatus(err), "error.html", map[string]interface{}{"Message": err.Error()})
 		return
 	}
+	removeKeyFiles(h.sshKeyDir, id)
 
 	http.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
