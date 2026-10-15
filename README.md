@@ -129,7 +129,8 @@ DOCKIFY_ADMIN_PASSWORD=secret123 docker compose up -d
 - **Default username:** `admin` (configurable via `DOCKIFY_ADMIN_USER`)
 - **No password set:** Web UI has **no authentication** (open to anyone)
 - **Password set:** All routes (except `/health` and `/api/webhook/*`) require login
-- **Session:** Cookie-based, expires after 24 hours
+- **Session:** Cookie-based (`HttpOnly`, `SameSite=Lax`, `Secure` behind HTTPS), expires after 24 hours
+- **Cross-site requests:** a form or script on another site cannot change anything (`403`). Behind a reverse proxy, forward the original `Host` header (Caddy does this by default)
 - **Logout:** Visit `/logout`
 
 **API token (scripts, CI, AI agents):** set `DOCKIFY_API_TOKEN` (e.g. `openssl rand -hex 32`) and
@@ -256,7 +257,7 @@ For an organization package, the token's owner must have read access to the pack
 
 ### Resource Monitoring
 
-Dockify collects CPU, RAM, and disk usage from all online servers every 60 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
+Dockify collects CPU, RAM, and disk usage from all online servers every 10 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
 
 - **CPU** — core count via `nproc`, usage % via two-sample `/proc/stat` (1s interval)
 - **RAM** — total and usage via `/proc/meminfo` (`MemTotal`/`MemAvailable`), with human-readable "used / free" info
@@ -386,12 +387,12 @@ Dockify verifies incoming webhooks using HMAC-SHA256 (GitHub) or secret token (G
 
 ### Webhook Security
 
-Dockify auto-generates a global **webhook secret** (64-character hex) on first startup, stored in the database. You can view, copy, regenerate (roll), or disable it on the **Settings** page (`/settings`). When disabled, webhooks are accepted without signature verification.
+Dockify auto-generates a global **webhook secret** (64-character hex) on first startup, stored in the database. You can view, copy, or regenerate (roll) it on the **Settings** page (`/settings`). It cannot be turned off: every webhook must be signed.
 
-When the webhook secret is set, Dockify validates incoming webhooks:
+Dockify validates every incoming webhook:
 
 - **GitHub** — HMAC-SHA256 via `X-Hub-Signature-256` header
-- **GitLab** — plain token comparison via `X-Gitlab-Token` header
+- **GitLab** — token via `X-Gitlab-Token` header
 
 If the signature or token does not match, the webhook is rejected with `401 Unauthorized`.
 
@@ -400,54 +401,18 @@ If the signature or token does not match, the webhook is rejected with `401 Unau
 1. Go to **Settings** in the Dockify web UI
 2. Click **Show** → **Copy** the webhook secret
 3. Paste it as the **Secret** in your GitHub/GitLab webhook settings
-4. For GitHub Actions, pass the secret via `${{ secrets.DOCKIFY_WEBHOOK_SECRET }}` (see examples below)
+4. For GitHub Actions, pass the secret via `${{ secrets.DOCKIFY_WEBHOOK_SECRET }}` (see the example below)
 
-> **Note:** When you **Roll** the secret, the old one stops working immediately. Update all CI secrets to match. Use **Disable** to turn off secret verification entirely.
+> **Note:** When you **Roll** the secret, the old one stops working immediately. Update all CI secrets to match.
 
 ### Trigger Deploy via GitHub Actions
 
 Add repository secrets (**Settings → Secrets and variables → Actions**):
 
 - `DOCKIFY_URL` — your Dockify URL (e.g. `https://dockify.example.com`)
-- `DOCKIFY_WEBHOOK_SECRET` — the webhook secret from Dockify Settings (for Option B)
+- `DOCKIFY_WEBHOOK_SECRET` — the webhook secret from Dockify Settings
 
-**Option A: Without webhook secret** (simple; disable the webhook secret on the Settings page first, or use when no secret is configured)
-
-```yaml
-name: Deploy via Dockify
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  test-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run tests
-        run: |
-          echo "Running tests..."
-          # npm test, go test, etc.
-
-      - name: Trigger Dockify deploy
-        env:
-          DOCKIFY_URL: ${{ secrets.DOCKIFY_URL }}
-        run: |
-          curl -s -X POST $DOCKIFY_URL/api/webhook/github \
-            -H "Content-Type: application/json" \
-            -d '{
-              "ref": "refs/heads/main",
-              "after": "${{ github.sha }}",
-              "repository": {
-                "clone_url": "https://github.com/${{ github.repository }}.git"
-              }
-            }'
-```
-
-**Option B: With webhook secret** (HMAC-SHA256, recommended for public-facing deployments)
+The workflow signs the payload with the secret (HMAC-SHA256):
 
 ```yaml
 name: Deploy via Dockify

@@ -20,67 +20,76 @@ Dockify is a self-hosted Docker app deployment platform — single Go binary, SQ
 ## Project Structure
 
 ```
-cmd/dockify/main.go              # Entry point, wires dependencies
+cmd/dockify/main.go              # Entry point: config → db → services → router, HTTP server
 internal/
-  config/config.go               # Environment variable config (11 vars)
-  db/db.go + schema.sql          # SQLite setup, 8 tables
+  config/config.go               # Environment variable config
+  db/db.go + schema.sql          # SQLite (one connection, WAL, foreign_keys=ON), 12 tables; ad-hoc migrations run on every start
+  model/model.go                 # Shared view types (AppSummary, ChartPoint)
   ssh/
-    client.go                    # SSH client: connect, exec, write file, PTY
+    interface.go                 # Connector interface + Factory (a new SSH connection per remote action)
+    client.go                    # SSH client: exec wrapped in `timeout -k 10 N sh -c`, pipes, heredoc file writes, PTY
     mock.go                      # Mock SSH for dev mode (DOCKIFY_DEV_MOCK=true)
   server/
-    service.go                   # Server CRUD (list, get, create, update, delete)
-    handler.go                   # JSON API handlers
-    web_handler.go               # Web UI handlers (pages + forms)
-    monitor.go                   # Background resource polling (every 60s)
+    model.go                     # Server, ServerStats
+    repository.go                # servers + server_stats queries
+    service.go                   # Server CRUD, worker init and prune, resource refresh, Monitor (every 10s)
+    handler.go                   # JSON API handlers + web UI handlers (pages, forms, HTMX cards)
   app/
-    service.go                   # App CRUD + deploy/undeploy/redeploy/rollback/stop/start
-    handler.go                   # JSON API handlers (apps, deployments, secrets, files, logs)
-    web_handler.go               # Web UI handlers (pages + forms)
-    scheduler.go                 # Auto-select least-loaded server
-    logs.go                      # SSH log streaming
-    backup.go                    # Compose file write/read on worker
-    stats.go                     # Stats collector: container stats, Caddy traffic, history
-  caddy/client.go                # Caddy Admin API client (route CRUD via SSH tunnel)
+    model.go                     # App, Deployment, stats types
+    repository.go                # apps, deployments, routes, secrets, files and stats queries
+    service.go                   # Deploy/undeploy/redeploy/rollback/stop/start, move between workers, Caddy route + DNS per domain
+    compose.go                   # Simple-mode compose generation, dockify network injection, service rename
+    stats.go                     # Stats collector (containers 10s, Caddy traffic 30s, disk 5 min, prune hourly) + history
+    handler.go                   # JSON API + web UI handlers (apps, deployments, secrets, files, logs, stats)
+  scheduler/scheduler.go         # Auto-select least-loaded server
+  caddy/client.go                # Caddy Admin API client: route CRUD and config save via `docker exec caddy curl` over SSH
   cloudflare/client.go           # Cloudflare DNS API v4 (list, create, upsert records)
-  webhook/handler.go             # GitHub + GitLab webhook receiver, HMAC validation
+  webhook/handler.go             # GitHub + GitLab webhook receiver, HMAC/token validation
   settings/
-    handler.go                   # Settings page, webhook secret CRUD, update check/run
-    updater.go                   # GitHub Releases checker, systemd-run self-update
+    settings.go                  # Webhook secret, GitHub Releases update check, systemd-run self-update
+    handler.go                   # Settings page, webhook secret get/roll, update check/run
   backup/
-    handler.go                   # Export/import pages, YAML generation/parsing
-    encryption.go                # AES-GCM encrypt/decrypt with PBKDF2 passphrase
+    backup.go                    # YAML export/import, AES-GCM encryption with PBKDF2 passphrase
+    handler.go                   # Export/import pages and endpoints
   http/
     router.go                    # Chi router, all routes, middleware
-    auth.go                      # Session auth, login/logout, middleware
-    console.go                   # WebSocket upgrade, PTY relay for SSH console
-    stats_ws.go                  # WebSocket real-time resource stats (1s interval)
-    renderer.go                  # Template rendering with layout
-    templates/                   # HTML templates (all pages, layout, partials)
-      layout.html                # Base layout: nav, head, all CSS (single <style> block)
+    auth.go                      # Session auth, login/logout, bearer token, cross-site request check
+    console.go                   # WebSocket upgrade, PTY relay for SSH and container consoles
+    stats_ws.go                  # WebSocket real-time server stats (1s interval)
+    app_stats_ws.go              # WebSocket real-time app container stats
+    templates.go                 # Embedded templates, template funcs, Render
+    templates/                   # HTML templates (pages, layout, partials)
+      layout.html                # head/nav/scripts blocks, all CSS (single <style> block)
       dashboard.html             # Dashboard with stats cards + server/app summary tables
-      server_list.html           # Server list
-      server_add.html            # Add server form
-      server_detail.html         # Server detail: info, resources card, SSH console, actions
-      server_edit.html           # Edit server form
+      servers.html               # Server list page (servers_list.html: table partial)
+      servers_add.html           # Add server form
+      servers_detail.html        # Server detail: info, resources card, live charts, SSH console, actions
+      servers_edit.html          # Edit server form
       servers_resources_card.html# HTMX partial: resource usage with human-readable values
-      app_list.html              # App list
-      app_add.html               # Deploy app form (simple/advanced toggle)
-      app_detail.html            # App detail: info, compose, secrets editor, files, logs, deployments
-      app_edit.html              # Edit app form (pre-fills from simple fields or compose)
-      settings.html              # Settings: webhook secret, update check/run, export/import links
-      about.html                 # About page: version, description, sponsor link
+      servers_stats_card.html    # HTMX partial: server stats
+      apps.html                  # App list page (apps_list.html: table partial)
+      apps_add.html              # Deploy app form, also used for edit (simple/advanced toggle)
+      apps_detail.html           # App detail: info, compose, env vars, files, logs, deployments, live charts, console
+      apps_stats_card.html       # HTMX partial: app stats
+      live_charts.html           # Partial: live chart script (included by layout)
+      settings.html              # Settings: webhook secret, export/import links
+      about.html                 # About page: version, update check/run, sponsor link
       export.html                # Export page: passphrase generator, download YAML
       import.html                # Import page: file upload, mode selector (merge/replace)
       login.html                 # Login page
+      error.html                 # Error page
 scripts/
   install.sh                     # One-liner install (3 modes: Docker Compose / Binary / Binary + Caddy)
   setup-worker.sh                # Generate SSH key on worker, install Docker, output private key
+  gen-ssh-key.sh                 # Dedicated SSH key for external/agent access to a VM
   update.sh                      # Auto-detect install mode, download & restart latest
+  update-latest.sh               # Same, run directly on the host
   release.sh                     # Version bump + tag helper
+  smoke-test.sh                  # Build, start, probe /health, /login and the auth redirect
 Dockerfile                       # Multi-stage Docker build
 docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 .air.toml                        # Air live-reload config
-.github/workflows/build.yml      # CI: vet, test, build binary + Docker, release on v* tag
+.github/workflows/build.yml      # CI: vet, test, smoke test, build binary + Docker, release on v* tag
 ```
 
 ## Environment Variables
@@ -100,7 +109,9 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for DNS automation (Zone:DNS:Edit scope) |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID for the domain |
 
-## Database Schema (8 Tables)
+## Database Schema (12 Tables)
+
+Foreign keys are enforced (`foreign_keys=ON`). `ON DELETE CASCADE` exists only on `app_secrets`, `app_files`, the stats tables' `app_id` and `server_stats.server_id`.
 
 ### servers
 
@@ -139,9 +150,14 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `git_repo` | TEXT | Git repo URL for webhook CI/CD |
 | `git_branch` | TEXT DEFAULT 'main' | Git branch to track |
 | `auth_user` | TEXT DEFAULT '' | HTTP basic auth username |
-| `auth_pass` | TEXT DEFAULT '' | HTTP basic auth password (bcrypt hashed) |
-| `status` | TEXT DEFAULT 'created' | created, deploying, running, stopped, failed |
+| `auth_pass` | TEXT DEFAULT '' | HTTP basic auth password (plaintext; bcrypt-hashed when the Caddy route is built) |
+| `status` | TEXT DEFAULT 'created' | draft, created, deploying, running, stopped, failed |
 | `compose_mode` | TEXT DEFAULT 'advanced' | simple or advanced |
+| `memory_limit`, `cpu_limit` | TEXT DEFAULT '' | Simple-mode resource limits |
+| `log_max_size`, `log_max_file` | TEXT DEFAULT '' | Simple-mode json-file log rotation |
+| `command` | TEXT DEFAULT '' | Simple-mode command override |
+| `ports` | TEXT DEFAULT '' | Simple-mode published ports (one per line) |
+| `ulimits_nofile` | TEXT DEFAULT '' | Simple-mode `nofile` ulimit |
 | `created_at` | DATETIME | Creation timestamp |
 | `updated_at` | DATETIME | Last update timestamp |
 
@@ -193,6 +209,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `app_id` | INTEGER FK→apps ON DELETE CASCADE | Parent app |
 | `key` | TEXT NOT NULL | Secret name |
 | `value` | TEXT NOT NULL | Secret value |
+| `is_secret` | INTEGER DEFAULT 0 | UI masks the value |
 | UNIQUE(app_id, key) | | One value per key per app |
 
 ### app_files
@@ -213,6 +230,17 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `value` | TEXT NOT NULL | Setting value |
 | `updated_at` | DATETIME | Last update timestamp |
 
+### Stats tables
+
+Written by the background collectors, pruned after 7 days, `created_at` in UTC.
+
+| Table | Columns | Written |
+|---|---|---|
+| `server_stats` | `server_id` (cascade), `cpu_percent`, `ram_percent`, `disk_percent`, `cpu_cores`, `ram_mb`, `disk_gb` | Monitor, every 10s per server |
+| `container_stats` | `app_id` (cascade), `server_id`, `container_name`, `cpu_percent`, `mem_usage_bytes`, `mem_limit_bytes`, `mem_percent`, `net_io_rx_bytes`, `net_io_tx_bytes`, `block_io_read`, `block_io_write` | Stats collector, every 10s per container |
+| `route_stats` | `app_id` (cascade), `domain`, `total_requests`, `requests_rps`, `status_2xx` … `status_5xx` | Caddy metrics, every 30s |
+| `app_disk_stats` | `app_id` (cascade), `server_id`, `disk_usage_bytes` | `du` of the app folder, every 5 min |
+
 ## API Endpoints
 
 ### Public (no auth)
@@ -222,10 +250,11 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/health` | Health check → `ok` |
 | GET/POST | `/login` | Login page / form submit |
 | POST | `/logout` | Clear session, redirect to login |
-| POST | `/api/webhook/github` | GitHub push webhook (HMAC-SHA256) |
-| POST | `/api/webhook/gitlab` | GitLab push webhook (token) |
-| GET | `/api/settings/update/check` | Check latest GitHub Release version |
+| POST | `/api/webhook/github` | GitHub push webhook (HMAC-SHA256), body ≤ 1 MiB |
+| POST | `/api/webhook/gitlab` | GitLab push webhook (token), body ≤ 1 MiB |
 | GET | `/static/*` | Static files (`web/static/`) |
+
+Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_API_TOKEN`. A POST/PATCH/DELETE sent by another site (`Sec-Fetch-Site`, or `Origin` ≠ `Host` for older browsers) gets `403`; bearer-token requests are exempt. WebSocket handshakes must be same-origin. Request bodies under `/api/servers` and `/api/apps` are capped at 1 MiB.
 
 ### Protected — Server API (JSON)
 
@@ -238,7 +267,9 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | DELETE | `/api/servers/:id` | Delete server |
 | POST | `/api/servers/:id/init` | Initialize worker (Docker + Caddy) |
 | POST | `/api/servers/:id/refresh` | Refresh resource metrics |
+| POST | `/api/servers/:id/prune` | `docker system prune` on the worker `{all?, volumes?}` + builder prune |
 | GET | `/api/servers/:id/console` | WebSocket upgrade → SSH terminal |
+| GET | `/api/servers/:id/stats/history` | Stats history (`?range=realtime\|1h\|6h\|24h\|7d`, default `1h`) |
 | GET | `/api/servers/:id/stats/live` | WebSocket real-time resource stats (1s interval) |
 
 ### Protected — Server Web UI
@@ -252,9 +283,12 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/servers/:id/edit` | Edit server form |
 | POST | `/servers/:id/edit` | Submit edit server form |
 | POST | `/servers/:id/init` | Initialize worker (web form) |
+| POST | `/servers/:id/prune` | Prune worker (web form) |
 | GET | `/servers/:id/resources` | Resource card (HTMX partial) |
+| GET | `/servers/:id/stats` | Stats card (HTMX partial) |
 | POST | `/servers/:id/refresh` | Refresh resources (web form) |
-| POST/DELETE | `/servers/:id/delete` | Delete server (web form) |
+| POST | `/servers/:id/delete` | Delete server (web form) |
+| DELETE | `/servers/:id` | Delete server |
 
 ### Protected — App API (JSON)
 
@@ -270,6 +304,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | POST | `/api/apps/:id/stop` | Stop app (docker compose stop + remove Caddy route) |
 | POST | `/api/apps/:id/start` | Start app (docker compose start + add Caddy route + DNS) |
 | GET | `/api/apps/:id/deployments` | List deployment history (last 20) |
+| DELETE | `/api/apps/:id/deployments` | Clear deployment history |
 | GET | `/api/apps/:id/logs` | Stream logs (`docker compose logs --tail=N`) |
 | GET | `/api/apps/:id/secrets` | List secrets |
 | POST | `/api/apps/:id/secrets` | Set env var `{key, value, is_secret?}`; `is_secret` omitted keeps the stored flag (new keys: not secret) |
@@ -277,6 +312,12 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/api/apps/:id/files` | List config files |
 | POST | `/api/apps/:id/files` | Set config file `{path, content}` |
 | DELETE | `/api/apps/:id/files/:path` | Delete config file |
+| GET | `/api/apps/:id/console` | WebSocket upgrade → shell in the app's first service container |
+| GET | `/api/apps/:id/stats` | Latest container stats |
+| GET | `/api/apps/:id/stats/history` | Container stats history (`?range=`, default `1h`) |
+| GET | `/api/apps/:id/stats/live` | WebSocket real-time container stats |
+| GET | `/api/apps/:id/traffic` | Latest Caddy traffic per domain |
+| GET | `/api/apps/:id/traffic/history` | Traffic history (`?range=`, default `1h`) |
 | GET | `/api/deployments/:id` | Get single deployment detail |
 
 ### Protected — App Web UI
@@ -286,14 +327,18 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/apps` | App list page |
 | GET | `/apps/add` | Deploy app form |
 | POST | `/apps/add` | Submit deploy app form |
+| POST | `/apps/redeploy-all` | Redeploy every running app |
 | GET | `/apps/:id` | App detail page |
 | POST/DELETE | `/apps/:id/undeploy` | Undeploy app (web form) |
+| POST | `/apps/:id/deploy` | Deploy a draft app (web form) |
+| POST | `/apps/:id/clear-deployments` | Clear deployment history (web form) |
 | POST | `/apps/:id/redeploy` | Redeploy app (web form) |
 | POST | `/apps/:id/rollback` | Rollback app (web form) |
 | POST | `/apps/:id/stop` | Stop app (web form) |
 | POST | `/apps/:id/start` | Start app (web form) |
 | GET | `/apps/:id/edit` | Edit app form page |
 | POST | `/apps/:id/edit` | Submit edit app form |
+| GET | `/apps/:id/stats` | Stats card (HTMX partial) |
 
 ### Protected — Settings, Backup, Pages
 
@@ -305,12 +350,11 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | GET | `/export` | Export page (passphrase generator, download) |
 | GET | `/import` | Import page (file upload, merge/replace) |
 | GET | `/api/settings/webhook-secret` | Get webhook secret |
-| POST | `/api/settings/webhook-secret/roll` | Regenerate webhook secret |
-| POST | `/api/settings/webhook-secret/disable` | Disable webhook secret checking |
-| POST | `/api/settings/webhook-secret/enable` | Re-enable webhook secret checking |
+| POST | `/api/settings/webhook-secret/roll` | Regenerate webhook secret (it cannot be disabled) |
+| GET | `/api/settings/update/check` | Check latest GitHub Release version (`?force=1` skips the 5-minute cache) |
 | POST | `/api/settings/update/run` | Trigger self-update via systemd-run |
 | POST | `/api/backup/export` | Download YAML export |
-| POST | `/api/backup/import` | Upload YAML import (multipart: `file` + `mode`) |
+| POST | `/api/backup/import` | Upload YAML import (multipart: `file` + `mode`), ≤ 16 MiB |
 
 ## Deploy Flow
 
@@ -326,10 +370,13 @@ When an app is deployed (create/redeploy):
 8. SSH → `docker compose pull`, then `docker compose up -d` (auto-detects `docker-compose` vs `docker compose`)
 9. Inject Caddy route via Admin API (`POST /config/apps/http/servers/srv0/routes`)
 10. If HTTP basic auth set: include bcrypt `basic_auth` handler in route
-11. Create Cloudflare DNS A record (if configured, skips duplicates, upserts on IP change)
-12. Save compose snapshot in deployment record (for rollback)
-13. Record deployment with status, log, commit SHA (if Git-triggered)
-14. Update app status → running
+11. Persist Caddy's running config to the file named by its `--config` argument (read with `docker inspect caddy`: `/etc/caddy/config.json` on workers set up by Init, `/data/config.json` on older ones) so routes survive a Caddy restart
+12. Create Cloudflare DNS A record (if configured, skips duplicates, upserts on IP change)
+13. Save compose snapshot in deployment record (for rollback)
+14. Record deployment with status, log, commit SHA (if Git-triggered)
+15. Update app status → running
+
+Undeploy runs `docker compose down --volumes --rmi all` for the app only; worker-wide pruning happens only through the Prune action.
 
 ## Worker Init Flow
 
@@ -349,8 +396,8 @@ Init is idempotent — re-running skips components that already exist (Caddy con
 ## Git Webhook Flow
 
 1. Receive push event at `POST /api/webhook/github` or `/api/webhook/gitlab`
-2. If webhook secret is enabled: validate HMAC-SHA256 (GitHub) or plain token (GitLab); reject 401 if mismatch
-3. If not a push event → return 200 `"ignored"`
+2. If not a push event → return 200 `"ignored"`
+3. Validate HMAC-SHA256 (GitHub) or the token (GitLab, constant-time) against the global secret; reject 401 on mismatch or when the secret cannot be read
 4. Parse: `ref` → branch, `after` → commit SHA, `clone_url`/`git_http_url` → repo URL
 5. Find **all** matching apps by `git_repo` + `git_branch`
 6. For each match: trigger `deployWithCommit(app.ID, commitSHA)` — same deploy flow as UI
@@ -387,17 +434,17 @@ When no server is specified for deployment (`server_id=0`):
 3. Pick the server with the lowest score
 4. Return error if no online servers available
 
-Resource metrics are refreshed every 60 seconds by the background monitor goroutine.
+Resource metrics are refreshed every 10 seconds by the background monitor goroutine.
 
 ## Resource Monitoring
 
-There are two monitoring paths:
+There are three monitoring paths:
 
-### Background Stats Collector (every 60s)
+### Background Server Monitor (every 10s)
 
-The `statsLoop()` goroutine runs every 60 seconds:
+`server.Monitor` runs every 10 seconds (and prunes `server_stats` hourly):
 
-- Queries all non-pending servers
+- Queries all online/offline servers and refreshes each in its own goroutine (new SSH connection per server per tick)
 - SSH exec to collect:
   - **CPU cores:** `nproc`
   - **CPU usage:** two-sample `/proc/stat` — `(delta_total - delta_idle) / delta_total × 100` — 1s sample interval
@@ -405,8 +452,12 @@ The `statsLoop()` goroutine runs every 60 seconds:
   - **RAM usage:** `awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf "%.1f", 100*(t-a)/t}' /proc/meminfo`
   - **Disk total:** `df -BG /` → Size
   - **Disk usage:** `df -BG /` → Use% as-is
-- Updates server record with metrics + timestamp
+- Updates server record with metrics + timestamp and inserts a `server_stats` row
 - Human-readable display on resource card (e.g. "3200 MB used, 4800 MB free")
+
+### App Stats Collector
+
+`app.Service.statsLoop()`: container stats every 10s (one `docker ps` + one `docker stats --no-stream` per worker), Caddy traffic from `/metrics` every 30s, app folder disk usage every 5 min, prune of rows older than 7 days hourly.
 
 ### Real-time WebSocket Stats (1s interval)
 
@@ -480,8 +531,10 @@ All styles live in `internal/http/templates/layout.html` as a single `<style>` b
 - Registry tokens stored the same way (`<id>.registry-token`, `0600`); DB holds only the path. Sent to `docker login --password-stdin` over SSH stdin (never in the command line), redacted from deploy logs and errors, never returned by the API
 - Cloudflare API token requires minimal scope: Zone:DNS:Edit
 - App containers on internal `dockify` Docker network only — no public port exposure except via Caddy
-- Webhook authentication: HMAC-SHA256 (GitHub), plain token (GitLab), auto-generated 64-char hex secret
-- Session auth: cookie-based (`dockify_session`), 24-hour expiry, in-memory sessions
+- Webhook authentication: HMAC-SHA256 (GitHub), token with constant-time compare (GitLab), auto-generated 64-char hex secret; always on (no disable), fails closed
+- Session auth: cookie-based (`dockify_session`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is TLS or `X-Forwarded-Proto: https`), 24-hour expiry, in-memory sessions
+- Cross-site requests: unsafe methods from another site get `403` (Go `http.CrossOriginProtection`), WebSocket handshakes must be same-origin, no CORS headers. A reverse proxy in front of Dockify must forward the original `Host` header (Caddy does by default)
+- HTTP server: `ReadHeaderTimeout` 10s, `IdleTimeout` 120s; request bodies capped (API JSON 1 MiB, webhooks 1 MiB, import 16 MiB)
 - HTTP Basic Auth for apps enforced at Caddy proxy level with bcrypt
 - Backup encryption: AES-GCM with PBKDF2 passphrase (600,000 iterations, 256-bit key)
 - Caddy auto-obtains Let's Encrypt certificates for all domains
