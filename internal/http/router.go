@@ -9,6 +9,7 @@ import (
 	"github.com/coderbuzz/dockify/internal/backup"
 	"github.com/coderbuzz/dockify/internal/server"
 	"github.com/coderbuzz/dockify/internal/settings"
+	"github.com/coderbuzz/dockify/internal/web"
 	"github.com/coderbuzz/dockify/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -42,7 +43,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
 		if !authEnabled || getSessionUser(r) != "" {
-			http.Redirect(w, r, "/", http.StatusFound)
+			web.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 		HandleLogin(w, r, cfgUser, cfgPass, render)
@@ -262,7 +263,7 @@ func PrefixMiddleware(next http.Handler) http.Handler {
 		}
 		if prefix != "" {
 			prefix = strings.TrimSuffix(prefix, "/") + "/"
-			r = SetBasePath(r, prefix)
+			r = web.SetBasePath(r, prefix)
 		}
 		next.ServeHTTP(w, r)
 	})

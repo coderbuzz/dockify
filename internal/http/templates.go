@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/coderbuzz/dockify/internal/model"
+	"github.com/coderbuzz/dockify/internal/web"
 )
 
 //go:embed templates/*.html
@@ -220,20 +221,7 @@ var tmpl = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "te
 
 type contextKey string
 
-const basePathKey contextKey = "basePath"
 const devMockKey contextKey = "devMock"
-
-func SetBasePath(r *http.Request, path string) *http.Request {
-	ctx := context.WithValue(r.Context(), basePathKey, path)
-	return r.WithContext(ctx)
-}
-
-func GetBasePath(r *http.Request) string {
-	if v, ok := r.Context().Value(basePathKey).(string); ok && v != "" {
-		return v
-	}
-	return "/"
-}
 
 func SetDevMock(r *http.Request, val bool) *http.Request {
 	ctx := context.WithValue(r.Context(), devMockKey, val)
@@ -254,10 +242,9 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 		return
 	}
 
-	basePath := GetBasePath(r)
 	m, ok := data.(map[string]interface{})
 	if ok {
-		m["BasePath"] = basePath
+		m["BasePath"] = web.GetBasePath(r)
 		m["DevMock"] = GetDevMock(r)
 	}
 

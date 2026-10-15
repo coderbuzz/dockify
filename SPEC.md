@@ -106,7 +106,7 @@ docker-compose.yml               # Dockify + Caddy reverse proxy (mode 1)
 | `DOCKIFY_ALLOW_NO_AUTH` | `false` | No | Allow a passwordless UI on a non-loopback bind |
 | `DOCKIFY_API_TOKEN` | — | No | `Authorization: Bearer` token accepted on all protected routes (scripts/agents) |
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH client for local development |
-| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`) |
+| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind reverse proxy (e.g. `/proxy/9898`); `X-Forwarded-Prefix` overrides it per request. Templates use links relative to `<base href>`, redirects go through `web.Redirect`, which prepends the prefix |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for DNS automation (Zone:DNS:Edit scope) |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID for the domain |
 

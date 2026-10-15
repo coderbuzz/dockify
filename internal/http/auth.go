@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/coderbuzz/dockify/internal/web"
 )
 
 var (
@@ -99,7 +101,7 @@ func AuthMiddleware(enabled bool, apiToken string, next http.Handler) http.Handl
 			return
 		}
 
-		http.Redirect(w, r, "/login", http.StatusFound)
+		web.Redirect(w, r, "/login", http.StatusFound)
 	})
 }
 
@@ -119,7 +121,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, cfgUser, cfgPass string
 		if user == cfgUser && pass == cfgPass {
 			setSession(w, r)
 			log.Printf("Login: %s", user)
-			http.Redirect(w, r, "/", http.StatusFound)
+			web.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 
@@ -137,5 +139,5 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, cfgUser, cfgPass string
 
 func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	clearSession(w, r)
-	http.Redirect(w, r, "/login", http.StatusFound)
+	web.Redirect(w, r, "/login", http.StatusFound)
 }

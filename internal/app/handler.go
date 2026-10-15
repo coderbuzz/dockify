@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/coderbuzz/dockify/internal/web"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -822,7 +823,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		go h.service.Deploy(app.ID)
 	}
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(app.ID, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1100,7 +1101,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	if flashMsg != "" {
 		redirectURL += "?flash=" + flashMsg
 	}
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	web.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppDetailPage(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1173,7 +1174,7 @@ func (h *WebHandler) refuseBusy(w http.ResponseWriter, r *http.Request, id int64
 	if !h.service.Busy(id) {
 		return false
 	}
-	http.Redirect(w, r, fmt.Sprintf("/apps/%d?flash=%s", id, url.QueryEscape(busyMsg)), http.StatusSeeOther)
+	web.Redirect(w, r, fmt.Sprintf("/apps/%d?flash=%s", id, url.QueryEscape(busyMsg)), http.StatusSeeOther)
 	return true
 }
 
@@ -1185,7 +1186,7 @@ func (h *WebHandler) AppDeleteWeb(w http.ResponseWriter, r *http.Request, render
 
 	go h.service.Undeploy(id)
 
-	http.Redirect(w, r, "/apps", http.StatusSeeOther)
+	web.Redirect(w, r, "/apps", http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppClearDeploymentsWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1193,7 +1194,7 @@ func (h *WebHandler) AppClearDeploymentsWeb(w http.ResponseWriter, r *http.Reque
 
 	_ = h.service.ClearDeployments(id)
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1204,7 +1205,7 @@ func (h *WebHandler) AppRedeployWeb(w http.ResponseWriter, r *http.Request, rend
 
 	go h.service.Redeploy(id)
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1217,7 +1218,7 @@ func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render
 	}
 
 	if app.ServerID == 0 {
-		http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
+		web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
 		return
 	}
 	if h.refuseBusy(w, r, id) {
@@ -1227,7 +1228,7 @@ func (h *WebHandler) AppDeployWeb(w http.ResponseWriter, r *http.Request, render
 	h.service.UpdateStatus(id, StatusDeploying)
 	go h.service.Redeploy(id)
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1241,7 +1242,7 @@ func (h *WebHandler) AppRollbackWeb(w http.ResponseWriter, r *http.Request, rend
 		return
 	}
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppStopWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1255,7 +1256,7 @@ func (h *WebHandler) AppStopWeb(w http.ResponseWriter, r *http.Request, render R
 		return
 	}
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1269,7 +1270,7 @@ func (h *WebHandler) AppStartWeb(w http.ResponseWriter, r *http.Request, render 
 		return
 	}
 
-	http.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) AppRedeployAll(w http.ResponseWriter, r *http.Request, render RenderFunc) {
@@ -1287,7 +1288,7 @@ func (h *WebHandler) AppRedeployAll(w http.ResponseWriter, r *http.Request, rend
 		}
 	}
 
-	http.Redirect(w, r, "/apps?flash="+url.QueryEscape(fmt.Sprintf("Redeploying %d running apps...", count)), http.StatusSeeOther)
+	web.Redirect(w, r, "/apps?flash="+url.QueryEscape(fmt.Sprintf("Redeploying %d running apps...", count)), http.StatusSeeOther)
 }
 
 func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {

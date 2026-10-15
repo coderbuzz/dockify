@@ -14,6 +14,7 @@ import (
 
 	"github.com/coderbuzz/dockify/internal/model"
 	"github.com/coderbuzz/dockify/internal/ssh"
+	"github.com/coderbuzz/dockify/internal/web"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -483,7 +484,7 @@ func (h *WebHandler) ServerAddForm(w http.ResponseWriter, r *http.Request, rende
 		go h.service.connectAndInit(server.ID)
 	}
 
-	http.Redirect(w, r, "/servers/"+strconv.FormatInt(server.ID, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/servers/"+strconv.FormatInt(server.ID, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerEditPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -596,7 +597,7 @@ func (h *WebHandler) ServerEditForm(w http.ResponseWriter, r *http.Request, rend
 
 	go h.service.TestConnection(id)
 
-	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -630,7 +631,7 @@ func (h *WebHandler) ServerInit(w http.ResponseWriter, r *http.Request, render f
 		h.service.InitWorker(id)
 	}(id)
 
-	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerRefreshWeb(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -638,7 +639,7 @@ func (h *WebHandler) ServerRefreshWeb(w http.ResponseWriter, r *http.Request, re
 
 	h.service.RefreshResources(id)
 
-	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	web.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerResourcesCard(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -668,7 +669,7 @@ func (h *WebHandler) ServerDeleteWeb(w http.ResponseWriter, r *http.Request, ren
 	}
 	removeKeyFiles(h.sshKeyDir, id)
 
-	http.Redirect(w, r, "/servers", http.StatusSeeOther)
+	web.Redirect(w, r, "/servers", http.StatusSeeOther)
 }
 
 func (h *WebHandler) ServerStatsCard(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
@@ -718,7 +719,7 @@ func (h *WebHandler) ServerPrune(w http.ResponseWriter, r *http.Request, render 
 		msg = fmt.Sprintf("Prune finished: %s", lastLine)
 	}
 
-	http.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10)+"?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+	web.Redirect(w, r, "/servers/"+strconv.FormatInt(id, 10)+"?msg="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func JSON(w http.ResponseWriter, status int, data interface{}) {

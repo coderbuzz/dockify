@@ -116,7 +116,7 @@ Create a `.env` file in the project root or set these environment variables:
 | `DOCKIFY_DEV_MOCK` | `false` | No | Enable mock SSH for local development (no real VMs needed) |
 | `CLOUDFLARE_API_TOKEN` | — | No | Cloudflare API token for automatic DNS A records |
 | `CLOUDFLARE_ZONE_ID` | — | No | Cloudflare zone ID |
-| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind a reverse proxy (e.g. `/proxy/9898`) |
+| `DOCKIFY_BASE_PATH` | — | No | URL prefix when behind a reverse proxy (e.g. `/proxy/9898`); links and redirects stay under it. A proxy can send `X-Forwarded-Prefix` per request instead |
 
 ### Authentication
 

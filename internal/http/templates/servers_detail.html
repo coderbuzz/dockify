@@ -186,13 +186,13 @@
       <tbody>
       {{range .Apps}}
         <tr>
-          <td style="white-space:nowrap"><a href="/apps/{{.ID}}">{{.Name}}</a></td>
+          <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
           <td style="white-space:nowrap">{{.Domain}}</td>
           <td>{{.Port}}</td>
           <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
           <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
           <td style="width:1%;white-space:nowrap">
-            <form method="POST" action="/apps/{{.ID}}/undeploy" style="display:inline"
+            <form method="POST" action="apps/{{.ID}}/undeploy" style="display:inline"
                   onsubmit="return confirm('{{if eq .Status "draft"}}Delete draft {{.Name}}?{{else}}Undeploy {{.Name}}? This will stop and remove the app.{{end}}')">
               <button class="btn btn-ghost btn-red">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
             </form>
