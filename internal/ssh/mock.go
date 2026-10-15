@@ -23,9 +23,10 @@ func NewMockClient() *MockClient {
 			{"docker stats", `{"BlockIO":"1.5MB / 0B","CPUPerc":"12.34%","Container":"abc12345","ID":"abc12345","MemPerc":"8.20%","MemUsage":"256MiB / 3.125GiB","Name":"app","NetIO":"45.6MB / 12.3MB","PIDs":"3"}`},
 			{"docker compose version", "Docker Compose version v2.24.0"},
 			{"docker compose", "app\n"},
+			{"{{json .Mounts}}", `[{"Type":"bind","Source":"/opt/dockify/caddy","Destination":"/etc/caddy"}] {"dockify.managed":"true"}`},
 			{"docker inspect caddy", `["caddy","run","--config","/etc/caddy/config.json"]`},
 			{"localhost:2019/config/apps/http/servers/srv0/routes", "200"}, // add route (with -w http_code)
-			{"localhost:2019/id/", "200"},                                  // remove/verify route
+			{"localhost:2019/id/", "200"}, // remove/verify route
 			{"docker", "Docker version 28.0.4, build b8034c0"},
 			{"uptime", "10:00:00 up 30 days,  0 users,  load average: 0.08, 0.03, 0.01"},
 			{"nproc", "4"},

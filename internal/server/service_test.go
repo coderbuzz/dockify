@@ -173,3 +173,23 @@ func TestHostKeyStoreAndClear(t *testing.T) {
 		}
 	}
 }
+
+func TestCaddyManaged(t *testing.T) {
+	imageLabels := `{"org.opencontainers.image.title":"Caddy"}`
+	cases := []struct {
+		name, inspect string
+		want          bool
+	}{
+		{"current layout", `[{"Type":"volume","Name":"caddy_data","Source":"/var/lib/docker/volumes/caddy_data/_data","Destination":"/data"},{"Type":"bind","Source":"/opt/dockify/caddy","Destination":"/etc/caddy"}] ` + imageLabels, true},
+		{"old layout", `[{"Type":"bind","Source":"/opt/dockify/caddy/config.json","Destination":"/data/config.json"}] ` + imageLabels, true},
+		{"labelled", `[] {"dockify.managed":"true"}`, true},
+		{"foreign", `[{"Type":"bind","Source":"/srv/caddy/Caddyfile","Destination":"/etc/caddy/Caddyfile"}] ` + imageLabels, false},
+		{"foreign no labels", `[{"Type":"bind","Source":"/opt/dockify-other","Destination":"/etc/caddy"}] null`, false},
+		{"garbage", `Error: No such object: caddy`, false},
+	}
+	for _, c := range cases {
+		if got := caddyManaged(c.inspect + "\n"); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

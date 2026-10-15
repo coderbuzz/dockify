@@ -398,10 +398,11 @@ When a server is initialized (`POST /api/servers/:id/init`):
 2. Install Docker via `get.docker.com` (if not present)
 3. Install Docker Compose plugin (if not present)
 4. Create `dockify` Docker network
-5. Deploy Caddy container (ports 80/443 + Admin API on localhost:2019)
-6. Collect CPU cores (`nproc`), RAM total (`/proc/meminfo`), disk total (`df -BG`)
-7. Collect CPU usage (`/proc/stat`), RAM usage (`/proc/meminfo`), disk usage (`df -BG`)
-8. Status → online
+5. Check an existing `caddy` container (`docker inspect caddy --format '{{json .Mounts}} {{json .Config.Labels}}'`): it is Dockify-managed when a mount source is `/opt/dockify/caddy` (current layout) or `/opt/dockify/caddy/config.json` (old layout), or it has the label `dockify.managed=true`. Any other `caddy` container (running or stopped) → status `error`, init stops: remove or rename it first
+6. Deploy Caddy container `caddy:2` with `--label dockify.managed=true` (ports 80/443 + Admin API on localhost:2019); a running managed container is migrated to `/opt/dockify/caddy:/etc/caddy` when its admin API answers
+7. Collect CPU cores (`nproc`), RAM total (`/proc/meminfo`), disk total (`df -BG`)
+8. Collect CPU usage (`/proc/stat`), RAM usage (`/proc/meminfo`), disk usage (`df -BG`)
+9. Status → online
 
 Init is idempotent — re-running skips components that already exist (Caddy container, Docker, network).
 

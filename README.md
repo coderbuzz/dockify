@@ -183,7 +183,7 @@ The `public_key` is also returned by `POST /api/servers` (send no `ssh_key`) and
 2. Install Docker via `get.docker.com` (if not present)
 3. Install Docker Compose plugin (if not present)
 4. Create `dockify` Docker network
-5. Deploy Caddy container (port 80/443 + Admin API on localhost:2019)
+5. Deploy Caddy container `caddy:2` (port 80/443 + Admin API on localhost:2019). A `caddy` container Dockify did not create (no `/opt/dockify/caddy` mount, no `dockify.managed=true` label) is left alone and init fails until it is removed or renamed
 6. Collect CPU, RAM, Disk info
 7. Status → **online**. Ready to deploy apps.
 
