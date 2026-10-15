@@ -77,6 +77,8 @@ cd /opt/dockify && docker compose up -d
 
 The image binds `DOCKIFY_HOST=0.0.0.0`, so the container needs `DOCKIFY_ADMIN_PASSWORD` in `/opt/dockify/.env` (the installer asks for it) or it exits at start; `DOCKIFY_ALLOW_NO_AUTH=true` overrides this.
 
+Worker SSH keys live in the `dockify_data` volume (`/var/lib/dockify/keys`); the host's `~/.ssh` is not mounted. Dockify generates each worker's key when you add the server and shows the public key on the server page (Step 2). Older compose files mounted `${HOME}/.ssh` read-only, which made adding a server fail with `read-only file system`: re-download `docker-compose.yml` and run `docker compose up -d`.
+
 **Option D: Build from source (development)**
 
 ```bash
