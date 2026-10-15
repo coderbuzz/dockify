@@ -44,6 +44,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	// Public routes (no auth required)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Dockify-Version", version) // read by the self-update monitor on the About page
 		w.Write([]byte("ok"))
 	})
 
