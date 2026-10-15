@@ -1,7 +1,10 @@
 package http
 
 import (
+	"errors"
 	"html/template"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -221,6 +224,21 @@ func TestLatestChartVal(t *testing.T) {
 	}
 	if got := latestChartVal(nil, 99.0); got != 99.0 {
 		t.Errorf("expected fallback 99.0, got %v", got)
+	}
+}
+
+// A template that fails while executing yields a clean 500, not a half page (B19).
+func TestRenderExecErrorIs500(t *testing.T) {
+	old := tmpl
+	t.Cleanup(func() { tmpl = old })
+	tmpl = template.Must(template.New("boom.html").Parse(`half page{{call .Fail}}`))
+
+	rec := httptest.NewRecorder()
+	Render(rec, httptest.NewRequest("GET", "/", nil), http.StatusOK, "boom.html", map[string]interface{}{
+		"Fail": func() (string, error) { return "", errors.New("boom") },
+	})
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "half page") {
+		t.Errorf("got %d %q, want a 500 without partial output", rec.Code, rec.Body)
 	}
 }
 

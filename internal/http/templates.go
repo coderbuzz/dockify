@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -248,9 +249,12 @@ func Render(w http.ResponseWriter, r *http.Request, status int, name string, dat
 		m["DevMock"] = GetDevMock(r)
 	}
 
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	if err := t.Execute(w, data); err != nil {
-		http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
-	}
+	buf.WriteTo(w)
 }
