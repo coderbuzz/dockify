@@ -21,8 +21,9 @@ const (
 	wsPingPeriod = 20 * time.Second
 )
 
+// No CheckOrigin: gorilla's default rejects a cross-origin handshake (Origin host != Host),
+// so a reverse proxy in front of Dockify must forward the original Host header.
 var upgrader = websocket.Upgrader{
-	CheckOrigin:     func(r *http.Request) bool { return true },
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 }
@@ -69,7 +70,7 @@ func (h *ConsoleHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	svr, err := h.serverSvc.Get(id)
-	if err != nil {
+	if err != nil || svr == nil {
 		http.Error(w, "server not found", http.StatusNotFound)
 		return
 	}

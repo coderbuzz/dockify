@@ -44,6 +44,14 @@ func (h *Handler) ImportPage(w http.ResponseWriter, r *http.Request, render func
 }
 
 func (h *Handler) ImportUpload(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<20)
+	if err := r.ParseMultipartForm(16 << 20); err != nil {
+		render(w, r, http.StatusBadRequest, "import.html", map[string]interface{}{
+			"Title": "Import",
+			"Error": "Upload failed (16 MiB max): " + err.Error(),
+		})
+		return
+	}
 	mode := r.FormValue("mode")
 	if mode != "replace" && mode != "merge" {
 		mode = "merge"

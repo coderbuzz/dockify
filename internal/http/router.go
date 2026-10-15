@@ -21,7 +21,6 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RealIP)
 	r.Use(PrefixMiddleware)
-	r.Use(CORSMiddleware)
 	r.Use(DevMockMiddleware(devMock))
 
 	authEnabled := cfgPass != ""
@@ -55,7 +54,6 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	r.Post("/api/webhook/github", whHandler.GitHub)
 	r.Post("/api/webhook/gitlab", whHandler.GitLab)
-	r.Get("/api/settings/update/check", settingsHandler.CheckUpdate)
 
 	staticDir := http.Dir("web/static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(staticDir)))
@@ -67,6 +65,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 
 		r.Route("/api/servers", func(r chi.Router) {
+			r.Use(chimw.RequestSize(1 << 20)) // JSON bodies
 			r.Get("/", apiHandler.List)
 			r.Post("/", apiHandler.Create)
 			r.Get("/{id}", apiHandler.Get)
@@ -123,6 +122,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 
 		r.Route("/api/apps", func(r chi.Router) {
+			r.Use(chimw.RequestSize(1 << 20)) // JSON bodies
 			r.Get("/", appAPIHandler.List)
 			r.Post("/", appAPIHandler.Create)
 			r.Get("/{id}", appAPIHandler.Get)
@@ -141,12 +141,12 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 			r.Get("/{id}/files", appAPIHandler.ListFiles)
 			r.Post("/{id}/files", appAPIHandler.SetFile)
 			r.Delete("/{id}/files/{path}", appAPIHandler.DeleteFile)
-		r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
-		r.Get("/{id}/stats", appAPIHandler.Stats)
-		r.Get("/{id}/stats/history", appAPIHandler.StatsHistory)
-		r.Get("/{id}/stats/live", statsHandler.ServeLiveAppStats)
-		r.Get("/{id}/traffic", appAPIHandler.Traffic)
-		r.Get("/{id}/traffic/history", appAPIHandler.TrafficHistory)
+			r.Get("/{id}/console", consoleHandler.ServeAppContainerWS)
+			r.Get("/{id}/stats", appAPIHandler.Stats)
+			r.Get("/{id}/stats/history", appAPIHandler.StatsHistory)
+			r.Get("/{id}/stats/live", statsHandler.ServeLiveAppStats)
+			r.Get("/{id}/traffic", appAPIHandler.Traffic)
+			r.Get("/{id}/traffic/history", appAPIHandler.TrafficHistory)
 		})
 
 		r.Get("/api/deployments/{id}", appAPIHandler.GetDeployment)
@@ -207,8 +207,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 		})
 		r.Get("/api/settings/webhook-secret", settingsHandler.GetWebhookSecret)
 		r.Post("/api/settings/webhook-secret/roll", settingsHandler.RollWebhookSecret)
-		r.Post("/api/settings/webhook-secret/disable", settingsHandler.DisableWebhookSecret)
-		r.Post("/api/settings/webhook-secret/enable", settingsHandler.EnableWebhookSecret)
+		r.Get("/api/settings/update/check", settingsHandler.CheckUpdate)
 		r.Post("/api/settings/update/run", settingsHandler.RunUpdate)
 
 		r.Get("/about", func(w http.ResponseWriter, r *http.Request) {
@@ -265,21 +264,6 @@ func PrefixMiddleware(next http.Handler) http.Handler {
 			prefix = strings.TrimSuffix(prefix, "/") + "/"
 			r = SetBasePath(r, prefix)
 		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
 		next.ServeHTTP(w, r)
 	})
 }

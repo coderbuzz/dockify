@@ -239,6 +239,7 @@ func (s *Service) collectServerStats(serverID int64, apps []App) {
 //     (com.docker.compose.project = app-<id>), mapping container -> appID.
 //  2. a single `docker stats --no-stream` for all those containers, returning
 //     one JSON line per container.
+//
 // This replaces the previous per-app/per-container `docker stats` calls, which
 // spawned one SSH session per container every tick.
 func (s *Service) collectAllContainerStats(client ssh.Connector, serverID int64, apps []App) {
@@ -347,8 +348,6 @@ func (s *Service) collectAllContainerStats(client ssh.Connector, serverID int64,
 		s.UpdateStatsCacheBatch(batch)
 	}
 }
-
-
 
 // parseComposeProjectAppID extracts the numeric app id from a compose project
 // name of the form "app-<id>" (the directory name Dockify uses for each app's
@@ -746,7 +745,7 @@ func parseMetricLine(lines []string, metric, statusPrefix, host string) int64 {
 }
 
 func (s *Service) pruneOldStats() {
-	cutoff := time.Now().Add(-7 * 24 * time.Hour)
+	cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
 	if err := s.repo.PruneContainerStats(cutoff); err != nil {
 		log.Printf("Stats collector: failed to prune container stats: %v", err)
 	}
@@ -803,11 +802,11 @@ func (s *Service) GetStatsHistory(appID int64, duration string) map[string]inter
 	}
 
 	return map[string]interface{}{
-		"cpu":    cpu,
-		"memory": mem,
+		"cpu":     cpu,
+		"memory":  mem,
 		"network": net,
-		"disk":   disk,
-		"labels": labels,
+		"disk":    disk,
+		"labels":  labels,
 	}
 }
 

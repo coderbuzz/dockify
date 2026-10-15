@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"math"
@@ -212,7 +212,7 @@ var funcMap = template.FuncMap{
 	"mul":             mul,
 	"clamp100":        clamp100,
 	"nl2br": func(s string) template.HTML {
-		return template.HTML(strings.ReplaceAll(s, "\n", "<br>"))
+		return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(s), "\n", "<br>"))
 	},
 }
 

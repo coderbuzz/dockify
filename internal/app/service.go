@@ -399,9 +399,6 @@ func (s *Service) Undeploy(id int64) error {
 	log.Printf("Undeploying %q from %s...", app.Name, svr.Name)
 
 	client.ExecLong(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
-	client.ExecLong("docker image prune -af 2>&1 || true")
-	client.ExecLong("docker volume prune -f 2>&1 || true")
-	client.ExecLong("docker builder prune -af 2>&1 || true")
 
 	routes, _ := s.repo.GetRoutes(app.ID)
 	for _, r := range routes {
@@ -409,7 +406,9 @@ func (s *Service) Undeploy(id int64) error {
 		caddyClient.RemoveRoute(r.Domain)
 	}
 	if len(routes) > 0 {
-		caddy.NewClient(client).SaveConfig()
+		if err := caddy.NewClient(client).SaveConfig(); err != nil {
+			log.Printf("Warning: failed to save caddy config: %v", err)
+		}
 	}
 	s.repo.DeleteRoutes(app.ID)
 	s.repo.DeleteDeployments(app.ID)
@@ -767,8 +766,6 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 		log.Printf("Cleaning up %q from %s (purging containers, volumes, images, folder)...", app.Name, svr.Name)
 		client.ExecLong(fmt.Sprintf("%s -f %s down --volumes --rmi all 2>&1 || true", dc, composePath))
 		client.ExecLong(fmt.Sprintf("rm -rf %s", remoteDir))
-		client.ExecLong("docker image prune -af 2>&1 || true")
-		client.ExecLong("docker volume prune -f 2>&1 || true")
 	} else {
 		log.Printf("Cleaning up %q from %s (containers stopped, folder kept)...", app.Name, svr.Name)
 		client.ExecLong(fmt.Sprintf("%s -f %s down 2>&1 || true", dc, composePath))
@@ -780,7 +777,9 @@ func (s *Service) CleanupFromServer(appID, serverID int64, purgeOld bool) {
 		caddyClient.RemoveRoute(r.Domain)
 	}
 	if len(routes) > 0 {
-		caddy.NewClient(client).SaveConfig()
+		if err := caddy.NewClient(client).SaveConfig(); err != nil {
+			log.Printf("Warning: failed to save caddy config: %v", err)
+		}
 	}
 
 	if purgeOld {
@@ -810,6 +809,9 @@ func (s *Service) setupRouteAndDNSForDomain(route Route, app *App, svr *server.S
 	} else {
 		if err := caddyClient.SaveConfig(); err != nil {
 			log.Printf("Warning: failed to save caddy config: %v", err)
+			if logs != nil {
+				*logs = append(*logs, fmt.Sprintf("caddy/save: %v", err))
+			}
 		}
 	}
 
@@ -1209,7 +1211,7 @@ func (s *Service) GetDeployment(id int64) (*Deployment, error) {
 	return s.repo.GetDeployment(id)
 }
 
-	var _ = time.Now
+var _ = time.Now
 
 func registryHost(svr *server.Server) string {
 	if svr.RegistryHost == "" {

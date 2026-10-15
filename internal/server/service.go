@@ -464,7 +464,7 @@ func (m *Monitor) Run() {
 		case <-ticker.C:
 			m.refreshAll()
 		case <-pruneTicker.C:
-			m.service.repo.PruneStats(time.Now().Add(-7 * 24 * time.Hour))
+			m.service.repo.PruneStats(time.Now().UTC().Add(-7 * 24 * time.Hour))
 		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/coderbuzz/dockify/internal/app"
 	"github.com/coderbuzz/dockify/internal/backup"
@@ -16,8 +17,8 @@ import (
 	httppkg "github.com/coderbuzz/dockify/internal/http"
 	"github.com/coderbuzz/dockify/internal/scheduler"
 	"github.com/coderbuzz/dockify/internal/server"
-	"github.com/coderbuzz/dockify/internal/ssh"
 	"github.com/coderbuzz/dockify/internal/settings"
+	"github.com/coderbuzz/dockify/internal/ssh"
 )
 
 var version = "0.1.0"
@@ -87,9 +88,12 @@ func main() {
 		log.Println("Web UI authentication enabled")
 	}
 
+	// No WriteTimeout: console and stats websockets, prune and import run long.
 	srv := &http.Server{
-		Addr:    cfg.Addr(),
-		Handler: router,
+		Addr:              cfg.Addr(),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	quit := make(chan os.Signal, 1)

@@ -3,6 +3,7 @@ package webhook
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -32,7 +33,7 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return
@@ -56,7 +57,7 @@ func (h *Handler) GitHub(w http.ResponseWriter, r *http.Request) {
 
 	secret := h.webhookSecretFn()
 	sig := r.Header.Get("X-Hub-Signature-256")
-	if secret != "" && !verifyHMACSHA256(sig, body, secret) {
+	if secret == "" || !verifyHMACSHA256(sig, body, secret) {
 		log.Printf("Webhook: invalid signature for %s@%s", repo, branch)
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
@@ -75,15 +76,15 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return
 	}
 
 	var payload struct {
-		Ref   string `json:"ref"`
-		After string `json:"after"`
+		Ref     string `json:"ref"`
+		After   string `json:"after"`
 		Project struct {
 			GitHTTPURL string `json:"git_http_url"`
 		} `json:"project"`
@@ -99,7 +100,7 @@ func (h *Handler) GitLab(w http.ResponseWriter, r *http.Request) {
 
 	secret := h.webhookSecretFn()
 	token := r.Header.Get("X-Gitlab-Token")
-	if secret != "" && token != secret {
+	if secret == "" || subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
 		log.Printf("Webhook: invalid token for %s@%s", repo, branch)
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
