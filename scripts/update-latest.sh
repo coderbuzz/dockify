@@ -42,11 +42,21 @@ fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
-BINARY="$TMP_DIR/dockify"
+BINARY="$TMP_DIR/dockify-linux-amd64"
+URL="https://github.com/coderbuzz/dockify/releases/latest/download/dockify-linux-amd64"
 
 echo "Downloading latest Dockify (no API call)..."
-curl -fsSL -o "$BINARY" \
-  "https://github.com/coderbuzz/dockify/releases/latest/download/dockify-linux-amd64"
+curl -fsSL -o "$BINARY" "$URL"
+
+echo "Verifying checksum..."
+if ! curl -fsSL -o "$BINARY.sha256" "$URL.sha256"; then
+  echo -e "${RED}Error: the latest release has no dockify-linux-amd64.sha256 (releases before checksums were published have none). Keeping current version.${NC}"
+  exit 1
+fi
+if ! (cd "$TMP_DIR" && sha256sum -c dockify-linux-amd64.sha256); then
+  echo -e "${RED}Error: checksum mismatch. Keeping current version.${NC}"
+  exit 1
+fi
 chmod +x "$BINARY"
 
 echo ""

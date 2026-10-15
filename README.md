@@ -502,7 +502,7 @@ The **Settings** page (`/settings`) provides centralized management:
 |---|---|
 | **Webhook Secret** | View, copy, or roll (regenerate) the global webhook secret |
 | **Update Check** | Checks GitHub Releases for a newer version |
-| **Run Update** | Triggers a self-update via `systemd-run` — downloads and runs the latest `update.sh` |
+| **Run Update** | Triggers a self-update via `systemd-run` — runs `update.sh` from the latest release tag found by the update check (refused when none is known); output in `journalctl -u dockify-upgrade` |
 
 The **About** page (`/about`) shows the current version, project description, and a **Sponsor** link. An update progress bar with live polling keeps you informed during self-updates.
 
@@ -539,6 +539,8 @@ A universal update script detects your install mode and updates accordingly:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/update.sh | bash
 ```
+
+Binary installs are checked against the release's `dockify-linux-amd64.sha256` before the binary is replaced; the update aborts if the file is missing (releases published before checksums have none) or does not match. `DOCKIFY_VERSION=vX.Y.Z` pins the release.
 
 Or manually per mode:
 

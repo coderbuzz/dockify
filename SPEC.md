@@ -354,7 +354,7 @@ Protected routes accept the session cookie or `Authorization: Bearer $DOCKIFY_AP
 | GET | `/api/settings/webhook-secret` | Get webhook secret |
 | POST | `/api/settings/webhook-secret/roll` | Regenerate webhook secret (it cannot be disabled) |
 | GET | `/api/settings/update/check` | Check latest GitHub Release version (`?force=1` skips the 5-minute cache) |
-| POST | `/api/settings/update/run` | Trigger self-update via systemd-run |
+| POST | `/api/settings/update/run` | Trigger self-update: `systemd-run --unit=dockify-upgrade /bin/bash -c` fetching `scripts/update.sh` from the latest release tag (no temp file; refused when no tag is known); `update.sh` verifies the binary against the release's `.sha256` |
 | POST | `/api/backup/export` | Download YAML export |
 | POST | `/api/backup/import` | Upload YAML import (multipart: `file` + `mode`), ≤ 16 MiB |
 
