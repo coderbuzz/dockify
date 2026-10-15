@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-palette="indigo" data-theme="light">
 <head>{{template "head" .}}</head>
 <body>
 {{template "nav" .}}
@@ -38,7 +38,7 @@
                 {{range $i, $d := .Domains}}
                 <div class="domain-row" style="display:flex;gap:0.4em;margin-bottom:0.35em">
                   <input type="text" name="domain" placeholder="app.example.com" value="{{$d}}" style="margin-bottom:0;flex:1">
-                  {{if $i}}<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>{{end}}
+                  {{if $i}}<button type="button" class="btn btn-ghost btn-icon-sm" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>{{end}}
                 </div>
                 {{end}}
                 {{else}}
@@ -135,7 +135,7 @@
         <p id="no-env-msg" style="color:var(--text-muted);font-size:0.85em">No variables added yet.</p>
       </div>
       <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center">
-        <button type="button" class="btn btn-primary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
+        <button type="button" class="btn btn-secondary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
         <button type="button" class="btn btn-ghost" onclick="openImportModal()" style="white-space:nowrap">Import</button>
         <button type="button" class="btn btn-ghost" onclick="openExportModal()" style="white-space:nowrap">Export</button>
       </div>
@@ -151,7 +151,7 @@
         <input type="hidden" name="file_content" value="{{.Content}}">
         <input type="file" style="display:none" onchange="uploadToFileRow(this)">
         <button type="button" class="btn btn-ghost" style="margin-bottom:0;white-space:nowrap" onclick="uploadClick(this)">Upload</button>
-        <button type="button" class="btn btn-ghost btn-red btn-icon" onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>
+        <button type="button" class="btn btn-ghost btn-icon-sm" onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>
       </div>
       {{end}}
       {{end}}
@@ -178,73 +178,61 @@
     <div style="display:flex;gap:0.6em;align-items:center">
       {{if .IsEdit}}
         {{if eq .App.Status "draft"}}
-          <button type="submit" class="btn btn-primary">Save as Draft</button>
+          <button type="submit" class="btn btn-secondary">Save as Draft</button>
         {{else}}
-          <button type="submit" class="btn btn-danger">Save &amp; Redeploy</button>
+          <button type="submit" class="btn btn-primary">Save &amp; Redeploy</button>
         {{end}}
-        <a href="apps/{{.App.ID}}" class="btn btn-ghost">Cancel</a>
+        <a href="apps/{{.App.ID}}" class="btn btn-secondary">Cancel</a>
       {{else}}
         <button type="submit" class="btn btn-primary">Deploy App</button>
-        <button type="button" class="btn btn-ghost" onclick="saveAsDraft()">Save as Draft</button>
+        <button type="button" class="btn btn-secondary" onclick="saveAsDraft()">Save as Draft</button>
       {{end}}
     </div>
   </form>
 </div>
 
-<div id="import-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeImportModal()">
-  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
-    <h3 style="margin:0 0 0.6em 0">Import</h3>
-    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 0.6em 0">Paste KEY=VALUE pairs below. Each line will be added as a new variable.</p>
-    <textarea id="import-textarea" rows="8" placeholder="KEY1=value1&#10;KEY2=value2&#10;..." style="width:100%;box-sizing:border-box"></textarea>
-    <p style="font-size:0.82em;color:var(--text-dim);margin:0.4em 0">Imported vars will be marked as <strong>Secret</strong>. You can change the type after import.</p>
-    <div style="display:flex;gap:0.5em;margin-top:0.8em">
-      <button type="button" class="btn btn-primary" onclick="importEnvFromModal()">Import</button>
-      <button type="button" class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
-    </div>
+{{template "ui_sheet_start" (dict "ID" "import-modal" "Title" "Import")}}
+  <p class="sheet-text">Paste KEY=VALUE pairs below. Each line will be added as a new variable.</p>
+  <textarea id="import-textarea" rows="8" class="sheet-textarea" placeholder="KEY1=value1&#10;KEY2=value2&#10;..."></textarea>
+  <p class="sheet-note">Imported vars will be marked as <strong>Secret</strong>. You can change the type after import.</p>
+  <div class="sheet-foot">
+    <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+    <button type="button" class="btn btn-primary" onclick="importEnvFromModal()">Import</button>
   </div>
-</div>
+{{template "ui_sheet_end"}}
 
-<div id="export-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeExportModal()">
-  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
-    <h3 style="margin:0 0 0.6em 0">Export</h3>
-    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 0.6em 0">Copy this to a <code>.env</code> file or another app.</p>
-    <textarea id="export-textarea" rows="10" readonly style="width:100%;box-sizing:border-box;resize:vertical" spellcheck="false"></textarea>
-    <div style="display:flex;gap:0.5em;margin-top:0.8em">
-      <button type="button" class="btn btn-primary" onclick="copyExport()">Copy</button>
-      <button type="button" class="btn btn-ghost" onclick="closeExportModal()">Close</button>
-    </div>
+{{template "ui_sheet_start" (dict "ID" "export-modal" "Title" "Export")}}
+  <p class="sheet-text">Copy this to a <code>.env</code> file or another app.</p>
+  <textarea id="export-textarea" rows="10" readonly class="sheet-textarea" spellcheck="false"></textarea>
+  <div class="sheet-foot">
+    <button type="button" class="btn btn-secondary" onclick="closeExportModal()">Close</button>
+    <button type="button" class="btn btn-primary" onclick="copyExport()">Copy</button>
   </div>
-</div>
+{{template "ui_sheet_end"}}
 
-<div id="move-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeMoveModal()">
-  <div class="modal-content" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1.2em;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
-    <h3 style="margin:0 0 0.6em 0">Pindahkan App ke Server Baru</h3>
-    <p style="color:var(--text-dim);font-size:0.85em;margin:0 0 1em 0">Anda mengubah server untuk aplikasi ini. Silahkan pilih opsi pemindahan data di bawah ini:</p>
-    
-    <div style="display:flex;flex-direction:column;gap:0.8em;margin-bottom:1.2em">
-      <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
-        <input type="checkbox" id="chk-move-files" checked style="margin-top:0.2em">
-        <div>
-          <strong>Move app files ke server baru</strong>
-          <div style="font-size:0.8em;color:var(--text-dim)">Salin folder aplikasi langsung dari server lama ke server baru via SSH (key sementara, dicabut setelah selesai), berjalan di background. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
-        </div>
-      </label>
-
-      <label style="display:flex;align-items:flex-start;gap:0.5em;cursor:pointer">
-        <input type="checkbox" id="chk-purge-old" checked style="margin-top:0.2em">
-        <div>
-          <strong>Purge app files and volumes from previous server</strong>
-          <div style="font-size:0.8em;color:var(--text-dim)">Setelah deploy di server baru sukses: hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama. Dilewati jika app memakai Docker volume.</div>
-        </div>
-      </label>
-    </div>
-
-    <div style="display:flex;gap:0.5em">
-      <button type="button" class="btn btn-primary" onclick="confirmMoveServer()">Pindahkan App</button>
-      <button type="button" class="btn btn-ghost" onclick="closeMoveModal()">Batal</button>
-    </div>
+{{template "ui_sheet_start" (dict "ID" "move-modal" "Title" "Pindahkan App ke Server Baru")}}
+  <p class="sheet-text">Anda mengubah server untuk aplikasi ini. Silahkan pilih opsi pemindahan data di bawah ini:</p>
+  <div class="sheet-opts">
+    <label class="sheet-opt">
+      <input type="checkbox" id="chk-move-files" checked>
+      <div>
+        <strong>Move app files ke server baru</strong>
+        <div class="sheet-note">Salin folder aplikasi langsung dari server lama ke server baru via SSH (key sementara, dicabut setelah selesai), berjalan di background. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
+      </div>
+    </label>
+    <label class="sheet-opt">
+      <input type="checkbox" id="chk-purge-old" checked>
+      <div>
+        <strong>Purge app files and volumes from previous server</strong>
+        <div class="sheet-note">Setelah deploy di server baru sukses: hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama. Dilewati jika app memakai Docker volume.</div>
+      </div>
+    </label>
   </div>
-</div>
+  <div class="sheet-foot">
+    <button type="button" class="btn btn-secondary" onclick="closeMoveModal()">Batal</button>
+    <button type="button" class="btn btn-primary" onclick="confirmMoveServer()">Pindahkan App</button>
+  </div>
+{{template "ui_sheet_end"}}
 
 <script>
 var pendingEnvVars = [];
@@ -301,8 +289,8 @@ function renderEnvVars() {
       : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     div.innerHTML = '<input type="text" class="env-key-input" value="' + escapeAttr(ev.key) + '" placeholder="KEY" autocomplete="off" style="margin-bottom:0;width:25%;min-width:120px" onchange="updateEnvKey(' + i + ', this.value)">'
       + '<textarea class="env-val-input" rows="1" placeholder="value" style="margin-bottom:0;flex:1;min-width:160px;resize:vertical" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
-      + '<button type="button" class="btn btn-ghost btn-icon" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '">' + svgEye + '</button>'
-      + '<button type="button" class="btn btn-ghost btn-red btn-icon" onclick="removeEnvVar(' + i + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
+      + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '">' + svgEye + '</button>'
+      + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="removeEnvVar(' + i + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
     list.appendChild(div);
   });
   syncEnvHiddenFields();
@@ -341,13 +329,13 @@ function syncEnvHiddenFields() {
 }
 
 function openImportModal() {
-  document.getElementById('import-modal').style.display = 'flex';
+  openSheet('import-modal');
   document.getElementById('import-textarea').value = '';
   document.getElementById('import-textarea').focus();
 }
 
 function closeImportModal() {
-  document.getElementById('import-modal').style.display = 'none';
+  closeSheet('import-modal');
 }
 
 function importEnvFromModal() {
@@ -380,14 +368,14 @@ function openExportModal() {
     return;
   }
   document.getElementById('export-textarea').value = lines.join('\n');
-  document.getElementById('export-modal').style.display = 'flex';
+  openSheet('export-modal');
   var ta = document.getElementById('export-textarea');
   ta.focus();
   ta.select();
 }
 
 function closeExportModal() {
-  document.getElementById('export-modal').style.display = 'none';
+  closeSheet('export-modal');
 }
 
 function copyExport() {
@@ -409,7 +397,7 @@ function addDomainRow() {
   div.className = 'domain-row';
   div.style.cssText = 'display:flex;gap:0.4em;margin-bottom:0.35em';
   div.innerHTML = '<input type="text" name="domain" placeholder="app.example.com" style="margin-bottom:0;flex:1">'
-    + '<button type="button" class="btn btn-ghost btn-icon" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>';
+    + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="removeDomainRow(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>';
   list.appendChild(div);
 }
 function removeDomainRow(btn) {
@@ -424,7 +412,7 @@ function addFileRow() {
     + '<input type="hidden" name="file_content">'
     + '<input type="file" style="display:none" onchange="uploadToFileRow(this)">'
     + '<button type="button" class="btn btn-ghost" style="margin-bottom:0;white-space:nowrap" onclick="uploadClick(this)">Upload</button>'
-    + '<button type="button" class="btn btn-ghost btn-red btn-icon" onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
+    + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="this.parentElement.remove()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg></button>';
   document.getElementById('file-rows').appendChild(div);
 }
 function uploadClick(btn) {
@@ -459,14 +447,14 @@ function validateServer() {
   var sel = document.querySelector('select[name="server_id"]');
   if (!sel.value) { alert('Please select a server or save as draft.'); return false; }
   if (isEdit && initialServerId && initialServerId !== "0" && sel.value !== initialServerId && !moveModalConfirmed) {
-    document.getElementById('move-modal').style.display = 'flex';
+    openSheet('move-modal');
     return false;
   }
   return true;
 }
 
 function closeMoveModal() {
-  document.getElementById('move-modal').style.display = 'none';
+  closeSheet('move-modal');
 }
 
 function confirmMoveServer() {

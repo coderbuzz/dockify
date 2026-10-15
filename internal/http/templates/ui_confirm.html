@@ -1,0 +1,11 @@
+{{/* Alert-dialog: dict ID Title Body Label [Action]. With Action the confirm button submits a POST form; without, bind a click handler to #<ID>-ok. */}}
+{{define "ui_confirm"}}<dialog class="sheet" id="{{.ID}}" aria-labelledby="{{.ID}}-title" role="alertdialog">
+<div class="sheet-head"><h2 id="{{.ID}}-title">{{.Title}}</h2><button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Close" onclick="closeSheet('{{.ID}}')">{{template "ui_icon" "x"}}</button></div>
+{{if .Action}}<form method="POST" action="{{.Action}}">{{end}}
+<div class="sheet-body"><p class="sheet-text">{{.Body}}</p></div>
+<div class="sheet-foot">
+<button type="button" class="btn btn-secondary" onclick="closeSheet('{{.ID}}')">Cancel</button>
+<button type="{{if .Action}}submit{{else}}button{{end}}" class="btn btn-destructive" id="{{.ID}}-ok">{{.Label}}</button>
+</div>
+{{if .Action}}</form>{{end}}
+</dialog>{{end}}
