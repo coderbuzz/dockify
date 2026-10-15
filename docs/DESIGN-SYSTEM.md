@@ -20,8 +20,7 @@ Tanpa framework CSS, tanpa Node saat build/runtime. Font: Plus Jakarta Sans 400/
 ## 3. Token lapis 2 (nama tetap, nilai per palet)
 Kegunaan tiap token sama dengan standar §3: `bg` latar halaman, `surface` kartu/header/sheet, `sunk` permukaan cekung (pill netral, wadah segmented),
 `line`/`line-strong` pemisah/batas, `control` batas input/select (≥3:1 terhadap `surface`), `ink`/`ink2`/`muted` teks (muted hanya ≥12px),
-`accent` teks/garis aksen, `accent-fill`+`on-accent` isian aksi utama, `accent-soft` hover/chip aktif, `brand2-fill`+`on-brand2` satu aksi pendamping per layar (Deploy App),
-`brand2`/`brand2-soft` angka sekunder, `chart`/`chart-soft` bar dan grafik, `ok`/`warn`/`danger` + `-text` + `-bg` status, `danger-fill` isian tombol konfirmasi hapus, `shadow` satu-satunya bayangan.
+`accent` teks/garis aksen, `accent-fill`+`on-accent` isian aksi utama, `accent-soft` hover/chip aktif, `brand2`/`brand2-soft` seri grafik kedua (RAM, disk, memori, jaringan) dari keluarga hue yang sama dengan aksen; `brand2-fill`+`on-brand2` disediakan tapi tidak dipakai tombol (keputusan user 2026-10-15: semua tombol aksi memakai `accent-fill`), `chart`/`chart-soft` bar dan grafik, `ok`/`warn`/`danger` + `-text` + `-bg` status, `danger-fill` isian tombol konfirmasi hapus, `shadow` satu-satunya bayangan.
 Semua pasangan kontras sudah dihitung (38/38 lolos per palet, lihat `docs/design/kontras.md`). Jangan ubah nilai tanpa menghitung ulang.
 
 ### 3.1 Palet `indigo` (Indigo Dockify, default)
@@ -40,10 +39,10 @@ Semua pasangan kontras sudah dihitung (38/38 lolos per palet, lihat `docs/design
 | accent-fill | `#4f46e5` | `#5850ec` |
 | on-accent | `#ffffff` | `#ffffff` |
 | accent-soft | `#eef0ff` | `#252a55` |
-| brand2-fill | `#14b8a6` | `#2dd4bf` |
-| on-brand2 | `#042f2e` | `#042f2e` |
-| brand2 | `#0f766e` | `#5eead4` |
-| brand2-soft | `#dcf5f1` | `#103633` |
+| brand2-fill | `#6d28d9` | `#6d28d9` |
+| on-brand2 | `#ffffff` | `#ffffff` |
+| brand2 | `#6d28d9` | `#c4b5fd` |
+| brand2-soft | `#ede9fe` | `#2a1d55` |
 | chart | `#6366f1` | `#818cf8` |
 | chart-soft | `#e3e5fc` | `#252a55` |
 | ok | `#15803d` | `#4ade80` |
@@ -74,10 +73,10 @@ Semua pasangan kontras sudah dihitung (38/38 lolos per palet, lihat `docs/design
 | accent-fill | `#2b3486` | `#4a54c9` |
 | on-accent | `#ffffff` | `#ffffff` |
 | accent-soft | `#e7e9f8` | `#242a5c` |
-| brand2-fill | `#f26a21` | `#f26a21` |
-| on-brand2 | `#1b1f3b` | `#1b1f3b` |
-| brand2 | `#c2410c` | `#ff9a5c` |
-| brand2-soft | `#fdeee4` | `#3a2418` |
+| brand2-fill | `#1e40af` | `#1e40af` |
+| on-brand2 | `#ffffff` | `#ffffff` |
+| brand2 | `#1e40af` | `#93c5fd` |
+| brand2-soft | `#dbeafe` | `#1a2a55` |
 | chart | `#4a54c9` | `#8c96ff` |
 | chart-soft | `#e3e5fb` | `#242a5c` |
 | ok | `#15803d` | `#4ade80` |
@@ -108,10 +107,10 @@ Semua pasangan kontras sudah dihitung (38/38 lolos per palet, lihat `docs/design
 | accent-fill | `#0e6e78` | `#0e6e78` |
 | on-accent | `#ffffff` | `#ffffff` |
 | accent-soft | `#e0f1f2` | `#103338` |
-| brand2-fill | `#f5a524` | `#f5a524` |
-| on-brand2 | `#1a1305` | `#1a1305` |
-| brand2 | `#a35a00` | `#f8b95a` |
-| brand2-soft | `#fdf0d9` | `#33270f` |
+| brand2-fill | `#075985` | `#075985` |
+| on-brand2 | `#ffffff` | `#ffffff` |
+| brand2 | `#075985` | `#7dd3fc` |
+| brand2-soft | `#e0f2fe` | `#0f2a3a` |
 | chart | `#0891b2` | `#38bdf8` |
 | chart-soft | `#dcf0f6` | `#0f2c3a` |
 | ok | `#15803d` | `#4ade80` |
@@ -143,7 +142,7 @@ Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Target sentuh a
 ## 5. Komponen (partial bersama, varian di partial bukan di pemakaian)
 | Kebutuhan | Partial / kelas | Catatan |
 | :--- | :--- | :--- |
-| Tombol | `.btn` + varian `primary` `brand` `secondary` `ghost` `destructive` `destructive-outline` `link`; ukuran 44 (default) / 36 (`sm`) / 48 (`lg`); ikon 44/40 | satu `primary` per layar/panel; `brand` maksimal satu; dalam satu kelompok varian harus berbeda |
+| Tombol | `.btn` + varian `primary` `secondary` `ghost` `destructive` `destructive-outline` `link`; ukuran 44 (default) / 36 (`sm`) / 48 (`lg`); ikon 44/40 | satu `primary` per layar/panel; dalam satu kelompok varian harus berbeda |
 | Input + label | `.field` (label 12.8px/600 + input 16px, border `control`, fokus outline 3px `accent`) | tanpa titik dua di label |
 | Select | `<select class="select">` native digayakan + chevron SVG | penyimpangan K4 yang disetujui |
 | Dialog / alert-dialog / drawer | `ui_sheet`: `<dialog class="sheet">` + `openSheet(id)`/`closeSheet(id)`; ≥700px popup tengah max-w 560 radius 16 max-h 86dvh; <700px panel bawah max-w 560 radius atas 16 handle 40×4 max-h 92dvh + safe-area; animasi ≤240 ms; hormati `prefers-reduced-motion`; tutup via X, backdrop, Escape; **tanpa tautan "Tutup" di bawah** | menggantikan semua `confirm()` dan modal inline |
@@ -157,8 +156,7 @@ Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Target sentuh a
 | Ikon | `ui_icon` nama: sun moon monitor logout menu x check alert refresh plus trash external chevron | SVG inline stroke 2 |
 
 ### 5.1 Hierarki aksi (K9)
-- **Primary** (`accent-fill`): satu per layar: Edit (app/server running), Start (stopped), Deploy (draft), Save, Sign in.
-- **Brand** (`brand2-fill`): Deploy App di daftar Apps, Add Server di daftar Servers.
+- **Primary** (`accent-fill`): satu per layar: Edit (app/server running), Start (stopped), Deploy (draft), Save, Sign in, Deploy App (daftar Apps), Add Server (daftar Servers). Tidak ada warna tombol kedua; semua palet memakai keluarga hue aksennya sendiri.
 - **Secondary**: Stop, Cancel, Save as Draft, tombol ikon header.
 - **Ghost**: Console, Tail 50/200/500, Copy, Show.
 - **Aksi berbahaya = merah**: Redeploy, Rollback, Init Worker, Prune Disk, Undeploy, Remove Server, Delete Draft, Clear History, Roll Secret, Update Dockify, Redeploy All. Pemicu = `destructive-outline` di **zona bahaya** terpisah (judul "Danger zone", garis atas); konfirmasi selalu lewat alert-dialog dengan kalimat akibat; tombol konfirmasi = `destructive` (isian `danger-fill`, teks putih).
