@@ -21,9 +21,9 @@ type DNSRecord struct {
 }
 
 type apiResponse struct {
-	Success  bool        `json:"success"`
-	Errors   []apiError  `json:"errors"`
-	Messages []string    `json:"messages"`
+	Success  bool            `json:"success"`
+	Errors   []apiError      `json:"errors"`
+	Messages []string        `json:"messages"`
 	Result   json.RawMessage `json:"result"`
 }
 
