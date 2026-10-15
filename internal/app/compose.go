@@ -37,81 +37,95 @@ func getServiceName(compose string) string {
 	return names[0]
 }
 
+type simpleCompose struct {
+	Services map[string]simpleService   `yaml:"services"`
+	Networks map[string]map[string]bool `yaml:"networks"`
+}
+
+type simpleService struct {
+	Image       string         `yaml:"image,omitempty"`
+	Restart     string         `yaml:"restart,omitempty"`
+	Command     string         `yaml:"command,omitempty"`
+	Ports       []string       `yaml:"ports,omitempty"`
+	Expose      []string       `yaml:"expose,omitempty"`
+	Volumes     []string       `yaml:"volumes,omitempty"`
+	Networks    []string       `yaml:"networks,omitempty"`
+	MemLimit    *yaml.Node     `yaml:"mem_limit,omitempty"`
+	CPUs        *yaml.Node     `yaml:"cpus,omitempty"`
+	Ulimits     *simpleUlimits `yaml:"ulimits,omitempty"`
+	Logging     *simpleLogging `yaml:"logging,omitempty"`
+	Environment []string       `yaml:"environment,omitempty"`
+}
+
+type simpleUlimits struct {
+	Nofile struct {
+		Soft *yaml.Node `yaml:"soft"`
+		Hard *yaml.Node `yaml:"hard"`
+	} `yaml:"nofile"`
+}
+
+type simpleLogging struct {
+	Driver  string            `yaml:"driver"`
+	Options map[string]string `yaml:"options,omitempty"`
+}
+
+// plain is an untagged scalar: written unquoted when that is valid YAML, so
+// "cpus: 0.5" stays a number as before, and quoted otherwise.
+func plain(s string) *yaml.Node {
+	if s == "" {
+		return nil
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Value: s}
+}
+
 func generateCompose(image string, port int, volumes string, appName string, memoryLimit, cpuLimit, logMaxSize, logMaxFile string, envKeys []string, command string, ports string, ulimitsNofile string) string {
 	svcName := "app"
 	if appName != "" {
 		svcName = sanitizeAppName(appName)
 	}
-	compose := fmt.Sprintf(`services:
-  %s:
-    image: %s`, svcName, image)
-
-	compose += "\n    restart: unless-stopped"
-
-	if command != "" {
-		compose += "\n    command: " + command
+	svc := simpleService{
+		Image:    image,
+		Restart:  "unless-stopped",
+		Command:  command,
+		Ports:    splitEnvVars(ports),
+		Volumes:  splitEnvVars(volumes),
+		Networks: []string{"dockify"},
+		MemLimit: plain(memoryLimit),
+		CPUs:     plain(cpuLimit),
 	}
-
-	if ports != "" {
-		compose += "\n    ports:"
-		for _, p := range splitEnvVars(ports) {
-			compose += fmt.Sprintf("\n      - %s", p)
-		}
-	}
-
 	if port > 0 {
-		compose += fmt.Sprintf("\n    expose:\n      - \"%d\"", port)
+		svc.Expose = []string{strconv.Itoa(port)}
 	}
-
-	if volumes != "" {
-		compose += "\n    volumes:"
-		for _, vol := range splitEnvVars(volumes) {
-			compose += fmt.Sprintf("\n      - %s", vol)
-		}
-	}
-
-	compose += "\n    networks:\n      - dockify"
-
-	if memoryLimit != "" {
-		compose += fmt.Sprintf("\n    mem_limit: %s", memoryLimit)
-	}
-
-	if cpuLimit != "" {
-		compose += fmt.Sprintf("\n    cpus: %s", cpuLimit)
-	}
-
 	if ulimitsNofile != "" {
-		compose += fmt.Sprintf("\n    ulimits:\n      nofile:\n        soft: %s\n        hard: %s", ulimitsNofile, ulimitsNofile)
+		svc.Ulimits = &simpleUlimits{}
+		svc.Ulimits.Nofile.Soft = plain(ulimitsNofile)
+		svc.Ulimits.Nofile.Hard = plain(ulimitsNofile)
 	}
-
 	if logMaxSize != "" || logMaxFile != "" {
-		compose += "\n    logging:"
-		compose += "\n      driver: json-file"
-		compose += "\n      options:"
+		svc.Logging = &simpleLogging{Driver: "json-file", Options: map[string]string{}}
 		if logMaxSize != "" {
-			compose += fmt.Sprintf("\n        max-size: \"%s\"", logMaxSize)
+			svc.Logging.Options["max-size"] = logMaxSize
 		}
 		if logMaxFile != "" {
-			compose += fmt.Sprintf("\n        max-file: \"%s\"", logMaxFile)
+			svc.Logging.Options["max-file"] = logMaxFile
+		}
+	}
+	for _, k := range envKeys {
+		if k = strings.TrimSpace(k); k != "" {
+			svc.Environment = append(svc.Environment, k+"=${"+k+"}")
 		}
 	}
 
-	if len(envKeys) > 0 {
-		compose += "\n    environment:"
-		for _, k := range envKeys {
-			if strings.TrimSpace(k) != "" {
-				compose += fmt.Sprintf("\n      - %s=${%s}", k, k)
-			}
-		}
+	var b strings.Builder
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(simpleCompose{
+		Services: map[string]simpleService{svcName: svc},
+		Networks: map[string]map[string]bool{"dockify": {"external": true}},
+	}); err != nil {
+		return "" // unreachable: simpleCompose holds only encodable types
 	}
-
-	compose += `
-
-networks:
-  dockify:
-    external: true`
-
-	return compose
+	return b.String()
 }
 
 func ensureDockifyNetwork(compose string) string {
@@ -232,16 +246,16 @@ func splitEnvVars(envVars string) []string {
 }
 
 type simpleFields struct {
-	Image      string
-	Port       int
-	EnvKeys    []string
-	Volumes    string
-	MemoryLimit string
-	CPULimit    string
-	LogMaxSize  string
-	LogMaxFile  string
-	Command     string
-	Ports       string
+	Image         string
+	Port          int
+	EnvKeys       []string
+	Volumes       string
+	MemoryLimit   string
+	CPULimit      string
+	LogMaxSize    string
+	LogMaxFile    string
+	Command       string
+	Ports         string
 	UlimitsNofile string
 }
 

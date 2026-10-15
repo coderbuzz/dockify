@@ -243,12 +243,8 @@ func (s *Service) deployWithCommit(id int64, commitSHA string, removedDomains ..
 
 	envPath := fmt.Sprintf("%s/.env", remoteDir)
 	envVars, _ := s.repo.ListSecrets(id)
-	var envLines []string
-	for _, ev := range envVars {
-		envLines = append(envLines, ev.Key+"="+strings.ReplaceAll(ev.Value, "$", "$$"))
-	}
-	if len(envLines) > 0 {
-		if err := client.WriteFile(envPath, strings.Join(envLines, "\n")+"\n", 0644); err != nil {
+	if len(envVars) > 0 {
+		if err := client.WriteFile(envPath, envFile(envVars), 0644); err != nil {
 			log.Printf("Warning: write .env: %v", err)
 		}
 	}

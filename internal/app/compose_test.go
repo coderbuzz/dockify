@@ -1,8 +1,11 @@
 package app
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestGenerateSimple(t *testing.T) {
@@ -31,8 +34,41 @@ func TestGenerateSimpleWithLogging(t *testing.T) {
 		t.Fatal("empty compose")
 	}
 
-	if !strings.Contains(c, "logging:") || !strings.Contains(c, "max-size: \"10m\"") || !strings.Contains(c, "max-file: \"3\"") {
+	if sf := parseSimpleFields(c); sf.LogMaxSize != "10m" || sf.LogMaxFile != "3" {
 		t.Fatalf("expected logging configuration in compose, got:\n%s", c)
+	}
+}
+
+// Values with ':' or '#' must not break the YAML, numeric limits stay numbers,
+// and parseSimpleFields reads back what the form sent.
+func TestGenerateComposeRoundTrip(t *testing.T) {
+	cmd := `sh -c 'echo a: b # not a comment'`
+	c := generateCompose("ghcr.io/x/app:1.2", 8080, "./data:/data\n./conf:/etc/app:ro", "my.app", "512m", "0.5", "10m", "3",
+		[]string{"FOO", "BAR"}, cmd, "8080:80, 9000:9000", "65535")
+
+	var doc struct {
+		Services map[string]struct {
+			Image   string
+			CPUs    float64 `yaml:"cpus"`
+			Ulimits struct{ Nofile struct{ Soft, Hard int } }
+		}
+		Networks map[string]struct{ External bool }
+	}
+	if err := yaml.Unmarshal([]byte(c), &doc); err != nil {
+		t.Fatalf("invalid YAML: %v\n%s", err, c)
+	}
+	svc := doc.Services["my-app"]
+	if svc.Image != "ghcr.io/x/app:1.2" || svc.CPUs != 0.5 || svc.Ulimits.Nofile.Soft != 65535 || svc.Ulimits.Nofile.Hard != 65535 || !doc.Networks["dockify"].External {
+		t.Fatalf("unexpected compose:\n%s", c)
+	}
+
+	want := simpleFields{
+		Image: "ghcr.io/x/app:1.2", Port: 8080, EnvKeys: []string{"FOO", "BAR"},
+		Volumes: "./data:/data\n./conf:/etc/app:ro", MemoryLimit: "512m", CPULimit: "0.5",
+		LogMaxSize: "10m", LogMaxFile: "3", Command: cmd, Ports: "8080:80\n9000:9000", UlimitsNofile: "65535",
+	}
+	if got := parseSimpleFields(c); !reflect.DeepEqual(got, want) {
+		t.Fatalf("round trip:\ngot  %+v\nwant %+v", got, want)
 	}
 }
 

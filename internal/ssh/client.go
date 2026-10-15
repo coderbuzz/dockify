@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -158,40 +159,17 @@ func shellQuote(s string) string {
 }
 
 func (c *Client) exec(cmd string, d time.Duration) (string, error) {
-	session, err := c.conn.NewSession()
-	if err != nil {
-		return "", fmt.Errorf("new session: %w", err)
-	}
-	defer session.Close()
-
-	var stdout, stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
-
-	if err := session.Start(wrapTimeout(cmd, d)); err != nil {
-		return "", fmt.Errorf("exec %q: %w", cmd, err)
-	}
-	done := make(chan error, 1)
-	go func() { done <- session.Wait() }()
-
-	// Backstop in case the connection itself hangs; the remote timeout fires first.
-	timer := time.NewTimer(d + 30*time.Second)
-	defer timer.Stop()
-	select {
-	case err = <-done:
-	case <-timer.C:
-		session.Close()
-		<-done
-		return stdout.String(), fmt.Errorf("exec %q: timed out after %s", cmd, d)
-	}
-	if err != nil {
-		return stdout.String(), fmt.Errorf("exec %q: %w: %s", cmd, err, stderr.String())
-	}
-
-	return stdout.String(), nil
+	var stdout bytes.Buffer
+	err := c.run(cmd, nil, &stdout, d)
+	return stdout.String(), err
 }
 
 func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
+	return c.run(cmd, stdin, stdout, ExecPipeTimeout)
+}
+
+// run executes cmd under a remote timeout d, with optional stdin and stdout.
+func (c *Client) run(cmd string, stdin io.Reader, stdout io.Writer, d time.Duration) error {
 	session, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("new session: %w", err)
@@ -207,23 +185,24 @@ func (c *Client) ExecPipe(cmd string, stdin io.Reader, stdout io.Writer) error {
 	var stderr bytes.Buffer
 	session.Stderr = &stderr
 
-	if err := session.Start(wrapTimeout(cmd, ExecPipeTimeout)); err != nil {
-		return fmt.Errorf("exec pipe %q: %w", cmd, err)
+	if err := session.Start(wrapTimeout(cmd, d)); err != nil {
+		return fmt.Errorf("exec %q: %w", cmd, err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- session.Wait() }()
 
-	timer := time.NewTimer(ExecPipeTimeout + 30*time.Second)
+	// Backstop in case the connection itself hangs; the remote timeout fires first.
+	timer := time.NewTimer(d + 30*time.Second)
 	defer timer.Stop()
 	select {
 	case err = <-done:
 	case <-timer.C:
 		session.Close()
 		<-done
-		return fmt.Errorf("exec pipe %q: timed out after %s", cmd, ExecPipeTimeout)
+		return fmt.Errorf("exec %q: timed out after %s", cmd, d)
 	}
 	if err != nil {
-		return fmt.Errorf("exec pipe %q: %w: %s", cmd, err, stderr.String())
+		return fmt.Errorf("exec %q: %w: %s", cmd, err, stderr.String())
 	}
 	return nil
 }
@@ -269,13 +248,15 @@ func (c *Client) ExecStream(ctx context.Context, cmd string) (<-chan string, err
 	return outCh, nil
 }
 
-func (c *Client) WriteFile(path, content string, mode os.FileMode) error {
-	cmd := fmt.Sprintf(
-		"mkdir -p $(dirname '%s') && cat > '%s' << 'DOCKIFY_EOF'\n%s\nDOCKIFY_EOF\nchmod %o '%s'",
-		path, path, content, mode, path,
-	)
-	_, err := c.Exec(cmd)
-	return err
+// WriteFile sends content on stdin, so the shell never parses any of it. A new
+// file is created 0600 (umask) and only then chmod'ed to mode.
+func (c *Client) WriteFile(name, content string, mode os.FileMode) error {
+	return c.run(writeFileCmd(name, mode), strings.NewReader(content), nil, ExecTimeout)
+}
+
+func writeFileCmd(name string, mode os.FileMode) string {
+	q := shellQuote(name)
+	return fmt.Sprintf("mkdir -p %s && (umask 077; cat > %s) && chmod %o %s", shellQuote(path.Dir(name)), q, mode, q)
 }
 
 func (c *Client) ExecPTY(ctx context.Context, cmd string, rows, cols int) (<-chan Output, chan<- Input, error) {

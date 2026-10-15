@@ -84,8 +84,27 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	envKeys := make([]string, 0, len(input.EnvVars))
 	for _, e := range input.EnvVars {
-		if strings.TrimSpace(e.Key) != "" {
-			envKeys = append(envKeys, strings.TrimSpace(e.Key))
+		if k := strings.TrimSpace(e.Key); k != "" {
+			if err := ValidEnvKey(k); err != nil {
+				jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
+			envKeys = append(envKeys, k)
+		}
+	}
+	for i, d := range append([]string{input.Domain}, input.Domains...) {
+		if strings.TrimSpace(d) == "" {
+			continue
+		}
+		n, err := ValidDomain(d)
+		if err != nil {
+			jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		if i == 0 {
+			input.Domain = n
+		} else {
+			input.Domains[i-1] = n
 		}
 	}
 
@@ -400,6 +419,10 @@ func (h *Handler) SetSecret(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "key is required"})
 		return
 	}
+	if err := ValidEnvKey(input.Key); err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
 	set := func() error { return h.service.SetSecret(id, input.Key, input.Value) }
 	if input.IsSecret != nil {
 		set = func() error { return h.service.SetSecretWithType(id, input.Key, input.Value, *input.IsSecret) }
@@ -445,7 +468,12 @@ func (h *Handler) SetFile(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "path is required"})
 		return
 	}
-	if err := h.service.SetFile(id, input.Path, input.Content); err != nil {
+	p, err := ValidFilePath(input.Path)
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := h.service.SetFile(id, p, input.Content); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
@@ -454,7 +482,11 @@ func (h *Handler) SetFile(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	path := chi.URLParam(r, "path")
+	path, err := ValidFilePath(chi.URLParam(r, "path"))
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
 	if err := h.service.DeleteFile(id, path); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -748,6 +780,11 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		render(w, r, http.StatusBadRequest, "apps_add.html", formCtx(servers, msg))
 		return
 	}
+	if err := validateForm(r, domains); err != nil {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusBadRequest, "apps_add.html", formCtx(servers, err.Error()))
+		return
+	}
 
 	if app.ServerID == 0 && !isDraft {
 		id, err := h.service.PickServerID()
@@ -971,6 +1008,11 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	if app.Name == "" || app.Compose == "" {
 		servers, _ := h.serverRepo.List()
 		render(w, r, http.StatusBadRequest, "apps_add.html", editCtx(servers, "name and compose are required"))
+		return
+	}
+	if err := validateForm(r, domains); err != nil {
+		servers, _ := h.serverRepo.List()
+		render(w, r, http.StatusBadRequest, "apps_add.html", editCtx(servers, err.Error()))
 		return
 	}
 	if h.service.Busy(id) {
@@ -1288,7 +1330,7 @@ func parseDomains(r *http.Request) []string {
 	seen := map[string]bool{}
 	var result []string
 	for _, d := range domains {
-		d = strings.TrimSpace(d)
+		d = strings.ToLower(strings.TrimSpace(d))
 		if d != "" && !seen[d] {
 			seen[d] = true
 			result = append(result, d)
@@ -1301,8 +1343,8 @@ func saveFormFiles(r *http.Request, svc *Service, appID int64) {
 	paths := r.Form["file_path"]
 	contents := r.Form["file_content"]
 	for i, p := range paths {
-		p = strings.TrimSpace(p)
-		if p == "" || i >= len(contents) {
+		p, err := ValidFilePath(p) // validateForm already rejected bad paths
+		if err != nil || i >= len(contents) {
 			continue
 		}
 		c := contents[i]
