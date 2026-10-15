@@ -20,9 +20,19 @@
   {{else if or (eq .Server.Status "initializing") (eq .Server.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" (printf "Status: %s" .Server.Status) "Sub" "Initialization in progress. This page refreshes every 2 seconds.")}}
   {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .Server.Status) "Sub" "Check the SSH key and connection, then run Init worker.")}}{{end}}
 
-  <div class="action-bar">
-    <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>
-    <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
+  <div class="card detail-card">
+    <dl class="detail-grid">
+      <div><dt>Host</dt><dd class="mono">{{.Server.Host}}</dd></div>
+      <div><dt>Port</dt><dd class="mono">{{.Server.Port}}</dd></div>
+      <div><dt>User</dt><dd class="mono">{{.Server.User}}</dd></div>
+      <div class="wide"><dt>SSH key</dt><dd class="mono wrap">{{.Server.SSHKey}}</dd></div>
+      <div class="wide"><dt>Host key</dt><dd class="mono wrap">{{with .Server.HostKeyFingerprint}}{{.}}{{else}}not pinned yet{{end}}</dd></div>
+      <div class="wide"><dt>Registry</dt><dd>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</dd></div>
+    </dl>
+  <div class="actgrid">
+    <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">{{template "ui_icon" "edit"}}Edit</a>
+    <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">{{template "ui_icon" "terminal"}}Console</button>
+  </div>
   </div>
 
   <div class="console-section">
@@ -62,18 +72,6 @@
   </div>
   {{end}}
 
-  <div class="card">
-    <h3>Connection</h3>
-    <dl class="detail-grid">
-      <div><dt>Host</dt><dd class="mono">{{.Server.Host}}</dd></div>
-      <div><dt>Port</dt><dd class="mono">{{.Server.Port}}</dd></div>
-      <div><dt>User</dt><dd class="mono">{{.Server.User}}</dd></div>
-      <div><dt>Status</dt><dd><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></dd></div>
-      <div class="wide"><dt>SSH key</dt><dd class="mono wrap">{{.Server.SSHKey}}</dd></div>
-      <div class="wide"><dt>Host key</dt><dd class="mono wrap">{{with .Server.HostKeyFingerprint}}{{.}}{{else}}not pinned yet{{end}}</dd></div>
-      <div class="wide"><dt>Registry</dt><dd>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</dd></div>
-    </dl>
-  </div>
 
   {{template "servers_resources_card" .}}
 
@@ -114,9 +112,12 @@
 
   <div class="card danger-zone">
     <h3>Danger zone</h3>
-    <div class="dz-row"><div><div class="dz-title">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</div><div class="dz-desc">Installs Docker and Caddy, re-applies the worker config.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-init')">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</button></div>
-    <div class="dz-row"><div><div class="dz-title">Prune disk</div><div class="dz-desc">Remove stopped containers, unused images and build cache.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('prune-modal')">Prune disk</button></div>
-    <div class="dz-row"><div><div class="dz-title">Remove server</div><div class="dz-desc">Remove from Dockify and delete its SSH key. Cannot be undone.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-remove')">Remove server</button></div>
+    <p class="dz-sub">Each action asks for confirmation first.</p>
+    <div class="dz-grid">
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('server-init')">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</button>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('prune-modal')">Prune disk</button>
+      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('server-remove')">Remove server</button>
+    </div>
   </div>
 
 </div>
