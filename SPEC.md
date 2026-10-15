@@ -58,9 +58,10 @@ internal/
     stats_ws.go                  # WebSocket real-time server stats (1s interval)
     app_stats_ws.go              # WebSocket real-time app container stats
     templates.go                 # Embedded templates, template funcs, Render (into a buffer, then write)
-    static/                      # Vendored htmx 2.0.4, xterm 5.3.0, xterm-addon-fit 0.8.0 (SOURCES.md: URLs + sha256)
+    static/                      # app.css (tokens + components), app.js, list.js, charts.js, console.js; vendored htmx 2.0.4, xterm 5.3.0, xterm-addon-fit 0.8.0 (SOURCES.md: URLs + sha256)
     templates/                   # HTML templates (pages, layout, partials)
-      layout.html                # head/nav/scripts blocks, all CSS (single <style> block)
+      layout.html                # head/nav/scripts blocks (CSS lives in static/app.css)
+      ui_*.html                  # Shared partials: ui_icon, ui_sheet, ui_confirm, ui_alert, ui_segmented, ui_listbar
       dashboard.html             # Dashboard with stats cards + server/app summary tables
       servers.html               # Server list page (servers_list.html: table partial)
       servers_add.html           # Add server form
@@ -72,7 +73,6 @@ internal/
       apps_add.html              # Deploy app form, also used for edit (simple/advanced toggle)
       apps_detail.html           # App detail: info, compose, env vars, files, logs, deployments, live charts, console
       apps_stats_card.html       # HTMX partial: app stats
-      live_charts.html           # Partial: live chart script (included by layout)
       settings.html              # Settings: webhook secret, export/import links
       about.html                 # About page: version, update check/run, sponsor link
       export.html                # Export page: passphrase generator, download YAML
@@ -480,63 +480,15 @@ There are three monitoring paths:
 
 ## UI Style Guide
 
-All styles live in `internal/http/templates/layout.html` as a single `<style>` block. No external CSS framework — fully custom Vanilla CSS.
+The normative reference is [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md); the revamp plan and measurements are in `docs/UI-REVAMP-PLAN.md` and `docs/ui-revamp/`. Summary:
 
-### Typography
-- **Primary UI Font Stack:** `'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` (body, headers, navigation, buttons, labels)
-- **Monospace Font Stack:** `'JetBrains Mono', 'Fira Code', ui-monospace, 'SF Mono', 'Cascadia Code', monospace` (IPs, ports, domains, badges, terminal, logs, secrets, code)
-- **Base size:** 14px, line-height: 1.5
-- **Headings:** weight 600; h1 = 1.35em, h2 = 1.1em
-
-### Color System & Design Tokens
-
-| Token | Light (`:root`) | Dark (`html.dark`) | Usage |
-|---|---|---|---|
-| `--bg` | `#f8fafc` | `#090d16` | App background |
-| `--bg-elevated` | `#ffffff` | `#0f172a` | Raised surface |
-| `--bg-card` | `#ffffff` | `#1e293b` | Card background |
-| `--border` | `#e2e8f0` | `rgba(255, 255, 255, 0.08)` | Subtle borders |
-| `--border-hover` | `#cbd5e1` | `rgba(255, 255, 255, 0.18)` | Interactive borders |
-| `--text` | `#0f172a` | `#f8fafc` | Primary text |
-| `--text-muted` | `#475569` | `#94a3b8` | Muted secondary text |
-| `--text-dim` | `#94a3b8` | `#64748b` | Dimmed tertiary text |
-| `--accent` | `#4f46e5` | `#6366f1` | Primary brand accent (Indigo) |
-| `--accent-hover` | `#4338ca` | `#818cf8` | Hover accent |
-| `--green` | `#10b981` | `#34d399` | Success / online / running |
-| `--red` | `#ef4444` | `#f87171` | Error / offline / failed |
-| `--yellow` | `#f59e0b` | `#fbbf24` | Warning / pending |
-| `--orange` | `#f97316` | `#fb923c` | Info / deploying |
-| `--blue` | `#3b82f6` | `#60a5fa` | Links / neutral interactive |
-| `--shadow-sm` | `0 1px 2px 0 rgba(0, 0, 0, 0.05)` | `0 1px 2px 0 rgba(0, 0, 0, 0.3)` | Subtle card elevation |
-| `--shadow-md` | `0 4px 6px -1px rgba(0,0,0,0.07)` | `0 4px 6px -1px rgba(0,0,0,0.4)` | Card hover / dropdown elevation |
-
-### Dark/Light Mode
-- Default: light mode (`<html>` without class)
-- Dark: `<html class="dark">`
-- Toggle button in nav uses `localStorage('dockify-theme')`, defaults to OS preference
-- Icons: ☀ (light mode), ☾ (dark mode)
-
-### Component Patterns
-
-**Nav:** `<div class="top-nav">` — `.logo` (bold), `.nav-links` (flex). Sticky top bar with glassmorphism backdrop (`backdrop-filter: blur(12px)`). Includes a responsive mobile drawer navigation for viewports under 680px.
-
-**Cards:** `<div class="card">` — `border: 1px solid var(--border)`, `border-radius: 8px`, `background: var(--bg-card)`, `box-shadow: var(--shadow-sm)`. Includes smooth hover micro-transitions (`transform: translateY(-1px)`).
-
-**Buttons:** `<button class="btn">` or `<a class="btn">`
-- `btn-primary` — filled indigo accent, white text
-- `btn-ghost` — transparent, muted text with hover transition
-- `btn-red` — red text, subtle red border hover
-- `btn-danger` — filled red background for destructive actions
-
-**Tables:** `<table>` — `<thead>` (uppercase th, letter-spacing), rounded container wrapping, row hover highlights.
-
-**Badges:** `<span class="badge badge-{status}">` — Status pill badges with optional pulsing indicator dot (`<span class="badge-dot"></span>`) for live online/running/deploying states.
-
-**Logs & Terminal:** Terminal and log container styled with dark glass topbar, macOS-style window controls, and crisp monospace log streaming.
-
-### CSS Conventions
-- CSS custom properties for all design tokens (no hardcoded color values)
-- Fully responsive across desktop, tablet, and mobile viewports
+- **Stack:** Go `html/template` + htmx + one custom stylesheet (`internal/http/static/app.css`), no CSS framework, no Node at build or runtime. Fonts: Plus Jakarta Sans (UI) and JetBrains Mono (technical values) from Google Fonts with `display=swap`.
+- **Theme:** `<html data-palette="indigo|navy|teal" data-theme="light|dark">`, chosen in Settings → Appearance (palette) and the header button or Settings (light / dark / system, default system). Preferences are in `localStorage` (`dockify_palette`, `dockify_theme`); a head script applies them before first paint. Components only use layer-2 tokens (`--ink`, `--surface`, `--accent-fill`, ...), never hex.
+- **Shell:** compact header (theme, sign out) plus a bottom tab bar below 900px and a tab row under the header from 900px; active item is set server-side (`aria-current`).
+- **Components:** shared partials (`ui_icon`, `ui_sheet`, `ui_confirm`, `ui_alert`, `ui_segmented`, `ui_listbar`) and classes (`.btn-*`, `.card`, `.badge-*`, `.field`, `.rows` tables that become card rows on phones). Dialogs are native `<dialog>`; there is no `confirm()` or `alert()`.
+- **Action hierarchy:** one primary action per screen; dangerous actions (redeploy, rollback, init, prune, undeploy, remove, clear history, roll secret, update) are destructive-outline triggers, grouped in a "Danger zone" on detail pages, and always confirmed in an alert dialog.
+- **Loading:** `xterm`, charts, console and htmx are loaded only where used (xterm on first Console click).
+- **Checks:** `node tests/e2e/ui.mjs` (screenshots, overflow, DOM nodes, navigation timing, WCAG contrast, quick a11y); see `AGENTS.md`.
 
 ## Security Considerations
 

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}<script src="static/htmx.min.js"></script><script src="static/charts.js?v={{.AssetVersion}}"></script>{{if eq .Server.Status "initializing"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<head>{{template "head" .}}<script src="static/htmx.min.js?v={{.AssetVersion}}"></script><script src="static/charts.js?v={{.AssetVersion}}"></script><script src="static/console.js?v={{.AssetVersion}}"></script>{{if eq .Server.Status "initializing"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
@@ -10,6 +10,7 @@
     <span>{{.Server.Name}}</span>
   </div>
 
+  {{if .Flash}}{{if .FlashError}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" "Prune failed" "Sub" .Flash)}}{{else}}<div class="toast" role="status">{{.Flash}}</div>{{end}}{{end}}
   <div class="page-head">
     <h1>{{.Server.Name}} <span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></h1>
     <p class="meta mono">{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
@@ -121,32 +122,32 @@
 </div>
 
   {{template "ui_sheet_start" (dict "ID" "prune-modal" "Title" (printf "Prune worker disk (%s)" .Server.Name))}}
-      <p class="sheet-text">Bersihkan cache Docker, image tidak terpakai, dan data sisa di server worker ini untuk membebaskan ruang disk.</p>
+      <p class="sheet-text">Remove Docker cache, unused images and leftover data on this worker to free disk space.</p>
       <form method="POST" action="servers/{{.Server.ID}}/prune" id="prune-form">
         <div class="sheet-opts">
           <label class="sheet-opt">
             <input type="radio" name="prune_type" value="standard" checked onclick="togglePruneOptions(false)">
             <div>
-              <strong>Standard Prune (Aman)</strong>
-              <div class="sheet-note">Menghapus container yang telah berhenti, network tidak terpakai, dan dangling images (`docker system prune -f`).</div>
+              <strong>Standard prune (safe)</strong>
+              <div class="sheet-note">Removes stopped containers, unused networks and dangling images (`docker system prune -f`).</div>
             </div>
           </label>
           <label class="sheet-opt">
             <input type="radio" name="prune_type" value="deep" onclick="togglePruneOptions(true)">
             <div>
-              <strong>Deep Prune (Pembersihan Total)</strong>
-              <div class="sheet-note">Menghapus seluruh image tidak terpakai, build cache (`docker builder prune -af`), dan opsi volume (`docker system prune -af --volumes`).</div>
+              <strong>Deep prune (full cleanup)</strong>
+              <div class="sheet-note">Removes all unused images, build cache (`docker builder prune -af`) and optionally volumes (`docker system prune -af --volumes`).</div>
             </div>
           </label>
           <div id="deep-options" class="sheet-suboptions">
-            <label class="sheet-opt"><input type="checkbox" name="all" value="1" id="chk-all"> Hapus semua unused images (bukan cuma dangling)</label>
-            <label class="sheet-opt"><input type="checkbox" name="volumes" value="1" id="chk-volumes"> Hapus unused Docker volumes</label>
+            <label class="sheet-opt"><input type="checkbox" name="all" value="1" id="chk-all"> Remove all unused images (not only dangling)</label>
+            <label class="sheet-opt"><input type="checkbox" name="volumes" value="1" id="chk-volumes"> Remove unused Docker volumes</label>
           </div>
         </div>
       </form>
       {{template "ui_sheet_foot"}}
-        <button type="button" class="btn btn-secondary" onclick="closeSheet('prune-modal')">Batal</button>
-        <button type="submit" form="prune-form" class="btn btn-destructive">Jalankan Prune</button>
+        <button type="button" class="btn btn-secondary" onclick="closeSheet('prune-modal')">Cancel</button>
+        <button type="submit" form="prune-form" class="btn btn-destructive">Run prune</button>
   {{template "ui_sheet_end"}}
   {{template "ui_confirm" (dict "ID" "server-init" "Title" (printf "Init worker %s?" .Server.Name) "Body" "This re-runs the worker setup over SSH and may restart Docker and Caddy on this server." "Label" "Init worker" "Action" (printf "servers/%d/init" .Server.ID))}}
   {{template "ui_confirm" (dict "ID" "server-remove" "Title" (printf "Remove %s?" .Server.Name) "Body" "This removes the server from Dockify and deletes its SSH key. It cannot be undone. Undeploy or move its apps first." "Label" "Remove server" "Action" (printf "servers/%d/delete" .Server.ID))}}

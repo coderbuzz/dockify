@@ -323,7 +323,6 @@ body:not(.login-page) { padding-bottom: calc(56px + env(safe-area-inset-bottom))
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
-.card h3 { font-size: 0.85em; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.8em; font-weight: 600; }
 .card p { font-size: 0.9em; margin: 0.3em 0; }
 
 /* Grid System */
@@ -340,7 +339,7 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
   padding: 0.45em 0.9em;
   font-size: 0.9em;
   font-family: inherit;
-  border-radius: 6px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
@@ -491,21 +490,13 @@ th[aria-sort=ascending] .icon, th[aria-sort=descending] .icon { opacity: 1; }
 th[aria-sort=ascending] .icon { transform: rotate(180deg); }
 .rows tbody td { padding: 10px 12px; vertical-align: middle; font-size: 14px; border-bottom: 1px solid var(--line); }
 .rows tbody tr:last-child td { border-bottom: 0; }
-.rows tbody tr:hover td { background: var(--sunk); }
+.rows tbody tr:hover td { background-color: var(--sunk); }
 .rows .c-name > a:first-child { font-size: 15px; font-weight: 700; display: block; }
 .rows .c-name small { display: block; font-size: 12px; color: var(--muted); }
 .rows .c-name small a { font-weight: 400; color: var(--muted); }
 .rows .c-name small a.ext::after { content: " \2197"; }
 .rows .c-num { font-size: 12px; white-space: nowrap; }
 .rows .badge { white-space: nowrap; }
-progress.bar { display: block; width: 100%; max-width: 96px; height: 4px; margin-top: 4px; border: 0; border-radius: 2px; background: var(--chart-soft); appearance: none; -webkit-appearance: none; }
-progress.bar::-webkit-progress-bar { background: var(--chart-soft); border-radius: 2px; }
-progress.bar::-webkit-progress-value { background: var(--chart); border-radius: 2px; }
-progress.bar::-moz-progress-bar { background: var(--chart); border-radius: 2px; }
-progress.bar-warn::-webkit-progress-value { background: var(--warn); }
-progress.bar-warn::-moz-progress-bar { background: var(--warn); }
-progress.bar-danger::-webkit-progress-value { background: var(--danger); }
-progress.bar-danger::-moz-progress-bar { background: var(--danger); }
 @media (max-width: 699px) {
   table.rows, .rows tbody { display: block; border: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
   .rows thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -667,26 +658,11 @@ pre {
   box-shadow: var(--shadow);
 }
 
-/* Secret Row */
-.secret-row {
-  display: flex;
-  align-items: center;
-  padding: 0.5em 0;
-  border-bottom: 1px solid var(--line);
-  gap: 0.6em;
-}
-.secret-row code { flex: 1; font-size: 0.85em; }
-.secret-row input { width: auto; min-width: 160px; padding: 0.4em 0.6em; font-size: 0.85em; }
-
 /* Empty state */
 .empty-state { text-align: center; padding: 3.5em 1.5em; color: var(--ink2); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; margin: 1em 0; }
 .empty-state p { margin-bottom: 1em; font-size: 0.95em; }
 
-/* Dev Mock Bar & Flash Banner */
-@keyframes blink-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
+/* Dev Mock Bar */
 .dev-mock-bar {
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -721,7 +697,6 @@ pre {
 
 /* Console Section */
 .console-section { margin-top: 1.2em; }
-.console-section #console-toggle { margin-bottom: 0.6em; }
 .console-container {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -740,8 +715,6 @@ pre {
 #terminal { padding: 0.4em; }
 
 /* Gauges & Live Charts */
-.stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2em; }
-.stats-header h3 { margin: 0; }
 
 .stats-gauges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.8em 1.5em; margin-bottom: 0.85em; }
 .stat-gauge { min-width: 0; }
@@ -758,19 +731,6 @@ pre {
 .chart-title-val--net { color: var(--accent); }
 .chart-title-val--disk { color: var(--accent); }
 .chart-svg { width: 100%; height: 100px; display: block; background: var(--surface); border-radius: 6px; border: 1px solid var(--line); }
-.live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
-  margin-left: 0.6em;
-  padding: 0.15em 0.5em;
-  font-size: 0.72em;
-  font-weight: 600;
-  color: var(--ok);
-  background: var(--ok-bg);
-  border-radius: 9999px;
-  border: 1px solid color-mix(in srgb, var(--ok) 20%, transparent);
-}
 .live-badge--hidden { opacity: 0; visibility: hidden; }
 
 /* Responsive Media Queries */
@@ -894,3 +854,18 @@ pre.code { margin: 0; padding: 12px; background: var(--sunk); border: 1px solid 
 /* iOS zooms inputs below 16px: keep mono fields at 16px on phones */
 @media (max-width: 699px) { input.mono, textarea.mono, .secret-row input { font-size: 16px; } }
 .row-domain > input:only-child { grid-column: 1 / -1; }
+
+/* Usage cells: the bar is the cell background (no extra DOM nodes), sub-text from data-sub */
+.bar-cell {
+  --bar: var(--chart);
+  background-image: linear-gradient(var(--bar), var(--bar)), linear-gradient(var(--chart-soft), var(--chart-soft));
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: var(--w, 0) 4px, 100% 4px;
+}
+.bar-cell.bar-warn { --bar: var(--warn); }
+.bar-cell.bar-danger { --bar: var(--danger); }
+.c-num[data-sub]::after { content: attr(data-sub); display: block; font-size: 11px; color: var(--muted); }
+@media (max-width: 699px) { .rows .bar-cell { padding-bottom: 8px; } }
+@media (min-width: 700px) { .rows-applist .c-name small { display: none; } }
+.rows tbody tr { content-visibility: auto; contain-intrinsic-size: 0 64px; }

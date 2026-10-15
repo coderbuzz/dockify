@@ -1,7 +1,7 @@
 {{define "apps_list"}}
 {{if .Apps}}
 <div data-list>
-{{template "ui_listbar" (dict "Placeholder" "Search name or domain" "Chips" (list "running" "stopped" "draft" "failed"))}}
+{{template "ui_listbar" (dict "Placeholder" "Search name or domain" "Chips" (list "running" "stopped" "draft" "deploying" "failed"))}}
 {{range .ServerGroups}}
 <section class="app-group" data-group>
   <header class="group-head">
@@ -10,11 +10,12 @@
     {{if .Status}}<span class="badge badge-{{.Status}}">{{.Status}}</span>{{end}}
     <span class="group-count">{{len .Apps}} {{if eq (len .Apps) 1}}app{{else}}apps{{end}}</span>
   </header>
-  <table class="rows">
+  <table class="rows rows-applist">
     <thead>
       <tr>
         <th aria-sort="none"><button type="button" class="th-sort" data-sort="name" data-type="string">Name{{template "ui_icon" "chevron-down"}}</button></th>
         <th aria-sort="none"><button type="button" class="th-sort" data-sort="status" data-type="string">Status{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="domain" data-type="string">Domain{{template "ui_icon" "chevron-down"}}</button></th>
         <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
         <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="memory" data-type="number">Memory{{template "ui_icon" "chevron-down"}}</button></th>
         <th class="col-sm-hide num" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
@@ -23,13 +24,14 @@
     </thead>
     <tbody>
       {{range .Apps}}
-      <tr data-name="{{.Name}}" data-status="{{if eq .Status "error"}}failed{{else}}{{.Status}}{{end}}" data-search="{{lower (printf "%s %s" .Name .Domain)}}"
+      <tr data-name="{{.Name}}" data-status="{{if eq .Status "error"}}failed{{else}}{{.Status}}{{end}}" data-search="{{lower (printf "%s %s" .Name .Domain)}}" data-domain="{{.Domain}}"
           data-cpu="{{with $st := index $.AppStats .ID}}{{printf "%.3f" $st.CPUPercent}}{{end}}"
           data-memory="{{with $st := index $.AppStats .ID}}{{$st.MemUsageBytes}}{{end}}"
           data-disk="{{with $st := index $.AppStats .ID}}{{$st.DiskUsageBytes}}{{end}}"
           data-port="{{.Port}}">
         <td class="c-name"><a href="apps/{{.ID}}">{{.Name}}</a>{{if .Domain}}<small class="mono"><a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></small>{{end}}</td>
         <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "running"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
+        <td class="col-sm-hide mono">{{if .Domain}}<a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a>{{else}}-{{end}}</td>
         <td class="c-num num" data-label="CPU">{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
         <td class="c-num num" data-label="Memory">{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
         <td class="c-num num col-sm-hide">{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>

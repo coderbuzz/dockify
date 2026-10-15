@@ -13,7 +13,7 @@
   {{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" .Error "Sub" "")}}
   {{end}}
 
-  <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}" onsubmit="return validateServer()">
+  <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}" id="app-form" onsubmit="return validateServer()">
     {{if and .IsEdit (eq .App.Status "draft")}}<input type="hidden" name="draft" value="1">{{end}}
     <div class="card">
       <h3>Basic</h3>
@@ -202,30 +202,30 @@
   <p class="sheet-text">Copy this to a <code>.env</code> file or another app.</p>
   <textarea id="export-textarea" rows="10" readonly class="sheet-textarea" spellcheck="false"></textarea>
   {{template "ui_sheet_foot"}}
-    <button type="button" class="btn btn-primary" onclick="copyExport()">Copy</button>
+    <button type="button" class="btn btn-primary" data-copy="#export-textarea">Copy</button>
 {{template "ui_sheet_end"}}
 
-{{template "ui_sheet_start" (dict "ID" "move-modal" "Title" "Pindahkan App ke Server Baru")}}
-  <p class="sheet-text">Anda mengubah server untuk aplikasi ini. Silahkan pilih opsi pemindahan data di bawah ini:</p>
+{{template "ui_sheet_start" (dict "ID" "move-modal" "Title" "Move app to another server")}}
+  <p class="sheet-text">You changed the server for this app. Choose how its data is moved:</p>
   <div class="sheet-opts">
     <label class="sheet-opt">
       <input type="checkbox" id="chk-move-files" checked>
       <div>
-        <strong>Move app files ke server baru</strong>
-        <div class="sheet-note">Salin folder aplikasi langsung dari server lama ke server baru via SSH (key sementara, dicabut setelah selesai), berjalan di background. Container di server lama dihentikan selama penyalinan; jika gagal, app tetap di server lama dan dinyalakan kembali. Docker volume (named/anonim) tidak ikut tersalin.</div>
+        <strong>Move app files to the new server</strong>
+        <div class="sheet-note">Copies the app folder directly from the old server to the new one over SSH (temporary key, revoked afterwards) in the background. Containers on the old server are stopped while copying; if the copy fails the app stays on the old server and is started again. Docker volumes (named or anonymous) are not copied.</div>
       </div>
     </label>
     <label class="sheet-opt">
       <input type="checkbox" id="chk-purge-old" checked>
       <div>
         <strong>Purge app files and volumes from previous server</strong>
-        <div class="sheet-note">Setelah deploy di server baru sukses: hentikan container, hapus image/volume Docker, dan hapus folder aplikasi di server lama. Dilewati jika app memakai Docker volume.</div>
+        <div class="sheet-note">After the deploy on the new server succeeds: stops the containers and removes images, volumes and the app folder on the old server. Skipped when the app uses Docker volumes.</div>
       </div>
     </label>
   </div>
   {{template "ui_sheet_foot"}}
-    <button type="button" class="btn btn-secondary" onclick="closeMoveModal()">Batal</button>
-    <button type="button" class="btn btn-primary" onclick="confirmMoveServer()">Pindahkan App</button>
+    <button type="button" class="btn btn-secondary" onclick="closeMoveModal()">Cancel</button>
+    <button type="button" class="btn btn-primary" onclick="confirmMoveServer()">Move app</button>
 {{template "ui_sheet_end"}}
 
 <script>
@@ -246,7 +246,7 @@ if (Array.isArray(initialEnvVars)) {
 
 function addEnvVar(key, value, isSecret) {
   if (key && value && pendingEnvVars.some(function(e){ return e.key === key; })) {
-    alert('Variable "' + key + '" already exists. Remove it first to add a different value.');
+    showToast('Variable "' + key + '" already exists. Remove it first to add a different value.', true);
     return;
   }
   var sy = window.scrollY;
@@ -332,9 +332,9 @@ function closeImportModal() {
 
 function importEnvFromModal() {
   var text = document.getElementById('import-textarea').value.trim();
-  if (!text) { alert('Paste KEY=VALUE pairs first'); return; }
+  if (!text) { showToast('Paste KEY=VALUE pairs first', true); return; }
   var lines = text.split(/[\r\n]+/).filter(function(l){ return l.trim() && l.indexOf('=') > 0; });
-  if (lines.length === 0) { alert('No valid KEY=VALUE lines found'); return; }
+  if (lines.length === 0) { showToast('No valid KEY=VALUE lines found', true); return; }
   lines.forEach(function(line) {
     var idx = line.indexOf('=');
     var key = line.substring(0, idx).trim();
@@ -356,7 +356,7 @@ function openExportModal() {
     }
   });
   if (lines.length === 0) {
-    alert('No variables to export');
+    showToast('No variables to export', true);
     return;
   }
   document.getElementById('export-textarea').value = lines.join('\n');
@@ -370,11 +370,6 @@ function closeExportModal() {
   closeSheet('export-modal');
 }
 
-function copyExport() {
-  var ta = document.getElementById('export-textarea');
-  ta.select();
-  navigator.clipboard.writeText(ta.value);
-}
 
 function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -421,7 +416,7 @@ function uploadToFileRow(input) {
   reader.readAsText(file);
 }
 function saveAsDraft() {
-  var form = document.querySelector('form');
+  var form = document.getElementById('app-form');
   var input = document.createElement('input');
   input.type = 'hidden';
   input.name = 'draft';
@@ -452,7 +447,7 @@ function closeMoveModal() {
 
 function confirmMoveServer() {
   moveModalConfirmed = true;
-  var form = document.querySelector('form');
+  var form = document.getElementById('app-form');
 
   var moveFilesInput = document.createElement('input');
   moveFilesInput.type = 'hidden';
@@ -482,7 +477,7 @@ var serverSel = document.getElementById('server-select');
 if (serverSel) serverSel.addEventListener('change', function () { document.getElementById('server-error').hidden = true; });
 (function () {
   var ok = document.getElementById('save-redeploy-ok');
-  if (ok) ok.addEventListener('click', function () { closeSheet('save-redeploy'); document.querySelector('form').requestSubmit(); });
+  if (ok) ok.addEventListener('click', function () { closeSheet('save-redeploy'); var f = document.getElementById('app-form'); if (f.requestSubmit) f.requestSubmit(); else if (validateServer()) f.submit(); });
 })();
 </script>
 {{template "scripts" .}}

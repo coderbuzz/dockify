@@ -615,12 +615,15 @@ func (h *WebHandler) ServerDetailPage(w http.ResponseWriter, r *http.Request, re
 
 	apps, _ := h.appSvc.ListByServer(id)
 	pub, _ := ssh.PublicKey(server.SSHKey)
+	flash := r.URL.Query().Get("msg")
 
 	render(w, r, http.StatusOK, "servers_detail.html", map[string]interface{}{
-		"Title":     server.Name,
-		"Server":    server,
-		"Apps":      apps,
-		"PublicKey": pub,
+		"Title":      server.Name,
+		"Server":     server,
+		"Apps":       apps,
+		"PublicKey":  pub,
+		"Flash":      flash,
+		"FlashError": strings.HasPrefix(flash, "Prune error"),
 	})
 }
 

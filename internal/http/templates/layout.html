@@ -16,6 +16,7 @@
     var meta = document.querySelector('meta[name=theme-color]');
     var bg = getComputedStyle(d).getPropertyValue('--bg').trim();
     if (meta && bg) meta.setAttribute('content', bg);
+    if (window.syncAppearance) window.syncAppearance();
     var b = document.getElementById('theme-toggle');
     if (b) {
       var next = MODES[(MODES.indexOf(mode) + 1) % 3];
@@ -55,7 +56,7 @@
 {{end}}
 
 {{define "nav"}}
-{{if .DevMock}}<div class="dev-mock-bar">⚠ Dev Mock Mode — All SSH operations are simulated</div>{{end}}
+{{if .DevMock}}<div class="dev-mock-bar">Dev Mock Mode — All SSH operations are simulated</div>{{end}}
 <header class="top-nav">
   <div class="top-bar">
     <a href="." class="logo"><span class="logo-icon">D</span>Dockify</a>
@@ -83,130 +84,5 @@ document.querySelectorAll('time[datetime]').forEach(function(el){
   var p=function(n){return String(n).padStart(2,'0');};
   el.textContent = d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
 });
-
-/* SSH Console */
-var term = null;
-var ws = null;
-
-function toggleConsole() {
-	var container = document.getElementById('console-container');
-	if (container.hidden) {
-		container.hidden = false;
-		document.getElementById('console-toggle').textContent = 'Close Console';
-		loadXterm(connectConsole);
-	} else {
-		container.hidden = true;
-		document.getElementById('console-toggle').textContent = 'Console';
-		disconnectConsole();
-	}
-}
-
-function connectConsole() {
-	var btn = document.getElementById('console-toggle');
-	var serverId = btn.getAttribute('data-server-id');
-	if (!serverId) return;
-	var base = document.querySelector('base').getAttribute('href') || '/';
-	var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-	var host = window.location.host;
-
-	term = new Terminal({
-		fontFamily: '"Fira Code", "JetBrains Mono", ui-monospace, monospace',
-		fontSize: 13,
-		lineHeight: 1.35,
-		cursorBlink: true,
-		cursorStyle: 'block',
-		theme: {
-			background: '#090d16',
-			foreground: '#f8fafc',
-			cursor: '#6366f1',
-			selectionBackground: '#334155',
-			black: '#090d16',
-			red: '#f87171',
-			green: '#34d399',
-			yellow: '#fbbf24',
-			blue: '#60a5fa',
-			magenta: '#c084fc',
-			cyan: '#38bdf8',
-			white: '#f8fafc',
-			brightBlack: '#64748b',
-			brightRed: '#f87171',
-			brightGreen: '#34d399',
-			brightYellow: '#fbbf24',
-			brightBlue: '#60a5fa',
-			brightMagenta: '#c084fc',
-			brightCyan: '#38bdf8',
-			brightWhite: '#ffffff'
-		}
-	});
-
-	var fitAddon = new FitAddon.FitAddon();
-	term.loadAddon(fitAddon);
-	term.open(document.getElementById('terminal'));
-
-	setTimeout(function() { fitAddon.fit(); }, 50);
-
-	ws = new WebSocket(proto + '//' + host + base + 'api/servers/' + serverId + '/console');
-	ws.binaryType = 'arraybuffer';
-
-	ws.onopen = function() {
-		document.getElementById('console-status').textContent = 'Connected';
-		document.getElementById('console-status').className = 'badge badge-online';
-		term.focus();
-		var enc = new TextEncoder();
-		var dims = fitAddon.proposeDimensions();
-		if (dims) {
-			ws.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
-		}
-	};
-
-	ws.onmessage = function(evt) {
-		var data = evt.data;
-		if (data instanceof ArrayBuffer) {
-			term.write(new Uint8Array(data));
-		} else {
-			term.write(data);
-		}
-	};
-	ws.onclose = function() {
-		document.getElementById('console-status').textContent = 'Disconnected';
-		document.getElementById('console-status').className = 'badge badge-offline';
-		if (term) {
-			term.write('\r\n\x1b[31mSession ended.\x1b[0m\r\n');
-		}
-	};
-
-	term.onData(function(data) {
-		if (ws && ws.readyState === WebSocket.OPEN) {
-			ws.send(data);
-		}
-	});
-
-	window._consoleResizeHandler = function() {
-		if (!fitAddon || !ws || ws.readyState !== WebSocket.OPEN) return;
-		fitAddon.fit();
-		var dims = fitAddon.proposeDimensions();
-		if (dims) {
-			ws.send(enc.encode(JSON.stringify({resize: {width: dims.cols, height: dims.rows}})));
-		}
-	};
-	window.addEventListener('resize', window._consoleResizeHandler);
-}
-
-function disconnectConsole() {
-	if (window._consoleResizeHandler) {
-		window.removeEventListener('resize', window._consoleResizeHandler);
-		window._consoleResizeHandler = null;
-	}
-	if (ws) {
-		ws.close();
-		ws = null;
-	}
-	if (term) {
-		term.dispose();
-		term = null;
-	}
-	document.getElementById('console-status').textContent = 'Disconnected';
-	document.getElementById('console-status').className = 'badge badge-offline';
-}
 </script>
 {{end}}

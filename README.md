@@ -16,7 +16,7 @@ Self-hosted Docker app deployment platform. Deploy Docker Compose stacks to your
 - **SSH console** — interactive terminal via browser (WebSocket + xterm.js)
 - **Dashboard** — live resource monitoring and deployment status at a glance
 - **Encrypted backups** — export/import config with AES-GCM passphrase encryption
-- **Web UI** — manage everything from the browser, dark/light mode
+- **Web UI** — manage everything from the browser, three color palettes with light, dark or system theme
 
 ## Architecture
 
@@ -249,7 +249,7 @@ For an organization package, the token's owner must have read access to the pack
 
 ### Resource Monitoring
 
-Dockify collects CPU, RAM, and disk usage from all online servers every 10 seconds in the background. Resource cards update via HTMX partial refresh (no page reload). A manual refresh button is available on each server detail page.
+Dockify collects CPU, RAM, and disk usage from all online servers every 10 seconds in the background. Resource cards update via HTMX partial refresh (no page reload).
 
 - **CPU** — core count via `nproc`, usage % via two-sample `/proc/stat` (1s interval)
 - **RAM** — total and usage via `/proc/meminfo` (`MemTotal`/`MemAvailable`), with human-readable "used / free" info
@@ -514,12 +514,12 @@ The **About** page (`/about`) shows the current version, project description, an
 
 Dockify's web UI is built with Go `html/template` + HTMX and fully custom CSS (no framework):
 
-- **Dark/Light mode** — toggle via nav button, persisted in `localStorage` (`dockify-theme`)
+- **Appearance** — three palettes (Indigo, Navy, Teal) and Light / Dark / System theme, chosen in Settings and persisted in `localStorage` (`dockify_palette`, `dockify_theme`); the theme follows your device until you pick one
+- **Mobile first** — compact header with a bottom tab bar on phones and tabs under the header on desktop; lists turn into card rows below 700px
 - **HTMX partial updates** — resource cards, log viewer, and status badges update without full page reloads
-- **No CDN scripts** — htmx and xterm.js are embedded in the binary and served from `/static/`; a Content-Security-Policy limits scripts to Dockify itself (only Google Fonts is loaded from outside)
-- **Responsive** — adapts to mobile screen sizes (single breakpoint at 600px)
+- **No CDN scripts** — htmx and xterm.js are embedded in the binary and served from `/static/` and loaded only on the pages that need them; a Content-Security-Policy limits scripts to Dockify itself (only Google Fonts is loaded from outside)
 - **Status badges** — color-coded for all server and app states
-- **Confirm dialogs** — destructive actions (undeploy, delete, rollback) require confirmation
+- **Confirm dialogs** — destructive actions (undeploy, remove, redeploy, rollback) sit in a Danger zone and require confirmation
 - **Relative timestamps** — deployment and resource times rendered in browser timezone
 
 ## Dev Mode

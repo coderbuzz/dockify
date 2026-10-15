@@ -50,17 +50,7 @@ Set `DOCKIFY_DEV_MOCK=true` to use mock SSH client — no real VMs needed for UI
 
 ## UI Style Guide
 
-**UI baru atau perubahan UI WAJIB mengikuti `docs/DESIGN-SYSTEM.md`** (token 3 palet × terang/gelap, partial komponen, hierarki aksi, checklist). Rencana revamp: `docs/UI-REVAMP-PLAN.md`. Bagian di bawah ini menjelaskan kondisi sebelum revamp dan akan diganti saat S8.
-
-All styles live in `internal/http/templates/layout.html` (single `<style>` block). Full design tokens and component patterns in `SPEC.md`.
-
-When editing templates or adding new UI:
-- Always consult SPEC.md for the color system, component patterns, and CSS conventions
-- No CSS frameworks — fully custom
-- Class naming: lowercase with hyphens
-- Use CSS variables (custom properties) for theming
-- Dark mode via `<html class="dark">`, toggle persisted in `localStorage('dockify-theme')`
-- Responsive: single `@media (max-width: 600px)` breakpoint
+UI work **must** follow `docs/DESIGN-SYSTEM.md` (3 palettes × light/dark/system tokens, shared partials, action hierarchy, PR checklist). The revamp plan and measurements: `docs/UI-REVAMP-PLAN.md`, `docs/ui-revamp/`. Styles live in `internal/http/static/app.css`; no CSS framework, no hex in templates (except xterm themes), no inline `style=""` except `--w` values. Run `node tests/e2e/ui.mjs` (see Key Commands) before opening a UI PR.
 
 ## Git Workflow
 
