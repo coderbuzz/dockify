@@ -8,7 +8,7 @@ Dockify is a self-hosted Docker app deployment platform — single Go binary, SQ
 
 | Layer | Choice | Details |
 |---|---|---|
-| Language | Go 1.23+ | Single binary, cross-compile |
+| Language | Go 1.26+ | Single binary, cross-compile |
 | Database | SQLite via `modernc.org/sqlite` | Pure Go, no CGo, embedded |
 | Router | `github.com/go-chi/chi/v5` | Middleware, groups, path params |
 | SSH | `golang.org/x/crypto/ssh` | Std SSH client, PTY sessions |
