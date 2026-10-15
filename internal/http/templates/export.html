@@ -15,13 +15,13 @@
   <form method="POST" action="api/backup/export">
     <div class="card">
       <h3>Download Backup</h3>
-      <p style="color:var(--text-muted)">
+      <p style="color:var(--ink2)">
         Export all servers and apps configuration to a YAML file.
         SSH keys are included and encrypted with your passphrase.
       </p>
 
       <label style="display:block;margin-bottom:0.5em">
-        <span style="font-size:0.85em;color:var(--text-muted)">Passphrase (save this — you'll need it to import)</span>
+        <span style="font-size:0.85em;color:var(--ink2)">Passphrase (save this — you'll need it to import)</span>
         <div style="display:flex;gap:0.4em;margin-top:0.3em;flex-wrap:wrap">
           <input type="text" name="passphrase" id="passphrase" value="{{.Passphrase}}" readonly
                  style="flex:1 1 200px;min-width:0;font-family:ui-monospace,monospace;font-size:0.85em" required>
@@ -30,7 +30,7 @@
         </div>
       </label>
 
-      <p style="color:var(--orange);font-size:0.85em">
+      <p style="color:var(--ink2);font-size:0.85em">
         ⚠ All sensitive values (secrets, auth passwords, SSH keys, config files) will be encrypted.
         Store the passphrase safely — without it you cannot import this backup.
       </p>
@@ -41,7 +41,7 @@
 
   <div class="card" style="margin-top:1em">
     <h3>What's exported</h3>
-    <ul style="color:var(--text-muted);font-size:0.9em">
+    <ul style="color:var(--ink2);font-size:0.9em">
       <li>Server: name, host, port, user, SSH key (encrypted with your passphrase)</li>
       <li>Apps: name, domain, port, compose, git repo/branch, auth credentials, secrets, config files</li>
       <li>Secrets are encrypted with your passphrase</li>

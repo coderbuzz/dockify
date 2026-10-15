@@ -26,3 +26,17 @@ document.addEventListener('click', function (e) {
   if (d.classList && d.classList.contains('sheet') && d === sheetDown && outsideSheet(d, e)) d.close();
   sheetDown = null;
 });
+
+// Segmented controls: keep aria-pressed in sync (the header sits outside the htmx-swapped body).
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('.seg-btn');
+  if (!b) return;
+  [].forEach.call(b.parentNode.children, function (s) { s.setAttribute('aria-pressed', String(s === b)); });
+});
+// Copy button: data-copy="#selector" copies that element's text.
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('[data-copy]');
+  if (!b) return;
+  var src = document.querySelector(b.getAttribute('data-copy'));
+  if (src && navigator.clipboard) navigator.clipboard.writeText(src.textContent.trim());
+});

@@ -10,7 +10,7 @@
   </hgroup>
 
   {{if .Error}}
-  <div class="card" style="color:var(--red)">{{.Error}}</div>
+  <div class="card" style="color:var(--danger)">{{.Error}}</div>
   {{end}}
 
   <form method="POST" action="{{if .IsEdit}}apps/{{.App.ID}}/edit{{else}}apps/add{{end}}" onsubmit="return validateServer()">
@@ -68,7 +68,7 @@
         <label>Ports<textarea name="ports" rows="2" placeholder="27017:27017&#10;6379:6379">{{if .IsEdit}}{{.Ports}}{{end}}</textarea><small>One port mapping per line (host:container)</small></label>
         <label>Volumes<textarea name="volumes" rows="2" placeholder="./data:/data&#10;./config:/etc/config">{{if .IsEdit}}{{.Volumes}}{{end}}</textarea><small>One volume mount per line (host:container)</small></label>
         <div style="margin-top:1em">
-          <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.85em">(optional)</span></h4>
+          <h4 style="margin:0 0 0.6em 0">Resource Limits <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.85em">(optional)</span></h4>
           <div class="grid-2" style="gap:0.6em">
             <label>Memory Limit
               <select name="memory_limit">
@@ -130,9 +130,9 @@
     </div>
 
     <div class="card">
-      <h3>Environment Variables <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(referenced in compose as <code>${KEY}</code>)</span></h3>
+      <h3>Environment Variables <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(referenced in compose as <code>${KEY}</code>)</span></h3>
       <div id="env-list">
-        <p id="no-env-msg" style="color:var(--text-muted);font-size:0.85em">No variables added yet.</p>
+        <p id="no-env-msg" style="color:var(--ink2);font-size:0.85em">No variables added yet.</p>
       </div>
       <div style="margin-top:0.8em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center">
         <button type="button" class="btn btn-secondary" onclick="addEnvVar()" style="white-space:nowrap">+ Add Variable</button>
@@ -143,7 +143,7 @@
     </div>
 
     <div class="card">
-      <h3>Config Files <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(optional — mount via <code>./filename:/container/path</code> in compose)</span></h3>
+      <h3>Config Files <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — mount via <code>./filename:/container/path</code> in compose)</span></h3>
       {{if .Files}}
       {{range .Files}}
       <div style="display:flex;gap:0.5em;align-items:center;margin-bottom:0.4em">
@@ -160,7 +160,7 @@
     </div>
 
     <div class="card">
-      <h3>Git <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(optional — for auto-deploy on push)</span></h3>
+      <h3>Git <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — for auto-deploy on push)</span></h3>
       <div class="grid">
         <label>Git Repo URL<input type="text" name="git_repo" placeholder="https://github.com/user/repo.git" value="{{if .App}}{{.App.GitRepo}}{{end}}"></label>
         <label>Branch<input type="text" name="git_branch" value="{{if .App}}{{.App.GitBranch}}{{else}}main{{end}}" placeholder="main"></label>
@@ -168,7 +168,7 @@
     </div>
 
     <div class="card">
-      <h3>Basic Auth <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);font-size:0.95em">(optional — protects the app with a username/password)</span></h3>
+      <h3>Basic Auth <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:0.95em">(optional — protects the app with a username/password)</span></h3>
       <div class="grid">
         <label>Username<input type="text" name="auth_user" placeholder="admin" autocomplete="off" value="{{if .App}}{{.App.AuthUser}}{{end}}"></label>
         <label>Password<input type="password" name="auth_pass" placeholder="password" autocomplete="new-password" value="{{if .App}}{{.App.AuthPass}}{{end}}"></label>

@@ -15,10 +15,10 @@
       <tr>
         <th aria-sort="none"><button type="button" class="th-sort" data-sort="name" data-type="string">Name{{template "ui_icon" "chevron-down"}}</button></th>
         <th aria-sort="none"><button type="button" class="th-sort" data-sort="status" data-type="string">Status{{template "ui_icon" "chevron-down"}}</button></th>
-        <th aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
-        <th aria-sort="none"><button type="button" class="th-sort" data-sort="memory" data-type="number">Memory{{template "ui_icon" "chevron-down"}}</button></th>
-        <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
-        <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="port" data-type="number">Port{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="memory" data-type="number">Memory{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="col-sm-hide num" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
+        <th class="col-sm-hide num" aria-sort="none"><button type="button" class="th-sort" data-sort="port" data-type="number">Port{{template "ui_icon" "chevron-down"}}</button></th>
       </tr>
     </thead>
     <tbody>
@@ -30,10 +30,10 @@
           data-port="{{.Port}}">
         <td class="c-name"><a href="apps/{{.ID}}">{{.Name}}</a>{{if .Domain}}<small class="mono"><a class="ext" href="https://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></small>{{end}}</td>
         <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "running"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
-        <td class="c-num" data-label="CPU">{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
-        <td class="c-num" data-label="Memory">{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
-        <td class="c-num col-sm-hide">{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>
-        <td class="col-sm-hide">{{.Port}}</td>
+        <td class="c-num num" data-label="CPU">{{with $st := index $.AppStats .ID}}{{printf "%.1f" (clamp100 $st.CPUPercent)}}%{{else}}-{{end}}</td>
+        <td class="c-num num" data-label="Memory">{{with $st := index $.AppStats .ID}}{{formatBytes $st.MemUsageBytes}}{{else}}-{{end}}</td>
+        <td class="c-num num col-sm-hide">{{with $st := index $.AppStats .ID}}{{formatBytes $st.DiskUsageBytes}}{{else}}-{{end}}</td>
+        <td class="col-sm-hide num">{{.Port}}</td>
       </tr>
       {{end}}
     </tbody>

@@ -119,7 +119,12 @@ function initLiveCharts(opts) {
         var pctEl = document.getElementById(g.pctId);
         if (pctEl) pctEl.textContent = pct;
         var fillEl = document.getElementById(g.fillId);
-        if (fillEl) fillEl.style.width = Math.min(v, 100) + '%';
+        if (fillEl) {
+          fillEl.style.setProperty('--w', Math.min(v, 100) + '%');
+          var bar = fillEl.parentNode;
+          bar.classList.toggle('bar-warn', v >= 70 && v < 85);
+          bar.classList.toggle('bar-danger', v >= 85);
+        }
         if (g.detailId && g.detailFn) {
           var detEl = document.getElementById(g.detailId);
           if (detEl) detEl.textContent = g.detailFn(data);
@@ -272,14 +277,5 @@ function initLiveCharts(opts) {
   return { disconnect: disconnect };
 }
 
-// Range buttons live in a static header (outside the htmx-swapped body), so the
-// server can't re-apply the btn-active class on swap. Keep it in sync here.
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest && e.target.closest('.chart-range-btns .btn');
-  if (!btn) return;
-  var siblings = btn.parentNode.children;
-  for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('btn-active');
-  btn.classList.add('btn-active');
-});
 </script>
 {{end}}

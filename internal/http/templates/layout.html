@@ -93,12 +93,12 @@ var ws = null;
 
 function toggleConsole() {
 	var container = document.getElementById('console-container');
-	if (container.style.display === 'none') {
-		container.style.display = 'block';
+	if (container.hidden) {
+		container.hidden = false;
 		document.getElementById('console-toggle').textContent = 'Close Console';
 		connectConsole();
 	} else {
-		container.style.display = 'none';
+		container.hidden = true;
 		document.getElementById('console-toggle').textContent = 'Console';
 		disconnectConsole();
 	}
