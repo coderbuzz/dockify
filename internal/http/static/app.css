@@ -486,8 +486,8 @@ form .grid { gap: 1.2em; margin-bottom: 0.9em; }
 .group-head .mono { font-size: 12px; color: var(--muted); }
 .group-count { font-size: 12px; color: var(--muted); }
 table.rows { border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); margin-bottom: 12px; }
-.rows thead th { padding: 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); background: var(--sunk); letter-spacing: 0.04em; }
-.th-sort { display: inline-flex; align-items: center; gap: 4px; width: 100%; min-height: 36px; padding: 0 12px; border: 0; border-radius: 0; background: none; box-shadow: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.rows thead th { padding: 0 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); background: var(--sunk); letter-spacing: 0.04em; }
+.th-sort { display: inline-flex; align-items: center; gap: 4px; width: 100%; min-height: 36px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .th-sort:hover { background: none; color: var(--ink); }
 .th-sort .icon { width: 12px; height: 12px; opacity: 0; transition: transform 0.15s; }
 th[aria-sort=ascending] .icon, th[aria-sort=descending] .icon { opacity: 1; }
@@ -896,3 +896,6 @@ hgroup .page-actions { margin-top: 4px; }
   .rows-applist td.c-num { order: 2; flex: 0 0 auto; display: inline-flex; gap: 6px; align-items: baseline; font-size: 12px; font-weight: 700; color: var(--ink); }
   .rows-applist td.c-num::before { display: inline; }
 }
+
+/* Lencana di tabel/daftar lebih kecil dari lencana judul (umpan balik produksi 2026-10-15) */
+.rows .badge, .group-head .badge { font-size: 10px; font-weight: 700; padding: 2px 6px; letter-spacing: 0.03em; }
