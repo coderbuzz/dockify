@@ -1,5 +1,4 @@
-{{define "live_charts"}}
-<script>
+// Live charts and gauges for the app/server detail pages (loaded only there).
 function formatBytes(b) {
   if (b === undefined || b === null || isNaN(b)) return '-';
   b = Number(b);
@@ -276,6 +275,3 @@ function initLiveCharts(opts) {
   connect();
   return { disconnect: disconnect };
 }
-
-</script>
-{{end}}

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en" data-palette="indigo" data-theme="light">
-<head>{{template "head" .}}{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
+<head>{{template "head" .}}<script src="static/htmx.min.js"></script><script src="static/charts.js?v={{.AssetVersion}}"></script>{{if eq .App.Status "deploying"}}<meta http-equiv="refresh" content="2">{{end}}</head>
 <body>
 {{template "nav" .}}
 <div class="container">
@@ -203,7 +203,7 @@ function toggleAppConsole() {
 	var container = document.getElementById('app-console-container');
 	if (container.hidden) {
 		container.hidden = false;
-		connectAppConsole();
+		loadXterm(connectAppConsole);
 	} else {
 		container.hidden = true;
 		disconnectAppConsole();
