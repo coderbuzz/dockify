@@ -10,95 +10,115 @@
     <span>{{.Server.Name}}</span>
   </div>
 
-  <hgroup>
+  <div class="page-head">
     <h1>{{.Server.Name}} <span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></h1>
-    <p>{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
-  </hgroup>
+    <p class="meta mono">{{.Server.Host}}:{{.Server.Port}} as {{.Server.User}}</p>
+  </div>
+
+  {{if eq .Server.Status "online"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" "Online" "Sub" (or (and (not .Server.ResourcesUpdatedAt.IsZero) (printf "Updated %s" (relativeTime .Server.ResourcesUpdatedAt))) ""))}}
+  {{else if or (eq .Server.Status "initializing") (eq .Server.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" (printf "Status: %s" .Server.Status) "Sub" "Initialization in progress. This page refreshes every 2 seconds.")}}
+  {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .Server.Status) "Sub" "Check the SSH key and connection, then run Init worker.")}}{{end}}
+
+  <div class="action-bar">
+    <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>
+    <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
+  </div>
+
+  <div class="console-section">
+    <div id="console-container" class="console-container" hidden>
+      <div class="console-toolbar">
+        <span class="badge badge-online" id="console-status">Connected</span>
+        <button class="btn btn-ghost btn-sm" id="console-disconnect" onclick="toggleConsole()">Disconnect</button>
+      </div>
+      <div id="terminal"></div>
+    </div>
+  </div>
 
   {{if eq .Server.Status "online"}}
-  <div class="card" style="margin-top:1em">
+  <div class="card">
     <div class="stats-header">
-      <h3>Resource Usage <span id="live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
-      <div class="chart-range-btns">
-        <button class="btn btn-ghost btn-active" data-range="realtime" title="Realtime 2-minute live stream" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-target="#server-stats-body" hx-swap="outerHTML">Realtime</button>
-        <button class="btn btn-ghost" data-range="1h" title="1 Hour history" hx-get="servers/{{.Server.ID}}/stats?range=1h" hx-target="#server-stats-body" hx-swap="outerHTML">1h</button>
-        <button class="btn btn-ghost" data-range="6h" title="6 Hours history" hx-get="servers/{{.Server.ID}}/stats?range=6h" hx-target="#server-stats-body" hx-swap="outerHTML">6h</button>
-        <button class="btn btn-ghost" data-range="24h" title="24 Hours history" hx-get="servers/{{.Server.ID}}/stats?range=24h" hx-target="#server-stats-body" hx-swap="outerHTML">24h</button>
-        <button class="btn btn-ghost" data-range="7d" title="7 Days history" hx-get="servers/{{.Server.ID}}/stats?range=7d" hx-target="#server-stats-body" hx-swap="outerHTML">7d</button>
-      </div>
+      <h3>Resource usage <span id="live-indicator" class="badge badge-online live-badge--hidden"><span class="badge-dot"></span>Live</span></h3>
+      {{template "ui_segmented" (dict "Label" "Time range" "Base" (printf "servers/%d/stats?range=" .Server.ID) "Target" "#server-stats-body" "Swap" "outerHTML" "Active" 0 "Items" (list "realtime:Realtime" "1h:1h" "6h:6h" "24h:24h" "7d:7d"))}}
     </div>
-    <div class="stats-gauges stats-gauges--resources">
-      <div class="stat-gauge">
-        <div class="stat-gauge-header">
-          <div class="stat-gauge-label">CPU</div>
-          <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0.0{{end}}%</span></div>
-        </div>
-        <div class="stat-gauge-bar">
-          <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0{{end}}%"></div>
-        </div>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="gauge-head"><span class="gauge-label">CPU</span><span class="gauge-val" id="cpu-gauge-pct">{{if .Server.CPUUsage}}{{printf "%.1f" .Server.CPUUsage}}{{else}}0.0{{end}}%</span></div>
+        <div class="bar{{if ge .Server.CPUUsage 85.0}} bar-danger{{else if ge .Server.CPUUsage 70.0}} bar-warn{{end}}"><span id="cpu-gauge-fill" style="--w:{{if .Server.CPUUsage}}{{printf "%.1f" (clamp100 .Server.CPUUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-header">
-          <div class="stat-gauge-label">RAM</div>
-          <div class="stat-gauge-value"><span id="ram-gauge-pct">{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="ram-gauge-detail">{{if and .Server.RAMMB .Server.RAMUsage}}{{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB{{else}}-{{end}}</span></div>
-        </div>
-        <div class="stat-gauge-bar">
-          <div class="stat-gauge-fill stat-gauge-mem" id="ram-gauge-fill" style="width:{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0{{end}}%"></div>
-        </div>
+      <div class="gauge">
+        <div class="gauge-head"><span class="gauge-label">RAM</span><span class="gauge-val"><span id="ram-gauge-pct">{{if .Server.RAMUsage}}{{printf "%.1f" .Server.RAMUsage}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="ram-gauge-detail">{{if and .Server.RAMMB .Server.RAMUsage}}{{printf "%.0f" (usedAmount .Server.RAMMB .Server.RAMUsage)}} MB{{else}}-{{end}}</span></span></div>
+        <div class="bar{{if ge .Server.RAMUsage 85.0}} bar-danger{{else if ge .Server.RAMUsage 70.0}} bar-warn{{end}}"><span id="ram-gauge-fill" style="--w:{{if .Server.RAMUsage}}{{printf "%.1f" (clamp100 .Server.RAMUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-header">
-          <div class="stat-gauge-label">Disk</div>
-          <div class="stat-gauge-value"><span id="disk-gauge-pct">{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="disk-gauge-detail">{{if and .Server.DiskGB .Server.DiskUsage}}{{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB{{else}}-{{end}}</span></div>
-        </div>
-        <div class="stat-gauge-bar">
-          <div class="stat-gauge-fill stat-gauge-disk" id="disk-gauge-fill" style="width:{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0{{end}}%"></div>
-        </div>
+      <div class="gauge">
+        <div class="gauge-head"><span class="gauge-label">Disk</span><span class="gauge-val"><span id="disk-gauge-pct">{{if .Server.DiskUsage}}{{printf "%.1f" .Server.DiskUsage}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="disk-gauge-detail">{{if and .Server.DiskGB .Server.DiskUsage}}{{printf "%.0f" (usedAmount .Server.DiskGB .Server.DiskUsage)}} GB{{else}}-{{end}}</span></span></div>
+        <div class="bar{{if ge .Server.DiskUsage 85.0}} bar-danger{{else if ge .Server.DiskUsage 70.0}} bar-warn{{end}}"><span id="disk-gauge-fill" style="--w:{{if .Server.DiskUsage}}{{printf "%.1f" (clamp100 .Server.DiskUsage)}}{{else}}0{{end}}%"></span></div>
       </div>
     </div>
     <hr class="stats-divider">
     <div id="server-stats-body" data-range="realtime" hx-get="servers/{{.Server.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
-      <p style="color:var(--text-muted);font-size:0.85em;margin-top:1em">Loading charts&hellip;</p>
+      <p class="muted-note">Loading charts&hellip;</p>
     </div>
   </div>
   {{end}}
 
-  <div class="grid">
-    <div class="card">
-      <h3>Connection</h3>
-      <div class="table-wrap"><table style="font-size:0.85em">
-        <tr><td><strong>Host</strong></td><td>{{.Server.Host}}</td></tr>
-        <tr><td><strong>Port</strong></td><td>{{.Server.Port}}</td></tr>
-        <tr><td><strong>User</strong></td><td>{{.Server.User}}</td></tr>
-        <tr><td><strong>SSH Key</strong></td><td><code style="word-break:break-all;font-size:0.78em">{{.Server.SSHKey}}</code></td></tr>
-        <tr><td><strong>Host Key</strong></td><td>{{with .Server.HostKeyFingerprint}}<code style="word-break:break-all;font-size:0.78em">{{.}}</code>{{else}}not pinned yet{{end}}</td></tr>
-        <tr><td><strong>Registry</strong></td><td>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</td></tr>
-        <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></td></tr>
-      </table></div>
-    </div>
-    {{template "servers_resources_card" .}}
+  <div class="card">
+    <h3>Connection</h3>
+    <dl class="detail-grid">
+      <div><dt>Host</dt><dd class="mono">{{.Server.Host}}</dd></div>
+      <div><dt>Port</dt><dd class="mono">{{.Server.Port}}</dd></div>
+      <div><dt>User</dt><dd class="mono">{{.Server.User}}</dd></div>
+      <div><dt>Status</dt><dd><span class="badge badge-{{.Server.Status}}">{{.Server.Status}}</span></dd></div>
+      <div class="wide"><dt>SSH key</dt><dd class="mono wrap">{{.Server.SSHKey}}</dd></div>
+      <div class="wide"><dt>Host key</dt><dd class="mono wrap">{{with .Server.HostKeyFingerprint}}{{.}}{{else}}not pinned yet{{end}}</dd></div>
+      <div class="wide"><dt>Registry</dt><dd>{{if .Server.RegistryUser}}{{.Server.RegistryHost}} as {{.Server.RegistryUser}}{{else}}&mdash;{{end}}</dd></div>
+    </dl>
   </div>
+
+  {{template "servers_resources_card" .}}
 
   {{if .PublicKey}}
   <div class="card">
-    <h3>Worker Access</h3>
-    <p style="font-size:0.85em;color:var(--text-dim)">Dockify connects with this public key. To prepare a new worker, run this on it as <strong>{{.Server.User}}</strong> (it installs Docker and adds the key to <code>~/.ssh/authorized_keys</code>), then click <strong>Init Worker</strong>:</p>
-    <pre style="white-space:pre-wrap;word-break:break-all;font-size:0.78em"><code>curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- '{{.PublicKey}}'</code></pre>
-    <small>Public key only: <code style="word-break:break-all">{{.PublicKey}}</code></small>
+    <h3>Worker access</h3>
+    <p class="muted-note">Dockify connects with this public key. To prepare a new worker, run this on it as <strong>{{.Server.User}}</strong> (it installs Docker and adds the key to <code>~/.ssh/authorized_keys</code>), then run Init worker:</p>
+    <div class="code-block">
+      <button type="button" class="btn btn-ghost btn-sm code-copy" data-copy="#worker-cmd">{{template "ui_icon" "copy"}}Copy</button>
+      <pre class="code" id="worker-cmd">curl -fsSL https://raw.githubusercontent.com/coderbuzz/dockify/main/scripts/setup-worker.sh | bash -s -- '{{.PublicKey}}'</pre>
+    </div>
+    <p class="muted-note">Public key only: <code class="wrap">{{.PublicKey}}</code></p>
   </div>
   {{end}}
 
-  <div class="btn-group">
-    <div class="btn-group-left">
-      <a href="servers/{{.Server.ID}}/edit" class="btn btn-primary">Edit</a>
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('server-init')">Init Worker</button>
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('prune-modal')">Prune Disk</button>
-      <button class="btn btn-ghost" id="console-toggle" data-server-id="{{.Server.ID}}" onclick="toggleConsole()">Console</button>
-    </div>
-    <div class="btn-group-right">
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('server-remove')">Remove Server</button>
-    </div>
+  <div class="card">
+    <h3>Apps <span class="count">{{len .Apps}}</span></h3>
+    {{if .Apps}}
+    <table class="rows rows-apps">
+      <thead><tr><th>Name</th><th>Status</th><th class="col-sm-hide">Domain</th><th class="col-sm-hide num">Port</th><th class="col-sm-hide">Git</th><th></th></tr></thead>
+      <tbody>
+      {{range .Apps}}
+        <tr>
+          <td class="c-name"><a href="apps/{{.ID}}">{{.Name}}</a>{{if .Domain}}<small class="mono">{{.Domain}}</small>{{end}}</td>
+          <td class="c-status"><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+          <td class="col-sm-hide mono">{{.Domain}}</td>
+          <td class="col-sm-hide num mono">{{.Port}}</td>
+          <td class="col-sm-hide mono">{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
+          <td class="c-act"><button type="button" class="btn btn-destructive-outline btn-sm" data-undeploy data-action="apps/{{.ID}}/undeploy" data-name="{{.Name}}" data-status="{{.Status}}">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted-note">No apps on this server.</p>
+    {{end}}
   </div>
+
+  <div class="card danger-zone">
+    <h3>Danger zone</h3>
+    <div class="dz-row"><div><div class="dz-title">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</div><div class="dz-desc">Installs Docker and Caddy, re-applies the worker config.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-init')">{{if eq .Server.Status "online"}}Re-run init{{else}}Init worker{{end}}</button></div>
+    <div class="dz-row"><div><div class="dz-title">Prune disk</div><div class="dz-desc">Remove stopped containers, unused images and build cache.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('prune-modal')">Prune disk</button></div>
+    <div class="dz-row"><div><div class="dz-title">Remove server</div><div class="dz-desc">Remove from Dockify and delete its SSH key. Cannot be undone.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('server-remove')">Remove server</button></div>
+  </div>
+
+</div>
 
   {{template "ui_sheet_start" (dict "ID" "prune-modal" "Title" (printf "Prune worker disk (%s)" .Server.Name))}}
       <p class="sheet-text">Bersihkan cache Docker, image tidak terpakai, dan data sisa di server worker ini untuk membebaskan ruang disk.</p>
@@ -164,43 +184,6 @@
     }
   }
   </script>
-
-  <div class="console-section">
-    <div id="console-container" class="console-container" style="display:none">
-      <div class="console-toolbar">
-        <span class="badge badge-online" id="console-status">Connected</span>
-        <button class="btn btn-ghost btn-sm" id="console-disconnect" onclick="toggleConsole()">Disconnect</button>
-      </div>
-      <div id="terminal"></div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top:1em">
-    <h3>Apps <small style="font-weight:400;color:var(--text-dim)">{{len .Apps}} app(s)</small></h3>
-    {{if .Apps}}
-    <div class="table-wrap"><table style="font-size:0.85em">
-      <thead>
-        <tr><th>Name</th><th>Domain</th><th>Port</th><th>Status</th><th>Git</th><th></th></tr>
-      </thead>
-      <tbody>
-      {{range .Apps}}
-        <tr>
-          <td style="white-space:nowrap"><a href="apps/{{.ID}}">{{.Name}}</a></td>
-          <td style="white-space:nowrap">{{.Domain}}</td>
-          <td>{{.Port}}</td>
-          <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
-          <td>{{if .GitRepo}}{{.GitRepo}}@{{.GitBranch}}{{else}}-{{end}}</td>
-          <td style="width:1%;white-space:nowrap">
-            <button type="button" class="btn btn-destructive-outline btn-sm" data-undeploy data-action="apps/{{.ID}}/undeploy" data-name="{{.Name}}" data-status="{{.Status}}">{{if eq .Status "draft"}}Delete{{else}}Undeploy{{end}}</button>
-          </td>
-        </tr>
-      {{end}}
-      </tbody>
-    </table></div>
-    {{else}}
-    <p style="color:var(--text-muted);font-size:0.85em">No apps on this server.</p>
-    {{end}}
-  </div>
 
   {{if eq .Server.Status "online"}}
   <script>

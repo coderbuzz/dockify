@@ -11,58 +11,67 @@
     <span>{{.App.Name}}</span>
   </div>
 
-  <hgroup>
+  <div class="page-head">
     <h1>{{.App.Name}} <span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></h1>
-    <p>{{if .Domains}}{{index .Domains 0}}{{if .ExtraDomainCount}} <span class="badge" style="font-size:0.65rem;vertical-align:middle">+{{.ExtraDomainCount}} more</span>{{end}}:{{.App.Port}}{{else}}Internal Service{{end}}</p>
-  </hgroup>
+    <p class="meta">{{if .Domains}}{{index .Domains 0}}{{if .ExtraDomainCount}} <span class="badge">+{{.ExtraDomainCount}} more</span>{{end}}:{{.App.Port}}{{else}}Internal service, port {{.App.Port}}{{end}}</p>
+  </div>
+
+  {{if eq .App.Status "running"}}{{template "ui_alert" (dict "Kind" "ok" "Icon" "check" "Title" (printf "Running on %s" .ServerName) "Sub" "")}}
+  {{else if eq .App.Status "stopped"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Stopped" "Sub" "The app is not running. Start it to serve traffic.")}}
+  {{else if eq .App.Status "draft"}}{{template "ui_alert" (dict "Kind" "neutral" "Icon" "alert" "Title" "Draft" "Sub" (or (and (ne .App.ServerID 0) (printf "Draft on %s. Deploy when ready." .ServerName)) "Assign a server and deploy."))}}
+  {{else if or (eq .App.Status "deploying") (eq .App.Status "pending")}}{{template "ui_alert" (dict "Kind" "warn" "Icon" "refresh" "Title" "Deploying" "Sub" "This page refreshes every 2 seconds.")}}
+  {{else}}{{template "ui_alert" (dict "Kind" "danger" "Icon" "alert" "Title" (printf "Status: %s" .App.Status) "Sub" (or (and .Deployments (index .Deployments 0).Log) ""))}}{{end}}
+
+  <div class="action-bar">
+    {{if eq .App.Status "draft"}}
+    <form method="POST" action="apps/{{.App.ID}}/deploy">
+      <button type="submit" class="btn btn-primary"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
+    </form>
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
+    {{else}}
+    {{if eq .App.Status "stopped"}}
+    <form method="POST" action="apps/{{.App.ID}}/start"><button type="submit" class="btn btn-primary">Start</button></form>
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
+    {{else}}
+    <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
+    {{if eq .App.Status "running"}}<form method="POST" action="apps/{{.App.ID}}/stop"><button type="submit" class="btn btn-secondary">Stop</button></form>{{end}}
+    {{end}}
+    <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
+    {{end}}
+  </div>
+
+  <div class="console-section">
+    <div id="app-console-container" class="console-container" hidden>
+      <div class="console-toolbar">
+        <span class="badge badge-online" id="app-console-status">Connected</span>
+        <button class="btn btn-ghost btn-sm" id="app-console-disconnect" onclick="toggleAppConsole()">Disconnect</button>
+      </div>
+      <div id="app-terminal"></div>
+    </div>
+  </div>
 
   {{if eq .App.Status "running"}}
-  <div class="card" style="margin-top:1em">
+  <div class="card">
     <div class="stats-header">
-      <h3>Resource Usage <span id="app-live-indicator" class="live-badge live-badge--hidden">● LIVE</span></h3>
-      <div class="chart-range-btns">
-        <button class="btn btn-ghost btn-active" data-range="realtime" title="Realtime 2-minute live stream" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-target="#app-stats-body" hx-swap="outerHTML">Realtime</button>
-        <button class="btn btn-ghost" data-range="1h" title="1 Hour history" hx-get="apps/{{.App.ID}}/stats?range=1h" hx-target="#app-stats-body" hx-swap="outerHTML">1h</button>
-        <button class="btn btn-ghost" data-range="6h" title="6 Hours history" hx-get="apps/{{.App.ID}}/stats?range=6h" hx-target="#app-stats-body" hx-swap="outerHTML">6h</button>
-        <button class="btn btn-ghost" data-range="24h" title="24 Hours history" hx-get="apps/{{.App.ID}}/stats?range=24h" hx-target="#app-stats-body" hx-swap="outerHTML">24h</button>
-        <button class="btn btn-ghost" data-range="7d" title="7 Days history" hx-get="apps/{{.App.ID}}/stats?range=7d" hx-target="#app-stats-body" hx-swap="outerHTML">7d</button>
-      </div>
+      <h3>Resource usage <span id="app-live-indicator" class="badge badge-online live-badge--hidden"><span class="badge-dot"></span>Live</span></h3>
+      {{template "ui_segmented" (dict "Label" "Time range" "Base" (printf "apps/%d/stats?range=" .App.ID) "Target" "#app-stats-body" "Swap" "outerHTML" "Active" 0 "Items" (list "realtime:Realtime" "1h:1h" "6h:6h" "24h:24h" "7d:7d"))}}
     </div>
-    <div class="stats-gauges stats-gauges--resources">
-      <div class="stat-gauge">
-        <div class="stat-gauge-header">
-          <div class="stat-gauge-label">CPU</div>
-          <div class="stat-gauge-value"><span id="cpu-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0.0{{end}}%</span></div>
-        </div>
-        <div class="stat-gauge-bar">
-          <div class="stat-gauge-fill stat-gauge-cpu" id="cpu-gauge-fill" style="width:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0{{end}}%"></div>
-        </div>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="gauge-head"><span class="gauge-label">CPU</span><span class="gauge-val" id="cpu-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0.0{{end}}%</span></div>
+        <div class="bar{{if .AppStats}}{{if ge .AppStats.CPUPercent 85.0}} bar-danger{{else if ge .AppStats.CPUPercent 70.0}} bar-warn{{end}}{{end}}"><span id="cpu-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.CPUPercent)}}{{else}}0{{end}}%"></span></div>
       </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-header">
-          <div class="stat-gauge-label">Memory</div>
-          <div class="stat-gauge-value"><span id="mem-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0.0{{end}}%</span> <span class="stat-gauge-detail" id="mem-gauge-detail">{{if .AppStats}}{{formatBytes .AppStats.MemUsageBytes}} / {{formatBytes .AppStats.MemLimitBytes}}{{else}}- / -{{end}}</span></div>
-        </div>
-        <div class="stat-gauge-bar">
-          <div class="stat-gauge-fill stat-gauge-mem" id="mem-gauge-fill" style="width:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0{{end}}%"></div>
-        </div>
+      <div class="gauge">
+        <div class="gauge-head"><span class="gauge-label">Memory</span><span class="gauge-val"><span id="mem-gauge-pct">{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0.0{{end}}%</span> <span class="gauge-detail" id="mem-gauge-detail">{{if .AppStats}}{{formatBytes .AppStats.MemUsageBytes}} / {{formatBytes .AppStats.MemLimitBytes}}{{else}}- / -{{end}}</span></span></div>
+        <div class="bar{{if .AppStats}}{{if ge .AppStats.MemPercent 85.0}} bar-danger{{else if ge .AppStats.MemPercent 70.0}} bar-warn{{end}}{{end}}"><span id="mem-gauge-fill" style="--w:{{if .AppStats}}{{printf "%.1f" (clamp100 .AppStats.MemPercent)}}{{else}}0{{end}}%"></span></div>
       </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-label">Disk</div>
-        <div class="stat-gauge-net"><span id="disk-usage">{{if .AppStats}}{{formatBytes .AppStats.DiskUsageBytes}}{{else}}-{{end}}</span></div>
-      </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-label">Net I/O</div>
-        <div class="stat-gauge-net"><span id="net-io">{{if .AppStats}}{{formatBytes .AppStats.NetIORxBytes}} / {{formatBytes .AppStats.NetIOTxBytes}}{{else}}- / -{{end}}</span></div>
-      </div>
-      <div class="stat-gauge">
-        <div class="stat-gauge-label">Block I/O</div>
-        <div class="stat-gauge-net"><span id="block-io">{{if .AppStats}}{{formatBytes .AppStats.BlockIORead}} / {{formatBytes .AppStats.BlockIOWrite}}{{else}}- / -{{end}}</span></div>
-      </div>
+      <div class="gauge"><div class="gauge-head"><span class="gauge-label">Disk</span><span class="gauge-val" id="disk-usage">{{if .AppStats}}{{formatBytes .AppStats.DiskUsageBytes}}{{else}}-{{end}}</span></div></div>
+      <div class="gauge"><div class="gauge-head"><span class="gauge-label">Net I/O</span><span class="gauge-val" id="net-io">{{if .AppStats}}{{formatBytes .AppStats.NetIORxBytes}} / {{formatBytes .AppStats.NetIOTxBytes}}{{else}}- / -{{end}}</span></div></div>
+      <div class="gauge"><div class="gauge-head"><span class="gauge-label">Block I/O</span><span class="gauge-val" id="block-io">{{if .AppStats}}{{formatBytes .AppStats.BlockIORead}} / {{formatBytes .AppStats.BlockIOWrite}}{{else}}- / -{{end}}</span></div></div>
     </div>
     <hr class="stats-divider">
     <div id="app-stats-body" data-range="realtime" hx-get="apps/{{.App.ID}}/stats?range=realtime" hx-trigger="load" hx-swap="outerHTML">
-      <p style="color:var(--text-muted);font-size:0.85em;margin-top:1em">Loading stats&hellip;</p>
+      <p class="muted-note">Loading stats&hellip;</p>
     </div>
   </div>
   <script>
@@ -95,164 +104,95 @@
   </script>
   {{end}}
 
-  <div class="grid grid-fill">
-    <div class="card">
-      <h3>Details</h3>
-      <div class="table-wrap"><table>
-        <tr><td><strong>Status</strong></td><td><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></td></tr>
-        <tr><td><strong>Server</strong></td><td>
-          {{if eq .App.ServerID 0}}
-            <span style="color:var(--orange);font-size:0.85em">Not assigned</span>
-            <a href="apps/{{.App.ID}}/edit" style="margin-left:0.5em;font-size:0.85em">Select one →</a>
-          {{else}}
-            {{.ServerName}}
-          {{end}}
-        </td></tr>
-        <tr><td><strong>Domain{{if gt (len .Domains) 1}}s{{end}}</strong></td><td>{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</td></tr>
-        <tr><td><strong>Port</strong></td><td>{{.App.Port}}</td></tr>
-        <tr><td><strong>Internal</strong></td><td><code>{{.ServiceName}}:{{.App.Port}}</code> <span style="color:var(--text-dim);font-size:0.82em">(plain HTTP)</span></td></tr>
-        {{if .App.Command}}<tr><td><strong>Command</strong></td><td><code>{{.App.Command}}</code></td></tr>{{end}}
-        {{if .App.Ports}}<tr><td><strong>Ports</strong></td><td><code>{{.App.Ports | nl2br}}</code></td></tr>{{end}}
-        {{if .App.MemoryLimit}}<tr><td><strong>Memory Limit</strong></td><td>{{.App.MemoryLimit}}</td></tr>{{end}}
-        {{if .App.CPULimit}}<tr><td><strong>CPU Limit</strong></td><td>{{.App.CPULimit}}</td></tr>{{end}}
-        {{if .App.UlimitsNofile}}<tr><td><strong>Ulimits (nofile)</strong></td><td>{{.App.UlimitsNofile}}</td></tr>{{end}}
-        {{if or .App.LogMaxSize .App.LogMaxFile}}<tr><td><strong>Log Limits</strong></td><td>{{if .App.LogMaxSize}}max-size={{.App.LogMaxSize}}{{end}}{{if and .App.LogMaxSize .App.LogMaxFile}}, {{end}}{{if .App.LogMaxFile}}max-file={{.App.LogMaxFile}}{{end}}</td></tr>{{end}}
-        {{if .App.AuthUser}}<tr><td><strong>Auth</strong></td><td>basic auth ({{.App.AuthUser}})</td></tr>{{end}}
-        {{if .App.GitRepo}}<tr><td><strong>Git Repo</strong></td><td>{{.App.GitRepo}}</td></tr>
-        <tr><td><strong>Branch</strong></td><td>{{.App.GitBranch}}</td></tr>{{end}}
-      </table></div>
-    </div>
-    <div class="card">
-      <h3>Docker Compose</h3>
-      <pre style="max-height:none">{{.App.Compose}}</pre>
-    </div>
+  <div class="card">
+    <h3>Details</h3>
+    <dl class="detail-grid">
+      <div><dt>Status</dt><dd><span class="badge badge-{{.App.Status}}">{{.App.Status}}</span></dd></div>
+      <div><dt>Server</dt><dd>{{if eq .App.ServerID 0}}Not assigned <a href="apps/{{.App.ID}}/edit">Select one</a>{{else}}{{.ServerName}}{{end}}</dd></div>
+      <div><dt>Domain{{if gt (len .Domains) 1}}s{{end}}</dt><dd class="mono">{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}{{if not .Domains}}-{{end}}</dd></div>
+      <div><dt>Port</dt><dd class="mono">{{.App.Port}}</dd></div>
+      <div><dt>Internal</dt><dd class="mono">{{.ServiceName}}:{{.App.Port}}</dd></div>
+      {{if .App.Command}}<div><dt>Command</dt><dd class="mono">{{.App.Command}}</dd></div>{{end}}
+      {{if .App.Ports}}<div><dt>Ports</dt><dd class="mono">{{.App.Ports | nl2br}}</dd></div>{{end}}
+      {{if .App.MemoryLimit}}<div><dt>Memory limit</dt><dd>{{.App.MemoryLimit}}</dd></div>{{end}}
+      {{if .App.CPULimit}}<div><dt>CPU limit</dt><dd>{{.App.CPULimit}}</dd></div>{{end}}
+      {{if .App.UlimitsNofile}}<div><dt>Ulimits (nofile)</dt><dd>{{.App.UlimitsNofile}}</dd></div>{{end}}
+      {{if or .App.LogMaxSize .App.LogMaxFile}}<div><dt>Log limits</dt><dd>{{if .App.LogMaxSize}}max-size={{.App.LogMaxSize}}{{end}}{{if and .App.LogMaxSize .App.LogMaxFile}}, {{end}}{{if .App.LogMaxFile}}max-file={{.App.LogMaxFile}}{{end}}</dd></div>{{end}}
+      {{if .App.AuthUser}}<div><dt>Auth</dt><dd>basic auth ({{.App.AuthUser}})</dd></div>{{end}}
+      {{if .App.GitRepo}}<div><dt>Git repo</dt><dd class="mono">{{.App.GitRepo}}</dd></div><div><dt>Branch</dt><dd class="mono">{{.App.GitBranch}}</dd></div>{{end}}
+    </dl>
   </div>
 
-    <div class="card" style="margin-top:1em">
-      <h3>Environment Variables</h3>
-      <p style="color:var(--text-muted);margin-top:0;font-size:0.85em">
-        Use <code>${KEY}</code> in your compose to reference these values.
-      </p>
-      {{if .Secrets}}
-      <div class="table-wrap"><table style="width:100%;border-collapse:collapse">
-        <tr style="border-bottom:1px solid var(--border)">
-          <th style="text-align:left;padding:0.4em 0.6em;font-size:0.82em;color:var(--text-dim)">Key</th>
-          <th style="text-align:left;padding:0.4em 0.6em;font-size:0.82em;color:var(--text-dim)">Value</th>
-        </tr>
+  <div class="card">
+    <h3>Docker Compose</h3>
+    <pre class="code">{{.App.Compose}}</pre>
+  </div>
+
+  <div class="card">
+    <h3>Environment variables</h3>
+    <p class="muted-note">Use <code>${KEY}</code> in your compose to reference these values. Add or change them in <a href="apps/{{.App.ID}}/edit">Edit</a>.</p>
+    {{if .Secrets}}
+    <table class="rows rows-kv">
+      <thead><tr><th>Key</th><th>Value</th></tr></thead>
+      <tbody>
         {{range .Secrets}}
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:0.4em 0.6em;font-family:monospace;font-size:0.9em;white-space:nowrap">{{.Key}}</td>
-          <td style="padding:0.4em 0.6em;font-family:monospace;font-size:0.9em;word-break:break-all">
-            {{if .IsSecret}}<span style="color:var(--text-dim)">••••••••</span>{{else}}{{.Value}}{{end}}
-          </td>
-        </tr>
+        <tr><td class="mono">{{.Key}}</td><td class="mono wrap">{{if .IsSecret}}<span class="muted">••••••••</span>{{else}}{{.Value}}{{end}}</td></tr>
         {{end}}
-      </table></div>
-      {{else}}
-      <p style="color:var(--text-muted);font-size:0.85em">No environment variables configured.</p>
-      {{end}}
-      <p style="color:var(--text-dim);font-size:0.82em;margin-top:0.6em">Variables can be added or modified in <a href="apps/{{.App.ID}}/edit">Edit</a> mode.</p>
-    </div>
-
-    <div class="card" style="margin-top:1em">
-      <h3>Config Files</h3>
-      <p style="color:var(--text-muted);margin-top:0;font-size:0.85em">
-        Files written to the app directory before deploy. Mount them via <code>./filename:/container/path</code> in compose.
-      </p>
-      <div>
-        {{if .Files}}
-        {{range .Files}}
-        <div style="padding:0.3em 0;border-bottom:1px solid var(--border)">
-          <code style="font-size:0.85em">{{.Path}}</code>
-        </div>
-        {{end}}
-        {{else}}
-        <p style="color:var(--text-muted);font-size:0.85em">No config files.</p>
-        {{end}}
-      </div>
-      <p style="color:var(--text-dim);font-size:0.82em;margin-top:0.6em">Config files can be added or modified in <a href="apps/{{.App.ID}}/edit">Edit</a> mode.</p>
-    </div>
-
-  <div class="btn-group">
-    <div class="btn-group-left">
-      {{if eq .App.Status "draft"}}
-      <form method="POST" action="apps/{{.App.ID}}/deploy" style="display:inline">
-        <button type="submit" class="btn btn-primary"{{if eq .App.ServerID 0}} disabled title="Assign a server in Edit first"{{end}}>Deploy</button>
-      </form>
-      <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
-      {{else}}
-      {{if eq .App.Status "running"}}
-      <form method="POST" action="apps/{{.App.ID}}/stop" style="display:inline">
-        <button type="submit" class="btn btn-secondary">Stop</button>
-      </form>
-      {{end}}
-      {{if eq .App.Status "stopped"}}
-      <form method="POST" action="apps/{{.App.ID}}/start" style="display:inline">
-        <button type="submit" class="btn btn-primary">Start</button>
-      </form>
-      {{end}}
-      {{if eq .App.Status "running"}}
-      <a href="apps/{{.App.ID}}/edit" class="btn btn-primary">Edit</a>
-      {{else}}
-      <a href="apps/{{.App.ID}}/edit" class="btn btn-secondary">Edit</a>
-      {{end}}
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-redeploy')">Redeploy</button>
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-rollback')">Rollback</button>
-      <button class="btn btn-ghost" id="app-console-toggle" data-app-id="{{.App.ID}}" onclick="toggleAppConsole()">Console</button>
-      {{end}}
-    </div>
-    <div class="btn-group-right">
-      <button type="button" class="btn btn-destructive-outline" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete Draft{{else}}Undeploy{{end}}</button>
-    </div>
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted-note">No environment variables configured.</p>
+    {{end}}
   </div>
 
-  <div class="console-section">
-    <div id="app-console-container" class="console-container" style="display:none">
-      <div class="console-toolbar">
-        <span class="badge badge-online" id="app-console-status">Connected</span>
-        <button class="btn btn-ghost btn-sm" id="app-console-disconnect" onclick="toggleAppConsole()">Disconnect</button>
-      </div>
-      <div id="app-terminal"></div>
-    </div>
+  <div class="card">
+    <h3>Config files</h3>
+    <p class="muted-note">Written to the app directory before deploy. Mount them via <code>./filename:/container/path</code> in compose. Add or change them in <a href="apps/{{.App.ID}}/edit">Edit</a>.</p>
+    {{if .Files}}
+    <ul class="file-list">{{range .Files}}<li class="mono">{{.Path}}</li>{{end}}</ul>
+    {{else}}
+    <p class="muted-note">No config files.</p>
+    {{end}}
   </div>
 
   {{if .Deployments}}
-  <div class="card" style="margin-top:1em">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8em">
-      <h3 style="margin:0">Deployment History</h3>
-      <button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-clear-history')">Clear History</button>
-    </div>
-    <div class="table-wrap"><table style="font-size:0.85em">
-      <thead>
-        <tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr>
-      </thead>
+  <div class="card">
+    <h3>Deployment history</h3>
+    <table class="rows rows-dep">
+      <thead><tr><th>Time</th><th>Status</th><th>Commit</th><th>Log</th></tr></thead>
       <tbody>
         {{range .Deployments}}
         <tr>
-          <td style="white-space:nowrap"><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</time></td>
+          <td><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</time></td>
           <td><span class="badge badge-{{.Status}}">{{or .Status "unknown"}}</span></td>
-          <td style="white-space:nowrap">{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
-          <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.Log}}">{{.Log}}</td>
+          <td class="mono">{{if .CommitSHA}}{{.CommitSHA}}{{else}}-{{end}}</td>
+          <td class="c-wide log-cell" title="{{.Log}}">{{.Log}}</td>
         </tr>
         {{end}}
       </tbody>
-    </table></div>
+    </table>
   </div>
   {{end}}
 
   {{if or (eq .App.Status "running") (eq .App.Status "stopped")}}
-  <div class="card" style="margin-top:1em">
+  <div class="card">
     <h3>Logs</h3>
-    <div class="log-container">
-      <div class="log-toolbar">
-        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=50" hx-target="#log-output" hx-swap="innerHTML">Tail 50</button>
-        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=200" hx-target="#log-output" hx-swap="innerHTML">Tail 200</button>
-        <button class="btn btn-ghost" hx-get="api/apps/{{.App.ID}}/logs?tail=500" hx-target="#log-output" hx-swap="innerHTML">Tail 500</button>
-      </div>
-      <pre id="log-output" class="log-content">Click to load logs…</pre>
-    </div>
+    {{template "ui_segmented" (dict "Label" "Log lines" "Base" (printf "api/apps/%d/logs?tail=" .App.ID) "Target" "#log-output" "Swap" "innerHTML" "Active" -1 "Items" (list "50:Tail 50" "200:Tail 200" "500:Tail 500"))}}
+    <pre id="log-output" class="log-content">Click to load logs…</pre>
   </div>
   {{end}}
+
+  <div class="card danger-zone">
+    <h3>Danger zone</h3>
+    {{if ne .App.Status "draft"}}
+    <div class="dz-row"><div><div class="dz-title">Redeploy</div><div class="dz-desc">Rebuild and restart the app. It is briefly unavailable.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-redeploy')">Redeploy</button></div>
+    <div class="dz-row"><div><div class="dz-title">Rollback</div><div class="dz-desc">Restore the last successful deployment.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-rollback')">Rollback</button></div>
+    {{end}}
+    {{if .Deployments}}
+    <div class="dz-row"><div><div class="dz-title">Clear deployment history</div><div class="dz-desc">Remove all deployment records. This cannot be undone.</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-clear-history')">Clear history</button></div>
+    {{end}}
+    <div class="dz-row"><div><div class="dz-title">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</div><div class="dz-desc">{{if eq .App.Status "draft"}}Permanently delete this draft.{{else}}Stop the app and remove it from {{.ServerName}}.{{end}}</div></div><button type="button" class="btn btn-destructive-outline btn-sm" onclick="openSheet('app-undeploy')">{{if eq .App.Status "draft"}}Delete draft{{else}}Undeploy{{end}}</button></div>
+  </div>
 </div>
 
 <script>
@@ -261,11 +201,11 @@ var appWs = null;
 
 function toggleAppConsole() {
 	var container = document.getElementById('app-console-container');
-	if (container.style.display === 'none') {
-		container.style.display = 'block';
+	if (container.hidden) {
+		container.hidden = false;
 		connectAppConsole();
 	} else {
-		container.style.display = 'none';
+		container.hidden = true;
 		disconnectAppConsole();
 	}
 }

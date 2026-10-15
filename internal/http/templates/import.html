@@ -13,10 +13,10 @@
   <hgroup><h1>Import Configuration</h1></hgroup>
 
   {{if .Error}}
-  <div class="card" style="color:var(--red);margin-bottom:1em">{{.Error}}</div>
+  <div class="card" style="color:var(--danger);margin-bottom:1em">{{.Error}}</div>
   {{end}}
   {{if .Message}}
-  <div class="card" style="color:var(--green);margin-bottom:1em">{{.Message}}</div>
+  <div class="card" style="color:var(--ok);margin-bottom:1em">{{.Message}}</div>
   {{end}}
 
   <form method="POST" action="api/backup/import" enctype="multipart/form-data">
@@ -27,22 +27,22 @@
       </label>
 
       <label style="display:block;margin-bottom:1em">
-        <span style="font-size:0.85em;color:var(--text-muted)">Passphrase (if encrypted)</span>
+        <span style="font-size:0.85em;color:var(--ink2)">Passphrase (if encrypted)</span>
         <input type="text" name="passphrase" placeholder="Enter passphrase from export" style="display:block;margin-top:0.3em;font-family:ui-monospace,monospace">
       </label>
 
-      <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1em;margin:0 0 1em">
-        <legend style="text-transform:uppercase;font-size:0.78em;color:var(--text-muted);font-weight:600;letter-spacing:0.05em">Import Mode</legend>
+      <fieldset style="border:1px solid var(--line);border-radius:4px;padding:1em;margin:0 0 1em">
+        <legend style="text-transform:uppercase;font-size:0.78em;color:var(--ink2);font-weight:600;letter-spacing:0.05em">Import Mode</legend>
         <label style="display:inline-flex;align-items:center;margin-bottom:0">
           <input type="radio" name="mode" value="merge" checked style="margin:0 0.7em 0 0">
           <strong>Merge</strong>&nbsp;
-          <span style="color:var(--text-muted)">— Add new servers/apps, skip existing by name</span>
+          <span style="color:var(--ink2)">— Add new servers/apps, skip existing by name</span>
         </label>
         <br>
         <label style="display:inline-flex;align-items:center;margin-bottom:0">
           <input type="radio" name="mode" value="replace" style="margin:0 0.7em 0 0">
           <strong>Replace</strong>&nbsp;
-          <span style="color:var(--red)">— Delete ALL existing servers and apps first, then import (every app must be stopped or a draft)</span>
+          <span style="color:var(--danger)">— Delete ALL existing servers and apps first, then import (every app must be stopped or a draft)</span>
         </label>
       </fieldset>
 

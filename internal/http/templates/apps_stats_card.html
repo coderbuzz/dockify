@@ -2,7 +2,7 @@
 {{$width := 600}}
 {{$height := 100}}
 
-<div id="app-stats-body" data-range="{{$range}}" style="margin-top:1em">
+<div id="app-stats-body" data-range="{{$range}}" class="stats-body">
 
 {{if .Stats}}
   {{if .ChartData.cpu}}
@@ -11,10 +11,10 @@
   <div class="chart-section">
     <div class="chart-title"><span>CPU</span> <span class="chart-title-val chart-title-val--cpu" id="cpu-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 (latestChartVal .ChartData.cpu .Stats.CPUPercent))}}%{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="cpu-chart-line" data-max="{{$cpuMax}}" data-points='{{chartPointsJSON .ChartData.cpu}}' fill="none" stroke="var(--chart)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.cpu $width $height $cpuMax $range}}" />
       <line id="cpu-threshold-line" x1="0" y1="{{$cpuThreshY}}" x2="{{$width}}" y2="{{$cpuThreshY}}"
-        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
+        stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
@@ -25,10 +25,10 @@
   <div class="chart-section">
     <div class="chart-title"><span>Memory</span> <span class="chart-title-val chart-title-val--mem" id="mem-chart-val">{{if .Stats}}{{printf "%.1f" (clamp100 (latestChartVal .ChartData.memory .Stats.MemPercent))}}% ({{formatBytes .Stats.MemUsageBytes}} / {{formatBytes .Stats.MemLimitBytes}}){{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="memory-chart-line" data-max="{{$memMax}}" data-points='{{chartPointsJSON .ChartData.memory}}' fill="none" stroke="var(--brand2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.memory $width $height $memMax $range}}" />
       <line id="memory-threshold-line" x1="0" y1="{{$memThreshY}}" x2="{{$width}}" y2="{{$memThreshY}}"
-        stroke="var(--red)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
+        stroke="var(--danger)" stroke-width="1" stroke-dasharray="4,2" opacity="0.4" />
     </svg>
   </div>
   {{end}}
@@ -39,7 +39,7 @@
   <div class="chart-section">
     <div class="chart-title"><span>Network I/O</span> <span class="chart-title-val chart-title-val--net" id="net-chart-val">{{if .Stats}}{{formatBytes .Stats.NetIORxBytes}} / {{formatBytes .Stats.NetIOTxBytes}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="network-chart-line" data-max="{{$netMax}}" data-points='{{chartPointsJSON .ChartData.network}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="network-chart-line" data-max="{{$netMax}}" data-points='{{chartPointsJSON .ChartData.network}}' fill="none" stroke="var(--brand2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.network $width $height $netMax $range}}" />
     </svg>
   </div>
@@ -51,17 +51,17 @@
   <div class="chart-section">
     <div class="chart-title"><span>Disk Usage</span> <span class="chart-title-val chart-title-val--disk" id="disk-chart-val">{{if .Stats}}{{formatBytes .Stats.DiskUsageBytes}}{{else}}-{{end}}</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline id="disk-chart-line" data-max="{{$diskMax}}" data-points='{{chartPointsJSON .ChartData.disk}}' fill="none" stroke="var(--brand2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .ChartData.disk $width $height $diskMax $range}}" />
     </svg>
   </div>
   {{end}}
 {{else}}
-  <p style="color:var(--text-muted);font-size:0.85em">Stats not yet available. Data collects every 10 seconds.</p>
+  <p class="muted-note">Stats not yet available. Data collects every 10 seconds.</p>
 {{end}}
 
 {{if .Traffic}}
-<div class="card" style="margin-top:1em">
+<div class="card">
   <h3>Traffic</h3>
   <div class="stats-gauges">
     <div class="stat-gauge">
@@ -74,19 +74,19 @@
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">2xx</div>
-      <div class="stat-gauge-value stat-gauge-net" style="color:var(--green)">{{.Traffic.Status2xx}}</div>
+      <div class="stat-gauge-value stat-gauge-net t-ok">{{.Traffic.Status2xx}}</div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">3xx</div>
-      <div class="stat-gauge-value stat-gauge-net" style="color:var(--link)">{{.Traffic.Status3xx}}</div>
+      <div class="stat-gauge-value stat-gauge-net t-info">{{.Traffic.Status3xx}}</div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">4xx</div>
-      <div class="stat-gauge-value stat-gauge-net" style="color:var(--yellow)">{{.Traffic.Status4xx}}</div>
+      <div class="stat-gauge-value stat-gauge-net t-warn">{{.Traffic.Status4xx}}</div>
     </div>
     <div class="stat-gauge">
       <div class="stat-gauge-label">5xx</div>
-      <div class="stat-gauge-value stat-gauge-net" style="color:var(--red)">{{.Traffic.Status5xx}}</div>
+      <div class="stat-gauge-value stat-gauge-net t-danger">{{.Traffic.Status5xx}}</div>
     </div>
   </div>
 
@@ -96,16 +96,16 @@
   <div class="chart-section">
     <div class="chart-title"><span>Requests / sec</span> <span class="chart-title-val chart-title-val--net" id="rps-chart-val">{{printf "%.1f" .Traffic.RequestsRPS}} req/s</span></div>
     <svg class="chart-svg" viewBox="0 0 {{$width}} {{$height}}" preserveAspectRatio="none">
-      <polyline fill="none" stroke="var(--link)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+      <polyline fill="none" stroke="var(--brand2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         points="{{chartPoints .TrafficData.rps $width $height $rpsMax $range}}" />
     </svg>
   </div>
   {{end}}
 </div>
 {{else}}
-<div class="card" style="margin-top:1em">
+<div class="card">
   <h3>Traffic</h3>
-  <p style="color:var(--text-muted);font-size:0.85em">Traffic data not available. Ensure Caddy metrics are enabled (re-init worker).</p>
+  <p class="muted-note">Traffic data not available. Ensure Caddy metrics are enabled (re-init worker).</p>
 </div>
 {{end}}
 

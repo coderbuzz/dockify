@@ -18,7 +18,7 @@
   </hgroup>
 
   {{if .Error}}
-  <div class="card" style="color:var(--red)">{{.Error}}</div>
+  <div class="card" style="color:var(--danger)">{{.Error}}</div>
   {{end}}
 
   <form method="POST" action="servers/{{.Server.ID}}/edit">

@@ -8,9 +8,9 @@
       <th aria-sort="none"><button type="button" class="th-sort" data-sort="name" data-type="string">Name{{template "ui_icon" "chevron-down"}}</button></th>
       <th aria-sort="none"><button type="button" class="th-sort" data-sort="status" data-type="string">Status{{template "ui_icon" "chevron-down"}}</button></th>
       <th class="col-sm-hide" aria-sort="none"><button type="button" class="th-sort" data-sort="user" data-type="string">User{{template "ui_icon" "chevron-down"}}</button></th>
-      <th aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
-      <th aria-sort="none"><button type="button" class="th-sort" data-sort="ram" data-type="number">RAM{{template "ui_icon" "chevron-down"}}</button></th>
-      <th aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
+      <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU{{template "ui_icon" "chevron-down"}}</button></th>
+      <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="ram" data-type="number">RAM{{template "ui_icon" "chevron-down"}}</button></th>
+      <th class="num" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk{{template "ui_icon" "chevron-down"}}</button></th>
     </tr>
   </thead>
   <tbody>
@@ -23,9 +23,9 @@
       <td class="c-name"><a href="servers/{{.ID}}">{{.Name}}</a><small class="mono">{{.Host}}:{{.Port}}</small></td>
       <td class="c-status"><span class="badge badge-{{.Status}}">{{if eq .Status "online"}}<span class="badge-dot"></span>{{end}}{{.Status}}</span></td>
       <td class="col-sm-hide">{{.User}}</td>
-      <td class="c-num" data-label="CPU"{{if .CPUCores}} title="{{.CPUCores}} cores"{{end}}>{{if .CPUUsage}}{{printf "%.1f" .CPUUsage}}%<progress class="bar{{if ge .CPUUsage 85.0}} bar-danger{{else if ge .CPUUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .CPUUsage}}" max="100"></progress>{{else}}-{{end}}</td>
-      <td class="c-num" data-label="RAM"{{if .RAMMB}} title="{{.RAMMB}} MB"{{end}}>{{if .RAMUsage}}{{printf "%.1f" .RAMUsage}}%<progress class="bar{{if ge .RAMUsage 85.0}} bar-danger{{else if ge .RAMUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .RAMUsage}}" max="100"></progress>{{else}}-{{end}}</td>
-      <td class="c-num" data-label="Disk"{{if .DiskGB}} title="{{.DiskGB}} GB"{{end}}>{{if .DiskUsage}}{{printf "%.1f" .DiskUsage}}%<progress class="bar{{if ge .DiskUsage 85.0}} bar-danger{{else if ge .DiskUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .DiskUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num num" data-label="CPU"{{if .CPUCores}} title="{{.CPUCores}} cores"{{end}}>{{if .CPUUsage}}{{printf "%.1f" .CPUUsage}}%<progress class="bar{{if ge .CPUUsage 85.0}} bar-danger{{else if ge .CPUUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .CPUUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num num" data-label="RAM"{{if .RAMMB}} title="{{.RAMMB}} MB"{{end}}>{{if .RAMUsage}}{{printf "%.1f" .RAMUsage}}%<progress class="bar{{if ge .RAMUsage 85.0}} bar-danger{{else if ge .RAMUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .RAMUsage}}" max="100"></progress>{{else}}-{{end}}</td>
+      <td class="c-num num" data-label="Disk"{{if .DiskGB}} title="{{.DiskGB}} GB"{{end}}>{{if .DiskUsage}}{{printf "%.1f" .DiskUsage}}%<progress class="bar{{if ge .DiskUsage 85.0}} bar-danger{{else if ge .DiskUsage 70.0}} bar-warn{{end}}" value="{{printf "%.1f" .DiskUsage}}" max="100"></progress>{{else}}-{{end}}</td>
     </tr>
     {{end}}
   </tbody>

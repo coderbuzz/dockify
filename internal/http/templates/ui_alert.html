@@ -1,0 +1,2 @@
+{{/* Status banner: dict Kind (ok|warn|danger|neutral), Icon, Title, Sub. */}}
+{{define "ui_alert"}}<div class="alert alert-{{.Kind}}" role="{{if eq .Kind "danger"}}alert{{else}}status{{end}}">{{template "ui_icon" .Icon}}<div class="alert-text"><div class="alert-title">{{.Title}}</div>{{if .Sub}}<div class="alert-sub">{{.Sub}}</div>{{end}}</div></div>{{end}}

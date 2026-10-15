@@ -21,7 +21,7 @@
 
   <div class="card" style="margin-top:1em">
     <h3>Update</h3>
-    <p style="color:var(--text-muted);margin-top:0">
+    <p style="color:var(--ink2);margin-top:0">
       Current: <strong id="cur-ver">v{{.Version}}</strong><br>
       Latest:  <strong id="lat-ver">-</strong>
     </p>
@@ -38,7 +38,7 @@
     <a href="https://github.com/sponsors/coderbuzz" class="btn btn-secondary" target="_blank" rel="noopener">Sponsor on GitHub</a>
   </div>
 
-  <p style="text-align:center;color:var(--text-muted);margin-top:2em;font-size:0.85em">Version {{.Version}}</p>
+  <p style="text-align:center;color:var(--ink2);margin-top:2em;font-size:0.85em">Version {{.Version}}</p>
 </div>
 {{template "ui_confirm" (dict "ID" "update-confirm" "Title" "Update Dockify now?" "Body" "The server restarts to apply the update and is unavailable for a short time." "Label" "Update")}}
 <script>

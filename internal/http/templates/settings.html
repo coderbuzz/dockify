@@ -12,17 +12,17 @@
 
   <div class="card">
     <h3>Webhook Secret</h3>
-    <p style="color:var(--text-muted);margin-top:0">
+    <p style="color:var(--ink2);margin-top:0">
       Use this secret in GitHub Actions to authenticate webhook deploy notifications.
     </p>
     <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap" id="wh-active">
       <input type="password" id="wh-secret" value="{{.WebhookSecret}}" readonly
-             style="flex:1 1 200px;font-family:monospace;font-size:0.85em;min-width:0;padding:0.5em;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+             style="flex:1 1 200px;font-family:monospace;font-size:0.85em;min-width:0;padding:0.5em;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)">
       <button class="btn btn-ghost" onclick="toggleSecret()" style="font-size:0.85em" id="toggle-btn">Show</button>
       <button class="btn btn-ghost" onclick="copySecret()" style="font-size:0.85em">Copy</button>
       <button class="btn btn-destructive-outline" onclick="openSheet('roll-confirm')" style="font-size:0.85em">Roll</button>
     </div>
-    <div style="margin-top:1em;font-size:0.8em;color:var(--text-muted)">
+    <div style="margin-top:1em;font-size:0.8em;color:var(--ink2)">
       <strong>GitHub Actions workflow snippet:</strong>
       <pre style="font-size:0.78em;background:var(--bg);padding:0.5em;border-radius:4px;overflow-x:auto">- name: Notify Dockify
   env:
@@ -40,7 +40,7 @@
 
   <div class="card" style="margin-top:1em">
     <h3>Export</h3>
-    <p style="color:var(--text-muted);margin-top:0">
+    <p style="color:var(--ink2);margin-top:0">
       Export all servers and apps configuration to a YAML file.
       SSH keys are <strong>not</strong> exported.
     </p>
@@ -49,7 +49,7 @@
 
   <div class="card" style="margin-top:1em">
     <h3>Import</h3>
-    <p style="color:var(--text-muted);margin-top:0">
+    <p style="color:var(--ink2);margin-top:0">
       Import servers and apps from a previously exported YAML file.
       Supports merge and replace modes.
     </p>
