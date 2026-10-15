@@ -1,6 +1,6 @@
 # Rencana revamp UI/UX Dockify (design system layout Dashboard di stack Go)
 
-Status: **draf untuk keputusan user** (2026-10-15). Leader: Fable 5.1 (akun Max). Sumber aturan:
+Status: **disetujui user 2026-10-15** (K1 stack dipertahankan, S0 dimulai, staging via tunnel). Leader: Fable 5.1 (akun Max). Sumber aturan:
 `~/workspace/tencent-dev-ops/standards/UI-STACK-DAN-DESIGN-SYSTEM.md` (standar UI) dan
 `WORKFLOW-PLANNER-EKSEKUTOR.md` (alur kerja). Setelah user memilih opsi warna, `docs/DESIGN-SYSTEM.md` di repo ini jadi rujukan utama.
 
@@ -39,7 +39,7 @@ Build `go build ./...`, `go vet`, `go test ./...` hijau (Go 1.26.0). Screenshot 
 | Inline style | 243 `style="..."` di 20 template | §5 komponen bersama |
 | Mode gelap | `html.dark`, skrip toggle di **akhir body** (FOUC saat tema gelap), tanpa opsi `system` eksplisit | §4 skrip inline di `<head>` |
 | Konfirmasi | 8 `confirm()` native; 4 modal kustom dengan inline style, tanpa Escape/fokus | §5 alert-dialog, §7.3 ResponsiveSheet |
-| Tombol | Redeploy, Rollback, Init Worker **isian merah** padahal aksi biasa; Edit isian biru; 6 tombol sejajar di detail app | §7.1 satu primary per layar, destructive hanya untuk hapus |
+| Tombol | Redeploy, Rollback, Init Worker isian merah penuh tanpa konfirmasi (Redeploy, Init Worker); Edit isian biru; 6 tombol sejajar sama bobot di detail app | §7.1 satu primary per layar; K9 pemicu berbahaya = outline merah + alert-dialog, isian merah hanya di konfirmasi |
 | Tombol di HP | `btn-group` jadi kolom penuh lebar, semua sama rata | §7.1 |
 | Navigasi HP | Hamburger + menu dropdown | §8 tab bar bawah |
 | Tabel di HP | Kolom terpotong, scroll horizontal di dalam `.table-wrap` | §8 tanpa overflow (hanya baris chip) |
@@ -51,13 +51,14 @@ Build `go build ./...`, `go vet`, `go test ./...` hijau (Go 1.26.0). Screenshot 
 
 ## 3. Keputusan (K1..K8)
 
-- **K1 Stack dipertahankan**: Go `html/template` + htmx + CSS kustom; tanpa Node di build/runtime. *Menunggu persetujuan user.*
+- **K1 Stack dipertahankan**: Go `html/template` + htmx + CSS kustom; tanpa Node di build/runtime. Disetujui user 2026-10-15.
 - **K2 CSS keluar dari `layout.html`** ke `internal/http/static/app.css` (ikut `go:embed`, disajikan `/static/app.css?v=<versi>` dengan cache lama). Token lapis 1 (palet) dan lapis 2 (semantik, nama persis seperti standar §3) di `:root` dan `:root[data-theme=dark]`.
 - **K3 Komponen = partial bersama** di `internal/http/templates/ui_*.html`: `ui_button` (varian primary/brand/secondary/ghost/destructive/destructive-outline/link; ukuran 44/36/48/ikon), `ui_badge`, `ui_card`, `ui_alert`, `ui_segmented`, `ui_sheet` (dialog/drawer responsif), `ui_icon` (SVG inline stroke 2). Varian diubah di partial, bukan di pemakaian. Inline style ditiadakan.
 - **K4 `<select>` native tetap dipakai, digayakan** (border `control`, chevron SVG, 16px). Alasan: 6 select enum sederhana; listbox kustom vanilla JS menambah kode dan risiko aksesibilitas tanpa manfaat. Dicatat sebagai penyimpangan §5 yang disetujui.
 - **K5 `<dialog>` native sebagai ResponsiveSheet**: `showModal()` memberi Escape, fokus terkurung, dan backdrop gratis. CSS: ≥700px popup tengah max-w 560 radius 16; <700px panel bawah radius atas 16 + handle 40×4 + safe-area; animasi ≤240 ms, hormati `prefers-reduced-motion`. Semua `confirm()` dan modal inline diganti.
 - **K6 Mode gelap**: pindah ke `data-theme` (`light|dark`) + preferensi `localStorage.dockify_theme` (`light|dark|system`, default `system`), skrip inline di `<head>`, satu blok `:root[data-theme=dark]`, tanpa `@media (prefers-color-scheme)` di CSS. Kunci lama `dockify-theme` dibaca sekali lalu dimigrasi.
 - **K7 Shell**: header ringkas (logo + tombol ikon 44px tema/keluar) + **tab bar bawah** di <900px (Dashboard, Servers, Apps, Settings; About pindah ke Settings), tab di bawah header mulai ≥900px, konten max 1100px. Tabel jadi daftar kartu baris di <700px (grid kolom tetap `minmax(0,1.3fr) 1fr 1fr 44px`), tabel penuh di ≥700px.
+- **K9 Aksi berbahaya = merah** (keputusan user 2026-10-15): Redeploy, Rollback, Init Worker, Prune Disk, Undeploy, Remove Server, Delete Draft, Clear History, Roll Secret, Update Dockify. Pemicu di bar aksi memakai `destructive-outline` (garis + teks `danger`), tombol konfirmasi akhir di alert-dialog memakai `destructive` (isian `danger-fill`). Satu primary per layar tetap berlaku untuk aksi tidak berbahaya (Edit, Start, Deploy draft, Simpan). Konfirmasi selalu lewat alert-dialog dengan kalimat akibatnya.
 - **K8 Pengukuran**: skrip `tests/e2e/ui.mjs` (Playwright dari `~/.local/share/pw-tools`): screenshot 360x740, 390x844, 1280x800 × terang/gelap; cek overflow horizontal; hitung node DOM; waktu navigasi antar halaman utama median 5 ulangan dengan CPU 4x dan latensi 80 ms; cek kontras token (≥4.5:1 teks, ≥3:1 kontrol) di kedua tema. Hasil "sebelum/sesudah" dilampirkan di tiap PR UI.
 
 Di luar cakupan: fitur baru, perubahan API/JSON, perubahan skema DB, terminal xterm (tema xterm tetap hex, dikecualikan dari grep hex), grafik SVG (hanya warnanya diganti token `chart`).
@@ -92,7 +93,7 @@ PR dengan bukti (screenshot 3 viewport × 2 tema untuk PR UI, tabel perf sebelum
 | S2 | Partial komponen (K3, K5): button varian, badge, card, alert, segmented, sheet, icon, toast; ganti 8 `confirm()` + 4 modal inline | Tidak ada `confirm(`; semua tombol pakai varian; Escape/backdrop/fokus jalan | Sonnet; review Opus (UI baru) | screenshot sheet 390 + 1280 |
 | S3 | Shell (K7): header, tab bar bawah, tab atas ≥900, container, About → Settings | 360/390 tanpa overflow; `aria-current`; safe-area | Sonnet | screenshot 3 viewport |
 | S4 | Dashboard + daftar Servers/Apps: KPI 2x2 di HP, baris kartu <700px, tabel ≥700px, filter satu baris + meta hasil + "Reset filter", urut tetap | DOM ≤12 node per baris; tanpa overflow; filter/urut masih jalan | Sonnet | screenshot, node count |
-| S5 | Detail App dan Server: bar aksi berhierarki (satu primary; Redeploy/Rollback secondary; Undeploy/Remove = destructive-outline + alert-dialog; Init Worker primary hanya saat belum online), `detail-grid`, banner status, rentang grafik segmented | Sesuai §7.1 dan §7.2; tabel inline style = 0 | Sonnet; review Opus | screenshot |
+| S5 | Detail App dan Server: bar aksi berhierarki (satu primary: Edit/Start/Deploy; aksi berbahaya K9 merah `destructive-outline` + alert-dialog; Console/Logs ghost), `detail-grid`, banner status, rentang grafik segmented | Sesuai §7.1, §7.2, K9; tabel inline style = 0 | Sonnet; review Opus | screenshot |
 | S6 | Form (apps add/edit, servers add/edit, settings, import/export): label 12.8px, input 16px, select bergaya, modal → sheet, baris env/file/domain memakai grid kolom tetap | Inline style = 0 di template form; iOS tidak zoom | Sonnet | screenshot 390 |
 | S7 | `tests/e2e/ui.mjs` (K8) + perbaikan temuan perf/a11y/kontras | Semua target §9/§10 terpenuhi; tabel sebelum/sesudah | Haiku jalankan (low), Sonnet perbaiki | tabel perf, laporan kontras |
 | S8 | Audit akhir leader (worktree `../dockify-audit`), perbarui `SPEC.md` §UI Style Guide → rujuk `docs/DESIGN-SYSTEM.md`, `README` screenshot, release patch | Checklist §11 semua tercentang; `./scripts/release.sh` | Fable | temuan bernomor, tag rilis |
