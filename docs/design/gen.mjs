@@ -255,14 +255,14 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
 .tab.on{color:var(--accent)}
 .tab.on::before{content:"";position:absolute;top:0;left:26%;right:26%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
 .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.btn{height:44px;border-radius:12px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;white-space:nowrap}
+.btn{height:40px;border-radius:12px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;white-space:nowrap}
 .btn .icon{width:17px;height:17px}
 .btn-primary{background:var(--accent-fill);color:var(--on-accent);box-shadow:var(--shadow)}
 .btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--control)}
 .btn-ghost{color:var(--ink2)}
 .btn-dout{color:var(--danger);border:1.5px solid var(--danger);padding:0 8px;background:transparent}
 .btn-destructive{background:var(--danger-fill);color:#fff}
-.input{height:44px;border-radius:12px;border:1px solid var(--control);background:var(--surface);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:16px}
+.input{height:40px;border-radius:12px;border:1px solid var(--control);background:var(--surface);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted);font-size:16px}
 .chips{display:flex;gap:6px;align-items:center;margin:0 -16px;padding:0 16px;overflow:hidden}
 .chip{flex:none;height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--line-strong);display:flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ink2)}
 .chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}

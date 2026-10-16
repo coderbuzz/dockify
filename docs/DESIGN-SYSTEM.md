@@ -137,13 +137,13 @@ Lencana: 10 sampai 11px, 800, huruf kapital, radius 6, font mono untuk nilai tek
 ## 4. Tipografi, spasi, radius
 Body 15px/1.5. KPI 24px/800 tracking -0.02em. Angka sekunder 20px/800. Judul kartu 15px/700. Label 12.8px. Meta/chip 11 sampai 12px (chip 600).
 Label tab bawah 11px. Input/select **16px**. Skala spasi 4px: padding halaman 14 sampai 16px, antar kartu 12px, antar kontrol 8px.
-Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Target sentuh aksi utama dan toggle ≥44px; chip 32px dengan jarak ≥6px.
+Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Skala kontrol (dikecilkan dari 44/48, mengikuti hadir S16): input/select/tombol default **40px**, `sm` 34px, `lg` 44px (satu aksi utama penuh-lebar), ikon 40px (`btn-icon`) dan 36px (`btn-icon-sm`), nav desktop 40px, segmen HP 38px. Teks input 16px di HP (iOS zoom), 14px di ≥700px. Chip 32px dengan jarak ≥6px.
 
 ## 5. Komponen (partial bersama, varian di partial bukan di pemakaian)
 | Kebutuhan | Partial / kelas | Catatan |
 | :--- | :--- | :--- |
-| Tombol | `.btn` + varian `primary` `secondary` `ghost` `destructive` `destructive-outline` `link`; ukuran 44 (default) / 36 (`sm`) / 48 (`lg`); ikon 44/40 | satu `primary` per layar/panel; dalam satu kelompok varian harus berbeda |
-| Input + label | `.field` (label 12.8px/600 + input 16px, border `control`, fokus outline 3px `accent`) | tanpa titik dua di label |
+| Tombol | `.btn` + varian `primary` `secondary` `ghost` `destructive` `destructive-outline` `link`; ukuran 40 (default) / 34 (`sm`) / 44 (`lg`); ikon 40/36 | satu `primary` per layar/panel; dalam satu kelompok varian harus berbeda |
+| Input + label | `.field` (label 12.8px/600 + input 16px HP, 14px desktop, tinggi 40, border `control`, fokus outline 3px `accent`) | tanpa titik dua di label |
 | Select | `<select class="select">` native digayakan + chevron SVG | penyimpangan K4 yang disetujui |
 | Dialog / alert-dialog / drawer | `ui_sheet`: `<dialog class="sheet">` + `openSheet(id)`/`closeSheet(id)`; ≥700px popup tengah max-w 560 radius 16 max-h 86dvh; <700px panel bawah max-w 560 radius atas 16 handle 40×4 max-h 92dvh + safe-area; animasi ≤240 ms; hormati `prefers-reduced-motion`; tutup via X, backdrop, Escape; **tanpa tautan "Tutup" di bawah** | menggantikan semua `confirm()` dan modal inline |
 | Kartu | `.card` = `surface` + border `line` + `shadow`, radius 16 | bayangan hanya di sini |
@@ -164,8 +164,8 @@ Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Target sentuh a
 
 ## 6. Layout
 - Mobile first 360×740, uji 390×844 dan 1280×800. Tanpa overflow horizontal halaman (hanya baris chip).
-- Shell: header ringkas (logo + nama + tombol ikon 44px: tema, keluar) + **tab bar bawah** <900px (Dashboard, Servers, Apps, Settings; ikon + label 11px, garis aktif, `aria-current`, `env(safe-area-inset-bottom)`). ≥900px: tab pindah ke bawah header, konten max 1100px, kartu grid 2 kolom. About pindah ke Settings.
-- Daftar: <700px baris kartu (grid `minmax(0,1.3fr) 1fr 1fr 44px`, `white-space:nowrap`), ≥700px tabel. KPI grid 2×2 di HP, 4 kolom di desktop.
+- Shell: header ringkas (logo + nama + tombol ikon 40px: tema, keluar) + **tab bar bawah** <900px (Dashboard, Servers, Apps, Settings; ikon + label 11px, garis aktif, `aria-current`, `env(safe-area-inset-bottom)`). ≥900px: tab pindah ke bawah header, konten max 1100px, kartu grid 2 kolom. About pindah ke Settings.
+- Daftar: <700px baris kartu (grid `minmax(0,1.3fr) 1fr 1fr 36px`, `white-space:nowrap`), ≥700px tabel. KPI grid 2×2 di HP, 4 kolom di desktop.
 - Panel detail: header (nama 18/800 + meta 12.8 muted + X) → banner status → `detail-grid` 2 kolom (dt 11/800 kapital muted, dd 14/600) → seksi berjudul (12.8/800 kapital, garis atas) → aksi (grid 2 kolom, primary penuh lebar) → zona bahaya.
 
 ## 7. Performa dan aksesibilitas (diukur, `tests/e2e/ui.mjs`)
