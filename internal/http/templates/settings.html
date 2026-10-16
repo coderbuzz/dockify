@@ -35,7 +35,7 @@
     <h3>Webhook secret</h3>
     <p class="card-sub">Use this secret in GitHub Actions to authenticate webhook deploy notifications.</p>
     <div class="secret-row" id="wh-active">
-      <input type="password" id="wh-secret" value="{{.WebhookSecret}}" readonly aria-label="Webhook secret">
+      <input type="password" id="wh-secret" value="" placeholder="••••••••••••••••" readonly aria-label="Webhook secret">
       <button class="btn btn-ghost btn-sm" onclick="toggleSecret()" id="toggle-btn">Show</button>
       <button class="btn btn-ghost btn-sm" onclick="copySecret()" id="copy-btn">Copy</button>
       <button class="btn btn-destructive-outline btn-sm" onclick="openSheet('roll-confirm')">Roll secret</button>
@@ -70,14 +70,26 @@
 <script>
 document.getElementById('roll-confirm-ok').addEventListener('click', function () { rollSecret(); });
 var visible = false;
+// The secret is not in the page: load it from the API on the first Show or Copy.
+function withSecret(fn) {
+  var el = document.getElementById('wh-secret');
+  if (el.value) return fn(el.value);
+  fetch('api/settings/webhook-secret')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) { el.value = d.secret; fn(d.secret); })
+    .catch(function () { showToast('Could not load the webhook secret', true); });
+}
 function toggleSecret() {
   var el = document.getElementById('wh-secret');
   var btn = document.getElementById('toggle-btn');
-  visible = !visible;
-  el.type = visible ? 'text' : 'password';
-  btn.textContent = visible ? 'Hide' : 'Show';
+  if (visible) {
+    visible = false; el.type = 'password'; btn.textContent = 'Show';
+    return;
+  }
+  withSecret(function () { visible = true; el.type = 'text'; btn.textContent = 'Hide'; });
 }
-function copySecret() {
+function copySecret() { withSecret(copyLoadedSecret); }
+function copyLoadedSecret() {
   var el = document.getElementById('wh-secret');
   var btn = document.getElementById('copy-btn');
   function done(ok) { btn.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); }

@@ -14,11 +14,8 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request, render func(w http.ResponseWriter, r *http.Request, status int, name string, data interface{})) {
-	secret, _ := h.service.GetWebhookSecret()
-	render(w, r, http.StatusOK, "settings.html", map[string]interface{}{
-		"Title":         "Settings",
-		"WebhookSecret": secret,
-	})
+	// The webhook secret is not rendered; the page loads it from GET /api/settings/webhook-secret on Show/Copy.
+	render(w, r, http.StatusOK, "settings.html", map[string]interface{}{"Title": "Settings"})
 }
 
 func (h *Handler) RollWebhookSecret(w http.ResponseWriter, r *http.Request) {

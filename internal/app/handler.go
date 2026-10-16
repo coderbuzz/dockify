@@ -739,21 +739,7 @@ func (h *WebHandler) AppAddForm(w http.ResponseWriter, r *http.Request, render R
 		app.Status = StatusDraft
 	}
 
-	envVals := r.Form["env_val"]
-	envTypes := r.Form["env_type"]
-	envList := make([]map[string]interface{}, 0, len(envKeysRaw))
-	for i, k := range envKeysRaw {
-		k = strings.TrimSpace(k)
-		if k == "" || i >= len(envVals) {
-			continue
-		}
-		envList = append(envList, map[string]interface{}{
-			"key":      k,
-			"value":    envVals[i],
-			"isSecret": i < len(envTypes) && envTypes[i] == "secret",
-		})
-	}
-	envJSON, _ := json.Marshal(envList)
+	envJSON, _ := json.Marshal(formEnvVars(r))
 
 	formCtx := func(servers interface{}, errMsg string) map[string]interface{} {
 		return map[string]interface{}{
@@ -856,13 +842,21 @@ func (h *WebHandler) AppEditPage(w http.ResponseWriter, r *http.Request, render 
 		}
 	}
 
-	secretsJSON, _ := json.Marshal(secrets)
+	// Secret values stay on the server: the form gets them masked (empty, orig = key) and keeps them unless changed.
+	envList := make([]formEnvVar, 0, len(secrets))
+	for _, s := range secrets {
+		ev := formEnvVar{Key: s.Key, Value: s.Value, IsSecret: s.IsSecret}
+		if s.IsSecret {
+			ev.Value, ev.Masked, ev.Orig = "", true, s.Key
+		}
+		envList = append(envList, ev)
+	}
+	secretsJSON, _ := json.Marshal(envList)
 
 	render(w, r, http.StatusOK, "apps_add.html", map[string]interface{}{
 		"Title":         "Edit " + app.Name,
 		"Servers":       servers,
 		"App":           app,
-		"Secrets":       secrets,
 		"SecretsJSON":   template.JS(secretsJSON),
 		"Files":         files,
 		"IsEdit":        true,
@@ -957,7 +951,12 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.GitRepo = strings.TrimSpace(r.FormValue("git_repo"))
 	app.GitBranch = strings.TrimSpace(r.FormValue("git_branch"))
 	app.AuthUser = strings.TrimSpace(r.FormValue("auth_user"))
-	app.AuthPass = strings.TrimSpace(r.FormValue("auth_pass"))
+	// The form never contains the stored password: empty keeps it, an empty username removes basic auth.
+	if p := strings.TrimSpace(r.FormValue("auth_pass")); p != "" {
+		app.AuthPass = p
+	} else if app.AuthUser == "" {
+		app.AuthPass = ""
+	}
 	app.MemoryLimit = memoryLimit
 	app.CPULimit = cpuLimit
 	app.LogMaxSize = logMaxSize
@@ -966,21 +965,7 @@ func (h *WebHandler) AppEditForm(w http.ResponseWriter, r *http.Request, render 
 	app.Ports = ports
 	app.UlimitsNofile = ulimitsNofile
 
-	envVals := r.Form["env_val"]
-	envTypes := r.Form["env_type"]
-	envList := make([]map[string]interface{}, 0, len(envKeysRaw))
-	for i, k := range envKeysRaw {
-		k = strings.TrimSpace(k)
-		if k == "" || i >= len(envVals) {
-			continue
-		}
-		envList = append(envList, map[string]interface{}{
-			"key":      k,
-			"value":    envVals[i],
-			"isSecret": i < len(envTypes) && envTypes[i] == "secret",
-		})
-	}
-	envJSON, _ := json.Marshal(envList)
+	envJSON, _ := json.Marshal(formEnvVars(r))
 
 	editCtx := func(servers interface{}, errMsg string) map[string]interface{} {
 		return map[string]interface{}{
@@ -1291,6 +1276,34 @@ func (h *WebHandler) AppRedeployAll(w http.ResponseWriter, r *http.Request, rend
 	web.Redirect(w, r, "/apps?flash="+url.QueryEscape(fmt.Sprintf("Redeploying %d running apps...", count)), http.StatusSeeOther)
 }
 
+// formEnvVar is one row of the env editor in apps_add.html. Masked: a stored secret sent without its
+// value; Orig is the key it was stored under.
+type formEnvVar struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	IsSecret bool   `json:"isSecret"`
+	Masked   bool   `json:"masked,omitempty"`
+	Orig     string `json:"orig,omitempty"`
+}
+
+// formEnvVars rebuilds the env rows from a submitted form (re-render after a validation error).
+func formEnvVars(r *http.Request) []formEnvVar {
+	keys, vals, types, origs := r.Form["env_key"], r.Form["env_val"], r.Form["env_type"], r.Form["env_orig"]
+	list := make([]formEnvVar, 0, len(keys))
+	for i, k := range keys {
+		k = strings.TrimSpace(k)
+		if k == "" || i >= len(vals) {
+			continue
+		}
+		ev := formEnvVar{Key: k, Value: vals[i], IsSecret: i < len(types) && types[i] == "secret"}
+		if ev.Value == "" && i < len(origs) && origs[i] != "" {
+			ev.Masked, ev.Orig = true, origs[i]
+		}
+		list = append(list, ev)
+	}
+	return list
+}
+
 func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {
 	existing, _ := svc.ListSecrets(appID)
 	existingMap := make(map[string]AppSecret)
@@ -1301,6 +1314,7 @@ func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {
 	keys := r.Form["env_key"]
 	vals := r.Form["env_val"]
 	types := r.Form["env_type"]
+	origs := r.Form["env_orig"]
 	submitted := make(map[string]bool)
 
 	for i, k := range keys {
@@ -1311,6 +1325,11 @@ func saveFormEnvVars(r *http.Request, svc *Service, appID int64) {
 		submitted[k] = true
 		v := vals[i]
 		isSecret := i < len(types) && types[i] == "secret"
+		if v == "" && i < len(origs) && origs[i] != "" {
+			if ev, ok := existingMap[origs[i]]; ok && ev.IsSecret {
+				v = ev.Value // masked row left unchanged (maybe renamed or made plain)
+			}
+		}
 
 		if isSecret && v == "" {
 			continue
