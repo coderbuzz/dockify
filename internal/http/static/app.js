@@ -73,6 +73,12 @@ document.addEventListener('click', function (e) {
   else fallback();
 });
 
+// Inline page scripts that need a deferred asset (charts.js, console.js): on a full load they run before it, so wait for DCL.
+function dockifyReady(fn) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
+  else fn();
+}
+
 // xterm is only needed for the SSH console: load it on first use.
 var xtermLoading = null;
 function loadXterm(cb) {

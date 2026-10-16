@@ -4,6 +4,7 @@ function dockifyConsole(cfg) {
   function el(id) { return document.getElementById(id); }
   function setStatus(text, cls) {
     var s = el(cfg.status);
+    if (!s) return; // socket closed after the page was swapped out
     s.textContent = text;
     s.className = 'badge ' + cls;
   }
@@ -47,6 +48,7 @@ function dockifyConsole(cfg) {
       if (box.hidden) {
         box.hidden = false;
         if (cfg.openLabel) btn.textContent = cfg.openLabel;
+        (window.dockifyCleanups = window.dockifyCleanups || []).push(closeConsoles);
         loadXterm(connect);
       } else {
         box.hidden = true;
@@ -113,7 +115,8 @@ function toggleAppConsole() {
   appConsole.toggle();
 }
 // A boosted navigation replaces #main; close any open console so its socket does not leak.
-(window.dockifyCleanups = window.dockifyCleanups || []).push(function () {
+// Registered on open: the cleanup list is emptied on every swap.
+function closeConsoles() {
   if (serverConsole) { serverConsole.disconnect(); serverConsole = null; }
   if (appConsole) { appConsole.disconnect(); appConsole = null; }
-});
+}
