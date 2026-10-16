@@ -1,88 +1,30 @@
-// Generator preview 3 opsi warna Dockify (S0). Hasil: preview-warna.html (statis, tanpa JS, font data URI) + kontras.md.
+// Generator preview 3 palet Dockify (nilai token dari docs/DESIGN-SYSTEM.md §3). Hasil: preview-warna.html (statis, tanpa JS, font data URI) + kontras.md.
 // Jalankan: node gen.mjs   (butuh akses ke fonts.googleapis.com untuk menanam font)
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
-// ---------- Token lapis 2 per opsi (nama persis standar §3) ----------
+// ---------- Token lapis 2 per opsi: dibaca dari docs/DESIGN-SYSTEM.md §3 (sumber tunggal nilai final) ----------
+const DS = readFileSync(new URL("../DESIGN-SYSTEM.md", import.meta.url), "utf8");
+function palet(slug) {
+	const sec = DS.split(/^### /m).find((x) => x.startsWith(`3.`) && x.includes("`" + slug + "`"));
+	if (!sec) throw new Error(`palet ${slug} tidak ada di DESIGN-SYSTEM.md §3`);
+	const light = {}, dark = {};
+	for (const m of sec.matchAll(/^\| ([a-z0-9-]+) \| `([^`]+)` \| `([^`]+)` \|$/gm)) [light[m[1]], dark[m[1]]] = [m[2], m[3]];
+	return { light, dark };
+}
 const OPSI = [
-	{
-		id: "1",
-		nama: "1 · Indigo Dockify",
-		catatan: "Brand Dockify sekarang (indigo) dirapikan: netral slate, indigo untuk aksi utama, teal untuk Deploy App. Paling akrab bagi pengguna lama.",
-		light: {
-			bg: "#f5f7fb", surface: "#ffffff", sunk: "#f1f4f9", line: "#e2e8f0", "line-strong": "#cbd5e1", control: "#7a8699",
-			ink: "#0f172a", ink2: "#334155", muted: "#5b677a",
-			accent: "#4f46e5", "accent-fill": "#4f46e5", "on-accent": "#ffffff", "accent-soft": "#eef0ff",
-			"brand2-fill": "#14b8a6", "on-brand2": "#042f2e", brand2: "#0f766e", "brand2-soft": "#dcf5f1",
-			chart: "#6366f1", "chart-soft": "#e3e5fc"
-		},
-		dark: {
-			bg: "#0b1020", surface: "#151b2e", sunk: "#0f1426", line: "#262e48", "line-strong": "#36405f", control: "#6e7a9c",
-			ink: "#e8ebf5", ink2: "#c0c7dc", muted: "#929bb8",
-			accent: "#a5b4fc", "accent-fill": "#5850ec", "on-accent": "#ffffff", "accent-soft": "#252a55",
-			"brand2-fill": "#2dd4bf", "on-brand2": "#042f2e", brand2: "#5eead4", "brand2-soft": "#103633",
-			chart: "#818cf8", "chart-soft": "#252a55"
-		}
-	},
-	{
-		id: "2",
-		nama: "2 · Navy Brosur",
-		catatan: "Palet contoh standar (hadir): navy tua untuk aksi, oranye untuk Deploy App, teal untuk grafik CPU/RAM/Disk. Paling hangat dan berkarakter.",
-		light: {
-			bg: "#eef1f8", surface: "#ffffff", sunk: "#f5f7fc", line: "#e1e5f0", "line-strong": "#c8cede", control: "#7c83ad",
-			ink: "#141a33", ink2: "#3d4566", muted: "#656d8c",
-			accent: "#2b3486", "accent-fill": "#2b3486", "on-accent": "#ffffff", "accent-soft": "#e7e9f8",
-			"brand2-fill": "#f26a21", "on-brand2": "#1b1f3b", brand2: "#c2410c", "brand2-soft": "#fdeee4",
-			chart: "#178a8c", "chart-soft": "#dff3f3"
-		},
-		dark: {
-			bg: "#0c0f1e", surface: "#161a2f", sunk: "#11142a", line: "#272c48", "line-strong": "#363c5e", control: "#6b7399",
-			ink: "#e9ebf7", ink2: "#bfc4de", muted: "#8f95b4",
-			accent: "#a9b2ff", "accent-fill": "#4a54c9", "on-accent": "#ffffff", "accent-soft": "#242a5c",
-			"brand2-fill": "#f26a21", "on-brand2": "#1b1f3b", brand2: "#ff9a5c", "brand2-soft": "#3a2418",
-			chart: "#4fd1d3", "chart-soft": "#143339"
-		}
-	},
-	{
-		id: "3",
-		nama: "3 · Slate Teal Ops",
-		catatan: "Netral abu-biru dingin, teal gelap untuk aksi, amber untuk Deploy App. Kesan layar monitoring: tenang, status dan angka paling menonjol.",
-		light: {
-			bg: "#f0f3f5", surface: "#ffffff", sunk: "#f3f6f8", line: "#dde3e8", "line-strong": "#c5cfd7", control: "#74828f",
-			ink: "#0f1a22", ink2: "#34434f", muted: "#5b6975",
-			accent: "#0e6e78", "accent-fill": "#0e6e78", "on-accent": "#ffffff", "accent-soft": "#e0f1f2",
-			"brand2-fill": "#f5a524", "on-brand2": "#1a1305", brand2: "#a35a00", "brand2-soft": "#fdf0d9",
-			chart: "#0891b2", "chart-soft": "#dcf0f6"
-		},
-		dark: {
-			bg: "#0a1116", surface: "#131c23", sunk: "#0e161c", line: "#22303a", "line-strong": "#314350", control: "#687b89",
-			ink: "#e6eef2", ink2: "#b9c8d1", muted: "#8a9ba7",
-			accent: "#5fd4dd", "accent-fill": "#0e6e78", "on-accent": "#ffffff", "accent-soft": "#103338",
-			"brand2-fill": "#f5a524", "on-brand2": "#1a1305", brand2: "#f8b95a", "brand2-soft": "#33270f",
-			chart: "#38bdf8", "chart-soft": "#0f2c3a"
-		}
-	}
+	{ id: "1", nama: "1 · Indigo Dockify (default)", catatan: "Netral slate, indigo untuk semua aksi utama (termasuk Deploy App), violet untuk seri grafik kedua.", ...palet("indigo") },
+	{ id: "2", nama: "2 · Navy Brosur", catatan: "Navy tua untuk aksi, biru untuk seri grafik kedua, grafik indigo-navy. Paling formal.", ...palet("navy") },
+	{ id: "3", nama: "3 · Slate Teal Ops", catatan: "Netral abu-biru dingin, teal gelap untuk aksi, biru langit untuk seri kedua. Kesan layar monitoring.", ...palet("teal") }
 ];
-
-// Token status sama di semua opsi (kontras tetap dihitung per opsi karena surface berbeda).
-const SEM = {
-	light: {
-		ok: "#15803d", "ok-text": "#166534", "ok-bg": "#dcfce7",
-		warn: "#b45309", "warn-text": "#92400e", "warn-bg": "#fef3c7",
-		danger: "#c81e1e", "danger-text": "#991b1b", "danger-bg": "#fee2e2", "danger-fill": "#c81e1e",
-		shadow: "0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05)"
-	},
-	dark: {
-		ok: "#4ade80", "ok-text": "#86efac", "ok-bg": "#10301e",
-		warn: "#fbbf24", "warn-text": "#fcd34d", "warn-bg": "#33270a",
-		danger: "#f87171", "danger-text": "#fca5a5", "danger-bg": "#3b1618", "danger-fill": "#c81e1e",
-		shadow: "0 1px 2px rgba(0,0,0,.45)"
-	}
-};
 
 const ORDER = ["bg", "surface", "sunk", "line", "line-strong", "control", "ink", "ink2", "muted", "accent", "accent-fill", "on-accent", "accent-soft",
 	"brand2-fill", "on-brand2", "brand2", "brand2-soft", "chart", "chart-soft", "ok", "ok-text", "ok-bg", "warn", "warn-text", "warn-bg",
 	"danger", "danger-text", "danger-bg", "danger-fill", "shadow"];
-const tok = (o, mode) => ({ ...o[mode], ...SEM[mode] });
+const tok = (o, mode) => o[mode];
+for (const o of OPSI) for (const mode of ["light", "dark"]) {
+	const miss = ORDER.filter((k) => !o[mode][k]);
+	if (miss.length) throw new Error(`opsi ${o.id} ${mode}: token hilang ${miss.join(", ")}`);
+}
 
 // ---------- Kontras WCAG ----------
 const lum = (hex) => {
@@ -194,7 +136,7 @@ const dashboard = (dark) => `${header(dark)}
 
 const apps = (dark) => `${header(dark)}
 <main class="body">
-  <div class="titlerow"><h1>Apps</h1><span class="btn btn-brand">${ic("plus")}Deploy App</span></div>
+  <div class="titlerow"><h1>Apps</h1><span class="btn btn-primary">${ic("plus")}Deploy App</span></div>
   <label class="input">${ic("search")}<span>Filter by name or domain</span></label>
   <div class="chips"><span class="chip on" aria-pressed="true">All</span><i class="vsep"></i><span class="chip">running</span><span class="chip">stopped</span><span class="chip">draft</span></div>
   <p class="meta">3 apps on 2 servers</p>
@@ -316,7 +258,6 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
 .btn{height:44px;border-radius:12px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;white-space:nowrap}
 .btn .icon{width:17px;height:17px}
 .btn-primary{background:var(--accent-fill);color:var(--on-accent);box-shadow:var(--shadow)}
-.btn-brand{background:var(--brand2-fill);color:var(--on-brand2)}
 .btn-secondary{background:var(--surface);color:var(--ink);border:1px solid var(--control)}
 .btn-ghost{color:var(--ink2)}
 .btn-dout{color:var(--danger);border:1.5px solid var(--danger);padding:0 8px;background:transparent}
@@ -388,9 +329,9 @@ const desktop = (o) => `<section class="opt"><h2>Pola ResponsiveSheet di desktop
 </div></div></section>`;
 
 const html = (fonts) => `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dockify · 3 opsi warna</title>
+<title>Dockify · 3 palet</title>
 <style>${fonts}${CSS}</style></head><body><div class="page">
-<h1>Dockify: pilih 1, 2, atau 3</h1>
+<h1>Dockify: tiga palet (Settings → Appearance)</h1>
 <p class="lead">Semua kontras sudah dihitung (WCAG, terang dan gelap): teks ≥4.5:1, batas kontrol ≥3:1, <b>semua pasangan lolos</b> (${OPSI.map((o) => `opsi ${o.id}: ${lolos(o.id)}`).join(", ")}).</p>
 <p class="lead">Struktur sama di ketiga opsi; yang berbeda hanya warna. Tiap layar: HP 360px, terang dan gelap berdampingan. Isi dari data mock Dockify (prod-heavy-1, staging-1, web-shop, api-core, worker-mail). Aksi berbahaya merah garis di zona bahaya, isian merah hanya di konfirmasi (K9). Label UI tetap bahasa Inggris.</p>
 ${OPSI.map((o) => `<section class="opt"><h2>${o.nama}</h2><p>${o.catatan}</p>
