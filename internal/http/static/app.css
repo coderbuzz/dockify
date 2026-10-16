@@ -902,3 +902,34 @@ hgroup .page-actions { margin-top: 4px; }
 /* Lencana di tabel/daftar lebih kecil dari lencana judul (umpan balik produksi 2026-10-15) */
 /* Konstruksi sama dengan lencana judul (line-height 1 + padding): di Android line-height tinggi membuat teks naik */
 .rows .badge, .group-head .badge { font-size: 8px; font-weight: 700; line-height: 1; padding: 4.5px 5px 3.5px; letter-spacing: 0.02em; } /* +0,5px: diukur dari foto HP, teks kapital mono duduk 0,25-0,6px terlalu tinggi di Android */
+
+/* Desktop density (>= 700px), sizes follow Coolify: controls 32px, buttons 13px, body 14px, cards p-4.
+   Phones keep 40px controls / 16px inputs (touch target, iOS zoom). DESIGN-SYSTEM §4. */
+@media (min-width: 700px) {
+  body { font-size: 14px; }
+  .btn { min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: 13px; }
+  .btn-sm { min-height: 28px; padding: 0 8px; font-size: 12px; }
+  .btn-lg { min-height: 36px; padding: 0 14px; }
+  .btn-link, .btn-link:hover { min-height: 0; padding: 0; }
+  .btn-icon { width: 32px; padding: 0; }
+  .btn-icon-sm { width: 28px; min-height: 28px; padding: 0; }
+  .actgrid .btn .icon { width: 15px; height: 15px; }
+  input, select, textarea { min-height: 32px; padding: 0 10px; border-radius: 8px; }
+  textarea { min-height: 72px; padding: 6px 10px; }
+  .row-env textarea { min-height: 32px; }
+  .search input { padding-left: 36px; }
+  .search .icon { left: 10px; width: 16px; height: 16px; }
+  .select-wrap select { padding-right: 34px; }
+  .select-wrap .icon { right: 10px; width: 16px; height: 16px; }
+  .field, label, .check { font-size: 14px; }
+  .seg-btn, .seg-radio span { min-height: 26px; font-size: 12px; }
+  .chip { min-height: 28px; }
+  .card { padding: 16px; }
+  .row-domain { grid-template-columns: minmax(0, 1fr) 32px; }
+  .row-env { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 28px 28px; }
+  .row-file { grid-template-columns: minmax(0, 1fr) auto 28px; }
+}
+@media (min-width: 900px) {
+  .main-nav { height: 36px; }
+  .main-nav a { font-size: 13px; }
+}
