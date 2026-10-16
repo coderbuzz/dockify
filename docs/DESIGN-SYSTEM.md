@@ -137,7 +137,7 @@ Lencana: 10 sampai 11px, 800, huruf kapital, radius 6, font mono untuk nilai tek
 ## 4. Tipografi, spasi, radius
 Body 15px/1.5. KPI 24px/800 tracking -0.02em. Angka sekunder 20px/800. Judul kartu 15px/700. Label 12.8px. Meta/chip 11 sampai 12px (chip 600).
 Label tab bawah 11px. Input/select **16px**. Skala spasi 4px: padding halaman 14 sampai 16px, antar kartu 12px, antar kontrol 8px.
-Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Skala kontrol (dikecilkan dari 44/48, mengikuti hadir S16): input/select/tombol default **40px**, `sm` 34px, `lg` 44px (satu aksi utama penuh-lebar), ikon 40px (`btn-icon`) dan 36px (`btn-icon-sm`), nav desktop 40px, segmen HP 38px. Teks input 16px di HP (iOS zoom), 14px di ≥700px. Chip 32px dengan jarak ≥6px.
+Radius: kartu 16, kontrol/tombol 12, lencana 6, chip/pill penuh. Skala kontrol (dikecilkan dari 44/48, mengikuti hadir S16): input/select/tombol default **40px**, `sm` 34px, `lg` 44px (satu aksi utama penuh-lebar), ikon 40px (`btn-icon`) dan 36px (`btn-icon-sm`), nav desktop 40px, segmen HP 38px. Teks input 16px di HP (iOS zoom), 14px di ≥700px. **Desktop ≥700px (kerapatan mengikuti Coolify)**: input/select/tombol 32px, teks tombol 13px, `sm` 28px, `lg` 36px, ikon 32/28px, segmen 26px, chip 28px, padding kartu 16px, nav 36px, body 14px. HP tetap 40px/16px. Chip 32px dengan jarak ≥6px.
 
 ## 5. Komponen (partial bersama, varian di partial bukan di pemakaian)
 | Kebutuhan | Partial / kelas | Catatan |
