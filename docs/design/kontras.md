@@ -6,7 +6,7 @@ Ringkasan: opsi 1 38/38 lolos · opsi 2 38/38 lolos · opsi 3 38/38 lolos (12 pa
 
 Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing/deploying = warn (`warn-bg` + `warn-text`); stopped/draft = netral (`sunk` + `ink2`, garis `line`); error/failed/offline = danger (`danger-bg` + `danger-text`).
 
-## Opsi 1 · Indigo Dockify
+## Opsi 1 · Indigo Dockify (default)
 
 | Pasangan | Min | Terang | Gelap | Catatan |
 | :--- | ---: | ---: | ---: | :--- |
@@ -21,13 +21,13 @@ Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing
 | danger-text / danger-bg | 4.5 | 6.80 | 8.42 |  |
 | ok-text / ok-bg | 4.5 | 6.49 | 10.22 |  |
 | warn-text / warn-bg | 4.5 | 6.37 | 10.15 |  |
-| on-brand2 / brand2-fill | 4.5 | 5.81 | 7.77 |  |
+| on-brand2 / brand2-fill | 4.5 | 7.10 | 7.10 |  |
 | muted / bg | 4.5 | 5.34 | 6.85 | meta di latar halaman |
 | accent / accent-soft | 4.5 | 5.55 | 6.84 | chip aktif |
 | ink2 / sunk | 4.5 | 9.39 | 10.84 | lencana netral |
 | ok / surface | 4.5 | 5.02 | 9.81 | angka KPI Online/Running |
 | white / danger-fill | 4.5 | 5.74 | 5.74 | tombol Undeploy di konfirmasi |
-| brand2 / surface | 4.5 | 5.47 | 11.56 | angka sekunder |
+| brand2 / surface | 4.5 | 7.10 | 9.26 | angka sekunder |
 | chart / chart-soft | 3 | 3.59 | 4.57 | bar CPU/RAM/Disk (grafis) |
 
 | Token | Terang | Gelap |
@@ -78,13 +78,13 @@ Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing
 | danger-text / danger-bg | 4.5 | 6.80 | 8.42 |  |
 | ok-text / ok-bg | 4.5 | 6.49 | 10.22 |  |
 | warn-text / warn-bg | 4.5 | 6.37 | 10.15 |  |
-| on-brand2 / brand2-fill | 4.5 | 5.25 | 5.25 |  |
+| on-brand2 / brand2-fill | 4.5 | 8.72 | 8.72 |  |
 | muted / bg | 4.5 | 4.51 | 6.46 | meta di latar halaman |
 | accent / accent-soft | 4.5 | 8.98 | 6.73 | chip aktif |
 | ink2 / sunk | 4.5 | 8.74 | 10.51 | lencana netral |
 | ok / surface | 4.5 | 5.02 | 9.85 | angka KPI Online/Running |
 | white / danger-fill | 4.5 | 5.74 | 5.74 | tombol Undeploy di konfirmasi |
-| brand2 / surface | 4.5 | 5.18 | 8.20 | angka sekunder |
+| brand2 / surface | 4.5 | 8.72 | 9.52 | angka sekunder |
 | chart / chart-soft | 3 | 4.96 | 5.08 | bar CPU/RAM/Disk (grafis) |
 
 | Token | Terang | Gelap |
@@ -135,13 +135,13 @@ Lencana Dockify: running/online = ok (`ok-bg` + `ok-text`); pending/initializing
 | danger-text / danger-bg | 4.5 | 6.80 | 8.42 |  |
 | ok-text / ok-bg | 4.5 | 6.49 | 10.22 |  |
 | warn-text / warn-bg | 4.5 | 6.37 | 10.15 |  |
-| on-brand2 / brand2-fill | 4.5 | 9.03 | 9.03 |  |
+| on-brand2 / brand2-fill | 4.5 | 7.56 | 7.56 |  |
 | muted / bg | 4.5 | 5.06 | 6.63 | meta di latar halaman |
 | accent / accent-soft | 4.5 | 5.12 | 7.70 | chip aktif |
 | ink2 / sunk | 4.5 | 9.38 | 10.65 | lencana netral |
 | ok / surface | 4.5 | 5.02 | 9.89 | angka KPI Online/Running |
 | white / danger-fill | 4.5 | 5.74 | 5.74 | tombol Undeploy di konfirmasi |
-| brand2 / surface | 4.5 | 5.22 | 9.92 | angka sekunder |
+| brand2 / surface | 4.5 | 7.56 | 10.34 | angka sekunder |
 | chart / chart-soft | 3 | 3.13 | 6.80 | bar CPU/RAM/Disk (grafis) |
 
 | Token | Terang | Gelap |
