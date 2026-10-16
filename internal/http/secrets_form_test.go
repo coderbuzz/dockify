@@ -101,6 +101,15 @@ func TestSecretsNotInFormHTML(t *testing.T) {
 		t.Errorf("secrets after edit: %+v", m)
 	}
 
+	dup := url.Values{}
+	for k, v := range form {
+		dup[k] = v
+	}
+	dup["env_key"] = []string{"PLAIN", "TOKEN", "PLAIN"}
+	if rec := do(http.MethodPost, editPath, dup); rec.Code != http.StatusBadRequest {
+		t.Errorf("duplicate env key: %d, want 400", rec.Code)
+	}
+
 	form.Set("auth_pass", "new-pass")
 	do(http.MethodPost, editPath, form)
 	if got, _ = appSvc.Get(a.ID); got.AuthPass != "new-pass" {
