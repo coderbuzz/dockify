@@ -23,6 +23,7 @@ func NewRouter(svc *server.Service, appSvc *app.Service, render RenderFunc, serv
 
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(compress)
 	if trustProxy {
 		r.Use(chimw.RealIP) // X-Forwarded-For/X-Real-IP from anyone otherwise
 	}
