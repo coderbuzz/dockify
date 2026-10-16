@@ -900,4 +900,4 @@ hgroup .page-actions { margin-top: 4px; }
 
 /* Lencana di tabel/daftar lebih kecil dari lencana judul (umpan balik produksi 2026-10-15) */
 /* Konstruksi sama dengan lencana judul (line-height 1 + padding): di Android line-height tinggi membuat teks naik */
-.rows .badge, .group-head .badge { font-size: 8px; font-weight: 700; line-height: 1; padding: 4px 5px; letter-spacing: 0.02em; }
+.rows .badge, .group-head .badge { font-size: 8px; font-weight: 700; line-height: 1; padding: 4.5px 5px 3.5px; letter-spacing: 0.02em; } /* +0,5px: diukur dari foto HP, teks kapital mono duduk 0,25-0,6px terlalu tinggi di Android */
