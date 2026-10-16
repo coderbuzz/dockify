@@ -52,11 +52,17 @@ func validateForm(r *http.Request, domains []string) error {
 			return err
 		}
 	}
+	seen := map[string]bool{}
 	for _, k := range r.Form["env_key"] {
 		if k = strings.TrimSpace(k); k != "" {
 			if err := ValidEnvKey(k); err != nil {
 				return err
 			}
+			// Two rows with one key would overwrite each other (and a masked secret silently).
+			if seen[k] {
+				return fmt.Errorf("environment variable %s is listed twice", k)
+			}
+			seen[k] = true
 		}
 	}
 	for _, p := range r.Form["file_path"] {

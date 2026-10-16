@@ -167,7 +167,7 @@
       <p class="card-sub">Optional. Protects the app with a username and password.</p>
       <div class="grid">
         <label class="field"><span class="field-label">Username</span><input type="text" name="auth_user" placeholder="admin" autocomplete="off" value="{{if .App}}{{.App.AuthUser}}{{end}}"></label>
-        <label class="field"><span class="field-label">Password</span><input type="password" name="auth_pass" placeholder="password" autocomplete="new-password" value="{{if .App}}{{.App.AuthPass}}{{end}}"></label>
+        <label class="field"><span class="field-label">Password</span><input type="password" name="auth_pass" placeholder="{{if and .IsEdit .App.AuthPass}}unchanged{{else}}password{{end}}" autocomplete="new-password" value="{{if and .App (not .IsEdit)}}{{.App.AuthPass}}{{end}}">{{if .IsEdit}}<small class="field-hint">Leave empty to keep the current password. Clear Username to remove basic auth.</small>{{end}}</label>
       </div>
     </div>
 
@@ -238,7 +238,8 @@ var initialEnvVars = {{.SecretsJSON}};
 if (Array.isArray(initialEnvVars)) {
   initialEnvVars.forEach(function(ev) {
     var isSecret = ev.isSecret || false;
-    pendingEnvVars.push({key: ev.key || '', value: ev.value || '', isSecret: isSecret});
+    // masked: a stored secret sent without its value; the server keeps it unless the value is changed.
+    pendingEnvVars.push({key: ev.key || '', value: ev.value || '', isSecret: isSecret, masked: !!ev.masked, orig: ev.orig || ''});
   });
 }
 {{end}}
@@ -279,7 +280,7 @@ function renderEnvVars() {
     div.className = 'env-row row-grid row-env';
     var typeLabel = ev.isSecret ? 'Secret' : 'Plain';
     div.innerHTML = '<input type="text" class="env-key-input mono" value="' + escapeAttr(ev.key) + '" placeholder="KEY" autocomplete="off" aria-label="Variable name" onchange="updateEnvKey(' + i + ', this.value)">'
-      + '<textarea class="env-val-input mono" rows="1" placeholder="value" aria-label="Variable value" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
+      + '<textarea class="env-val-input mono" rows="1" placeholder="' + (ev.masked ? 'unchanged' : 'value') + '" aria-label="Variable value" onchange="updateEnvVal(' + i + ', this.value)">' + escapeHtml(ev.value) + '</textarea>'
       + '<button type="button" class="btn btn-ghost btn-icon-sm" onclick="toggleEnvType(' + i + ')" title="' + typeLabel + '" aria-label="Toggle secret" aria-pressed="' + (ev.isSecret ? 'true' : 'false') + '">' + (ev.isSecret ? ICON_EYE_OFF : ICON_EYE) + '</button>'
       + '<button type="button" class="btn btn-ghost btn-icon-sm" aria-label="Remove variable" onclick="removeEnvVar(' + i + ')">' + ICON_TRASH + '</button>';
     list.appendChild(div);
@@ -294,6 +295,7 @@ function updateEnvKey(index, val) {
 
 function updateEnvVal(index, val) {
   pendingEnvVars[index].value = val;
+  pendingEnvVars[index].masked = false;
   syncEnvHiddenFields();
 }
 
@@ -313,9 +315,14 @@ function syncEnvHiddenFields() {
     t.type = 'hidden';
     t.name = 'env_type';
     t.value = ev.isSecret ? 'secret' : 'plain';
+    var o = document.createElement('input');
+    o.type = 'hidden';
+    o.name = 'env_orig';
+    o.value = ev.masked ? ev.orig : '';
     container.appendChild(k);
     container.appendChild(v);
     container.appendChild(t);
+    container.appendChild(o);
   });
 }
 
@@ -348,10 +355,20 @@ function importEnvFromModal() {
 }
 
 function openExportModal() {
+  var appId = '{{if .IsEdit}}{{.App.ID}}{{end}}';
+  if (!appId || !pendingEnvVars.some(function(ev){ return ev.masked; })) return showExport({});
+  // Masked secrets are fetched only when the user asks for them.
+  fetch('api/apps/' + appId + '/secrets')
+    .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(list){ var m = {}; (list || []).forEach(function(s){ m[s.key] = s.value; }); showExport(m); })
+    .catch(function(){ showToast('Could not load secret values', true); });
+}
+
+function showExport(stored) {
   var lines = [];
   pendingEnvVars.forEach(function(ev) {
     if (ev.key) {
-      lines.push(ev.key + '=' + ev.value);
+      lines.push(ev.key + '=' + (ev.masked ? (stored[ev.orig] || '') : ev.value));
     }
   });
   if (lines.length === 0) {
