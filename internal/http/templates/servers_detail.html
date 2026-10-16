@@ -189,7 +189,7 @@
 
   {{if eq .Server.Status "online"}}
   <script>
-  var serverCharts = initLiveCharts({
+  dockifyReady(function () { initLiveCharts({
     wsUrl: 'api/servers/{{.Server.ID}}/stats/live',
     metrics: ['cpu', 'ram', 'disk'],
     gauges: [
@@ -227,7 +227,7 @@
         }
       }
     }
-  });
+  }); });
   </script>
   {{end}}
 </div>

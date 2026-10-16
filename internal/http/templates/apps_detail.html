@@ -91,7 +91,7 @@
     </div>
   </div>
   <script>
-  var appCharts = initLiveCharts({
+  dockifyReady(function () { initLiveCharts({
     wsUrl: 'api/apps/{{.App.ID}}/stats/live',
     metrics: ['cpu', 'memory', 'network', 'disk'],
     gauges: [
@@ -115,7 +115,7 @@
         var e2=document.getElementById('disk-chart-val'); if(e2) e2.textContent=formatBytes(d.disk_usage_bytes);
       }
     }
-  });
+  }); });
   </script>
   {{end}}
 
