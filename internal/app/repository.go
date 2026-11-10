@@ -69,8 +69,21 @@ func (r *Repository) Get(id int64) (*App, error) {
 	return &a, nil
 }
 
+// FindAllByGitRepo returns non-draft apps on branch whose git_repo points at
+// the same repository as repo, compared with normalizeGitRepo.
 func (r *Repository) FindAllByGitRepo(repo, branch string) ([]App, error) {
-	return r.queryApps("WHERE git_repo = ? AND git_branch = ? AND status != 'draft' ORDER BY id", repo, branch)
+	candidates, err := r.queryApps("WHERE git_repo IS NOT NULL AND git_repo != '' AND git_branch = ? AND status != 'draft' ORDER BY id", branch)
+	if err != nil {
+		return nil, err
+	}
+	want := normalizeGitRepo(repo)
+	var apps []App
+	for _, a := range candidates {
+		if normalizeGitRepo(a.GitRepo) == want {
+			apps = append(apps, a)
+		}
+	}
+	return apps, nil
 }
 
 func (r *Repository) ListByServer(serverID int64) ([]App, error) {

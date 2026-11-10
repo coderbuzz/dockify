@@ -198,7 +198,7 @@ func (s *Service) DeployByGit(repo, branch, commitSHA string) {
 		return
 	}
 	for _, app := range apps {
-		if app.Status != StatusRunning {
+		if !webhookDeployable(app.Status) {
 			log.Printf("Webhook: app %q is %s, skipping deploy", app.Name, app.Status)
 			continue
 		}
