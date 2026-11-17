@@ -3,6 +3,8 @@ package caddy
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -68,21 +70,29 @@ func (c *Client) AddRoute(domain, target string) error {
 			Upstreams: []upstream{{Dial: target}},
 		}},
 	}
-	return c.postRoute(route)
+	return c.postRoute(route, c.currentRoute(route.ID))
 }
 
 func (c *Client) AddRouteWithAuth(domain, target, user, pass string) error {
-	route, err := authRoute(domain, target, user, pass)
+	current := c.currentRoute(sanitizeID(domain))
+	route, err := authRoute(domain, target, user, pass, current)
 	if err != nil {
 		return err
 	}
-	return c.postRoute(route)
+	return c.postRoute(route, current)
 }
 
-func authRoute(domain, target, user, pass string) (Route, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(pass), 14)
-	if err != nil {
-		return Route{}, fmt.Errorf("bcrypt hash: %w", err)
+// authRoute keeps the bcrypt hash from current (the route Caddy already holds)
+// when it still matches user and pass: a fresh hash has a new salt, so the route
+// would never compare equal and every deploy would reload Caddy.
+func authRoute(domain, target, user, pass string, current []byte) (Route, error) {
+	hash := reusableHash(current, user, pass)
+	if hash == "" {
+		h, err := bcrypt.GenerateFromPassword([]byte(pass), 14)
+		if err != nil {
+			return Route{}, fmt.Errorf("bcrypt hash: %w", err)
+		}
+		hash = string(h)
 	}
 	return Route{
 		ID:    sanitizeID(domain),
@@ -92,7 +102,7 @@ func authRoute(domain, target, user, pass string) (Route, error) {
 				Handler: "authentication",
 				Providers: &providers{HTTPBasic: httpBasic{
 					Hash:     hashConfig{Algorithm: "bcrypt"},
-					Accounts: []account{{Username: user, Password: string(hash)}},
+					Accounts: []account{{Username: user, Password: hash}},
 				}},
 			},
 			{
@@ -103,7 +113,56 @@ func authRoute(domain, target, user, pass string) (Route, error) {
 	}, nil
 }
 
-func (c *Client) postRoute(route Route) error {
+func reusableHash(current []byte, user, pass string) string {
+	var r Route
+	if json.Unmarshal(current, &r) != nil {
+		return ""
+	}
+	for _, h := range r.Handle {
+		if h.Providers == nil {
+			continue
+		}
+		for _, a := range h.Providers.HTTPBasic.Accounts {
+			if a.Username == user && bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(pass)) == nil {
+				return a.Password
+			}
+		}
+	}
+	return ""
+}
+
+// currentRoute returns the JSON Caddy holds for route id, or nil if it has none.
+func (c *Client) currentRoute(id string) []byte {
+	out, err := c.ssh.Exec(fmt.Sprintf(`docker exec caddy curl -sf http://localhost:2019/id/%s`, id))
+	if err != nil {
+		return nil
+	}
+	return []byte(out)
+}
+
+// sameRoute compares as decoded JSON: Caddy echoes the route back with its keys
+// sorted, so the bytes differ even when nothing changed.
+func sameRoute(current []byte, route Route) bool {
+	want, err := json.Marshal(route)
+	if err != nil {
+		return false
+	}
+	var a, b any
+	if json.Unmarshal(current, &a) != nil || json.Unmarshal(want, &b) != nil {
+		return false
+	}
+	return reflect.DeepEqual(a, b)
+}
+
+// postRoute replaces the route unless current already equals it. Every admin API
+// write reloads Caddy, which closes all proxied websockets (code 1001) on the
+// server, so a deploy that does not change the route must not write at all.
+func (c *Client) postRoute(route Route, current []byte) error {
+	if current != nil && sameRoute(current, route) {
+		log.Printf("Caddy route unchanged: %s", route.Match[0].Host[0])
+		return nil
+	}
+
 	// Remove old route with same ID (if any, ignore error)
 	c.ssh.Exec(fmt.Sprintf(
 		`docker exec caddy curl -s -o /dev/null -X DELETE http://localhost:2019/id/%s`,

@@ -2,16 +2,18 @@ package caddy
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/coderbuzz/dockify/internal/ssh"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // TestAuthRouteJSON checks the route against Caddy's module ids:
 // http.handlers.authentication with provider http.authentication.providers.http_basic.
 func TestAuthRouteJSON(t *testing.T) {
-	route, err := authRoute("app.example.com", "app-1-web:80", "admin", "secret")
+	route, err := authRoute("app.example.com", "app-1-web:80", "admin", "secret", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,6 +82,62 @@ func TestConfigPath(t *testing.T) {
 	} {
 		if got, err := configPath(bad); err == nil {
 			t.Errorf("configPath(%s) = %q, want error", bad, got)
+		}
+	}
+}
+
+// fakeCaddy answers the GET of /id/<route> with current (404 when empty) and
+// records every admin API write.
+type fakeCaddy struct {
+	ssh.Connector
+	current string
+	writes  []string
+}
+
+func (f *fakeCaddy) Exec(cmd string) (string, error) {
+	if strings.Contains(cmd, "curl -sf http://localhost:2019/id/") {
+		if f.current == "" {
+			return "", errors.New("exit status 22")
+		}
+		return f.current, nil
+	}
+	if strings.Contains(cmd, " -X ") {
+		f.writes = append(f.writes, cmd)
+	}
+	return "200\n", nil
+}
+
+// TestPostRouteSkipsUnchanged: every admin API write reloads Caddy and closes all
+// websockets on the server with 1001, so an unchanged route must not be written.
+// current is shaped like Caddy's GET /id/ output (keys sorted).
+func TestPostRouteSkipsUnchanged(t *testing.T) {
+	plain := `{"@id":"dockify-a-example-com","handle":[{"handler":"reverse_proxy","upstreams":[{"dial":"web:80"}]}],"match":[{"host":["a.example.com"]}]}` + "\n"
+	h, _ := bcrypt.GenerateFromPassword([]byte("p"), bcrypt.MinCost)
+	auth := `{"@id":"dockify-a-example-com","handle":[{"handler":"authentication","providers":{"http_basic":{"accounts":[{"password":"` + string(h) + `","username":"u"}],"hash":{"algorithm":"bcrypt"},"hash_cache":{}}}},{"handler":"reverse_proxy","upstreams":[{"dial":"web:80"}]}],"match":[{"host":["a.example.com"]}]}`
+
+	cases := []struct {
+		name, current string
+		add           func(*Client) error
+		wantWrites    bool
+	}{
+		{"unchanged", plain, func(c *Client) error { return c.AddRoute("a.example.com", "web:80") }, false},
+		{"changed target", plain, func(c *Client) error { return c.AddRoute("a.example.com", "web:81") }, true},
+		{"missing", "", func(c *Client) error { return c.AddRoute("a.example.com", "web:80") }, true},
+		{"auth added", plain, func(c *Client) error { return c.AddRouteWithAuth("a.example.com", "web:80", "u", "p") }, true},
+		{"auth unchanged", auth, func(c *Client) error { return c.AddRouteWithAuth("a.example.com", "web:80", "u", "p") }, false},
+		{"auth new password", auth, func(c *Client) error { return c.AddRouteWithAuth("a.example.com", "web:80", "u", "p2") }, true},
+		{"auth removed", auth, func(c *Client) error { return c.AddRoute("a.example.com", "web:80") }, true},
+	}
+	for _, tc := range cases {
+		f := &fakeCaddy{current: tc.current}
+		if err := tc.add(NewClient(f)); err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if !tc.wantWrites && len(f.writes) > 0 {
+			t.Errorf("%s: wrote to Caddy: %q", tc.name, f.writes)
+		}
+		if tc.wantWrites && (len(f.writes) != 3 || !strings.Contains(f.writes[0], "-X DELETE") || !strings.Contains(f.writes[2], "-X POST")) {
+			t.Errorf("%s: want DELETE, POST [], POST route; got %q", tc.name, f.writes)
 		}
 	}
 }
